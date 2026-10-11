@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from ..errors import not_implemented, problem_responses
-from ..schemas.common import JournalId
+from ..schemas.common import NO_NUL, JournalId
 from ..schemas.search import SearchMode, SearchResults
 from .params import DateFrom, DateTo
 
@@ -17,7 +17,13 @@ router = APIRouter(tags=["search"])
 )
 async def search(
     q: Annotated[
-        str, Query(min_length=1, max_length=500, description="What to look for, in plain words.")
+        str,
+        Query(
+            min_length=1,
+            max_length=500,
+            pattern=NO_NUL,
+            description="What to look for, in plain words.",
+        ),
     ],
     mode: Annotated[SearchMode, Query(description="Which retrieval to use.")] = SearchMode.HYBRID,
     journal_id: Annotated[

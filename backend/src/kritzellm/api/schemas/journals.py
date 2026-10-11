@@ -2,9 +2,9 @@
 
 from enum import StrEnum
 
-from pydantic import Field
+from pydantic import MISSING, Field
 
-from .common import ApiModel, Cursor, InputModel, JournalId, Timestamp
+from .common import NO_NUL, ApiModel, InputModel, JournalId, Timestamp
 
 
 class Journal(ApiModel):
@@ -24,18 +24,18 @@ class Journal(ApiModel):
 class JournalCreate(InputModel):
     """A new journal."""
 
-    name: str = Field(min_length=1, max_length=120)
+    name: str = Field(min_length=1, max_length=120, pattern=NO_NUL)
     """Display name."""
-    description: str | None = Field(default=None, max_length=2000)
+    description: str | None = Field(default=None, max_length=2000, pattern=NO_NUL)
     """Optional notes about the journal."""
 
 
 class JournalUpdate(InputModel):
     """Changes to a journal. Only the given fields change."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=120)
+    name: str | MISSING = Field(default=MISSING, min_length=1, max_length=120, pattern=NO_NUL)
     """New display name."""
-    description: str | None = Field(default=None, max_length=2000)
+    description: str | None = Field(default=None, max_length=2000, pattern=NO_NUL)
     """New notes; `null` clears them."""
 
 
@@ -43,7 +43,8 @@ class JournalList(ApiModel):
     """A page of journals."""
 
     items: list[Journal]
-    next_cursor: Cursor
+    next_cursor: JournalId | None
+    """Pass as `cursor` to get the next page; `null` on the last page."""
 
 
 class ExportFormat(StrEnum):

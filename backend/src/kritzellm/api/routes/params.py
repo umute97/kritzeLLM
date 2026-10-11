@@ -16,14 +16,11 @@ ConversationIdPath = Annotated[
 JobIdPath = Annotated[JobId, Path(alias="jobId", description="The job's ID.")]
 
 Limit = Annotated[int, Query(ge=1, le=100, description="Maximum number of items to return.")]
-CursorQuery = Annotated[
-    str | None,
-    Query(
-        min_length=1,
-        max_length=512,
-        description="The `nextCursor` from the previous page. Omit for the first page.",
-    ),
-]
+_CURSOR = "The `nextCursor` from the previous page. Omit for the first page."
+JournalCursor = Annotated[JournalId | None, Query(description=_CURSOR)]
+PageCursor = Annotated[PageId | None, Query(description=_CURSOR)]
+ConversationCursor = Annotated[ConversationId | None, Query(description=_CURSOR)]
+JobCursor = Annotated[JobId | None, Query(description=_CURSOR)]
 DateFrom = Annotated[
     date | None, Query(alias="dateFrom", description="Only entries dated on or after this day.")
 ]

@@ -1,5 +1,6 @@
 """RFC 9457 problem details for every error the API returns."""
 
+from collections.abc import Mapping
 from http import HTTPStatus
 from typing import Any, NoReturn
 
@@ -7,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.routing import Match
 
 from .schemas.common import Problem, ProblemError
 
@@ -39,6 +41,7 @@ def problem(
     *,
     request: Request | None = None,
     errors: list[ProblemError] | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> ProblemResponse:
     body = Problem(
         title=HTTPStatus(status).phrase,
@@ -47,10 +50,16 @@ def problem(
         instance=request.url.path if request else None,
         errors=errors,
     )
-    headers = {"WWW-Authenticate": "Bearer"} if status == 401 else None
+    headers = dict(headers or {})
+    if status == 401:
+        headers["WWW-Authenticate"] = "Bearer"
     return ProblemResponse(
         body.model_dump(mode="json", exclude_none=True), status_code=status, headers=headers
     )
+
+
+def not_found(what: str) -> NoReturn:
+    raise StarletteHTTPException(404, f"{what} not found.")
 
 
 class NotImplementedYetError(Exception):
@@ -74,11 +83,28 @@ def _validation_errors(exc: RequestValidationError) -> list[ProblemError]:
     return errors
 
 
+_METHODS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+
+
+def _allowed_methods(request: Request) -> str:
+    """Every method the path supports. Starlette's own `Allow` only names the first matching route's."""
+    allowed = {
+        method
+        for method in _METHODS
+        for route in request.app.router.routes
+        if route.matches({**request.scope, "method": method})[0] is Match.FULL
+    }
+    return ", ".join(sorted(allowed))
+
+
 def install_problem_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def _http(request: Request, exc: StarletteHTTPException) -> ProblemResponse:
         detail = exc.detail if isinstance(exc.detail, str) else None
-        return problem(exc.status_code, detail, request=request)
+        headers = dict(exc.headers or {})
+        if exc.status_code == 405:
+            headers["Allow"] = _allowed_methods(request)
+        return problem(exc.status_code, detail, request=request, headers=headers)
 
     @app.exception_handler(RequestValidationError)
     async def _validation(request: Request, exc: RequestValidationError) -> ProblemResponse:

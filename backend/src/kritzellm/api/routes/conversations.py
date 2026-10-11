@@ -12,7 +12,7 @@ from ..schemas.conversations import (
     Message,
     MessageCreate,
 )
-from .params import ConversationIdPath, CursorQuery, Limit, location_header
+from .params import ConversationCursor, ConversationIdPath, Limit, location_header
 
 router = APIRouter(tags=["conversations"])
 
@@ -22,7 +22,9 @@ router = APIRouter(tags=["conversations"])
     summary="List conversations",
     responses=problem_responses(400, 401, 422),
 )
-async def list_conversations(limit: Limit = 25, cursor: CursorQuery = None) -> ConversationList:
+async def list_conversations(
+    limit: Limit = 25, cursor: ConversationCursor = None
+) -> ConversationList:
     """Lists chat threads, most recently active first."""
     not_implemented()
 
