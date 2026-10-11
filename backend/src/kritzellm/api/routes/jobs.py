@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query, Response, status
 
 from ..errors import not_implemented, problem_responses
 from ..schemas.jobs import Job, JobKind, JobList, JobStatus
-from .params import BINARY, JOB_LOCATION, CursorQuery, JobIdPath, Limit
+from .params import BINARY, JOB_LOCATION, JobCursor, JobIdPath, Limit
 
 router = APIRouter()
 
@@ -21,7 +21,7 @@ async def list_jobs(
     ] = None,
     kind: Annotated[JobKind | None, Query(description="Only jobs of this kind.")] = None,
     limit: Limit = 25,
-    cursor: CursorQuery = None,
+    cursor: JobCursor = None,
 ) -> JobList:
     """Lists background jobs, newest first."""
     not_implemented()

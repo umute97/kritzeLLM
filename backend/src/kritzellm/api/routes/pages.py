@@ -15,7 +15,7 @@ from ..schemas.pages import (
     PageUpdate,
     TranscribeRequest,
 )
-from .params import BINARY, JOB_LOCATION, CursorQuery, DateFrom, DateTo, Limit, PageIdPath
+from .params import BINARY, JOB_LOCATION, DateFrom, DateTo, Limit, PageCursor, PageIdPath
 
 router = APIRouter(tags=["pages"])
 
@@ -35,7 +35,7 @@ async def list_pages(
     date_from: DateFrom = None,
     date_to: DateTo = None,
     limit: Limit = 25,
-    cursor: CursorQuery = None,
+    cursor: PageCursor = None,
 ) -> PageList:
     """Lists pages, ordered by journal and page number."""
     not_implemented()

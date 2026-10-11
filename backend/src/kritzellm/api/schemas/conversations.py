@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal
 from pydantic import ConfigDict, Field
 
 from .blocks import Block
-from .common import ApiModel, ConversationId, Cursor, InputModel, MessageId, Problem, Timestamp
+from .common import NO_NUL, ApiModel, ConversationId, InputModel, MessageId, Problem, Timestamp
 from .pages import PageSummary
 
 
@@ -66,7 +66,7 @@ class Message(ApiModel):
 class MessageCreate(InputModel):
     """A user message."""
 
-    content: str = Field(min_length=1, max_length=4000)
+    content: str = Field(min_length=1, max_length=4000, pattern=NO_NUL)
     """The user's message."""
 
 
@@ -92,14 +92,14 @@ class ConversationDetail(Conversation):
 class ConversationCreate(InputModel):
     """A new chat thread."""
 
-    title: str | None = Field(default=None, min_length=1, max_length=200)
+    title: str | None = Field(default=None, min_length=1, max_length=200, pattern=NO_NUL)
     """Optional title; generated from the first message when omitted."""
 
 
 class ConversationUpdate(InputModel):
     """A new title for a chat thread."""
 
-    title: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=200, pattern=NO_NUL)
     """New title."""
 
 
@@ -107,7 +107,8 @@ class ConversationList(ApiModel):
     """A page of conversations."""
 
     items: list[Conversation]
-    next_cursor: Cursor
+    next_cursor: ConversationId | None
+    """Pass as `cursor` to get the next page; `null` on the last page."""
 
 
 # --- Chat stream --------------------------------------------------------------------------

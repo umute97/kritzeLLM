@@ -3,7 +3,7 @@
   "info": {
     "title": "kritzeLLM API",
     "summary": "Search and chat with a handwritten journal.",
-    "description": "Upload photos of handwritten journal pages, review their transcriptions, search them, and chat with\nan agent that cites the exact page and spot. 🖍️\n\n## Conventions\n\n- **Base path** `/api/v1`. JSON bodies use `camelCase`.\n- **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.\n- **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded\n  UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,\n  `cnv` conversation, `msg` message, `job` job.\n- **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.\n  `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed\n  IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.\n- **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as\n  `cursor`. `nextCursor` is `null` on the last page.\n- **Long-running work** (transcribing, re-indexing, exports) answers `202 Accepted` with a `Job`\n  and a `Location` header. Poll the job until it finishes.\n- **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`\n  needs `Authorization: Bearer <token>`.\n- **Locations on a page** are normalized to the page image: `0,0` is the top-left corner and `1,1`\n  the bottom-right, so they work for any image size.\n",
+    "description": "Upload photos of handwritten journal pages, review their transcriptions, search them, and chat with\nan agent that cites the exact page and spot. 🖍️\n\n## Conventions\n\n- **Base path** `/api/v1`. JSON bodies use `camelCase`.\n- **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.\n- **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded\n  UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,\n  `cnv` conversation, `msg` message, `job` job.\n- **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.\n  `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed\n  IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.\n- **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as\n  `cursor`. `nextCursor` is `null` on the last page. A cursor is the ID of the last item you got,\n  so it stays valid even if that item is deleted meanwhile.\n- **Long-running work** (transcribing, re-indexing, exports) answers `202 Accepted` with a `Job`\n  and a `Location` header. Poll the job until it finishes.\n- **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`\n  needs `Authorization: Bearer <token>`.\n- **Locations on a page** are normalized to the page image: `0,0` is the top-left corner and `1,1`\n  the bottom-right, so they work for any image size.\n",
     "version": "0.1.0"
   },
   "servers": [
@@ -72,8 +72,8 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 512
+                  "pattern": "^jrn_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+                  "description": "TypeID of a journal."
                 },
                 {
                   "type": "null"
@@ -789,8 +789,8 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 512
+                  "pattern": "^pg_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+                  "description": "TypeID of a page."
                 },
                 {
                   "type": "null"
@@ -1722,6 +1722,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 500,
+              "pattern": "^[^\\x00]*$",
               "description": "What to look for, in plain words.",
               "title": "Q"
             },
@@ -1891,8 +1892,8 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 512
+                  "pattern": "^cnv_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+                  "description": "TypeID of a conversation."
                 },
                 {
                   "type": "null"
@@ -2463,8 +2464,8 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 512
+                  "pattern": "^job_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+                  "description": "TypeID of a job."
                 },
                 {
                   "type": "null"
@@ -2889,6 +2890,7 @@
             "type": "string",
             "maxLength": 20000,
             "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Text",
             "description": "The block's text."
           },
@@ -2946,7 +2948,8 @@
               {
                 "type": "string",
                 "maxLength": 20000,
-                "minLength": 1
+                "minLength": 1,
+                "pattern": "^[^\\x00]*$"
               },
               {
                 "type": "null"
@@ -3195,7 +3198,8 @@
               {
                 "type": "string",
                 "maxLength": 200,
-                "minLength": 1
+                "minLength": 1,
+                "pattern": "^[^\\x00]*$"
               },
               {
                 "type": "null"
@@ -3282,7 +3286,9 @@
           "nextCursor": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^cnv_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+                "description": "TypeID of a conversation."
               },
               {
                 "type": "null"
@@ -3306,6 +3312,7 @@
             "type": "string",
             "maxLength": 200,
             "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Title",
             "description": "New title."
           }
@@ -3542,7 +3549,9 @@
           "nextCursor": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^job_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+                "description": "TypeID of a job."
               },
               {
                 "type": "null"
@@ -3695,6 +3704,7 @@
             "type": "string",
             "maxLength": 120,
             "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Name",
             "description": "Display name."
           },
@@ -3702,7 +3712,8 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 2000
+                "maxLength": 2000,
+                "pattern": "^[^\\x00]*$"
               },
               {
                 "type": "null"
@@ -3732,7 +3743,9 @@
           "nextCursor": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^jrn_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+                "description": "TypeID of a journal."
               },
               {
                 "type": "null"
@@ -3753,16 +3766,10 @@
       "JournalUpdate": {
         "properties": {
           "name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 120,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Name",
             "description": "New display name."
           },
@@ -3770,7 +3777,8 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 2000
+                "maxLength": 2000,
+                "pattern": "^[^\\x00]*$"
               },
               {
                 "type": "null"
@@ -3876,6 +3884,7 @@
             "type": "string",
             "maxLength": 4000,
             "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Content",
             "description": "The user's message."
           }
@@ -4217,7 +4226,9 @@
           "nextCursor": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^pg_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+                "description": "TypeID of a page."
               },
               {
                 "type": "null"
@@ -4346,7 +4357,8 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 40
+                "maxLength": 40,
+                "pattern": "^[^\\x00]*$"
               },
               {
                 "type": "null"
@@ -4776,7 +4788,8 @@
             "anyOf": [
               {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "pattern": "^[^\\x00]*$"
               },
               {
                 "type": "null"

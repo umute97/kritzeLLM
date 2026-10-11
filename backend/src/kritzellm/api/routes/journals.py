@@ -6,7 +6,7 @@ from ..errors import not_implemented, problem_responses
 from ..schemas.jobs import Job
 from ..schemas.journals import ExportCreate, Journal, JournalCreate, JournalList, JournalUpdate
 from ..schemas.pages import UploadResult
-from .params import JOB_LOCATION, CursorQuery, JournalIdPath, Limit, location_header
+from .params import JOB_LOCATION, JournalCursor, JournalIdPath, Limit, location_header
 
 router = APIRouter(tags=["journals"])
 
@@ -16,7 +16,7 @@ router = APIRouter(tags=["journals"])
     summary="List journals",
     responses=problem_responses(400, 401, 422),
 )
-async def list_journals(limit: Limit = 25, cursor: CursorQuery = None) -> JournalList:
+async def list_journals(limit: Limit = 25, cursor: JournalCursor = None) -> JournalList:
     """Lists all journals, newest first."""
     not_implemented()
 

@@ -5,7 +5,7 @@ from enum import StrEnum
 from pydantic import Field
 
 from .blocks import Block
-from .common import ApiModel, Cursor, Day, InputModel, JournalId, PageId, Problem, Timestamp
+from .common import NO_NUL, ApiModel, Day, InputModel, JournalId, PageId, Problem, Timestamp
 from .jobs import Job
 
 
@@ -104,7 +104,7 @@ class PageUpdate(InputModel):
     """Move the page to this journal."""
     page_number: int | None = Field(default=None, ge=1)
     """New position in the journal. Must not be taken by another page."""
-    page_label: str | None = Field(default=None, max_length=40)
+    page_label: str | None = Field(default=None, max_length=40, pattern=NO_NUL)
     """Label as written on the page; `null` clears it."""
     entry_dates: list[Day] | None = None
     """Corrected entry dates."""
@@ -114,7 +114,8 @@ class PageList(ApiModel):
     """A page of pages."""
 
     items: list[Page]
-    next_cursor: Cursor
+    next_cursor: PageId | None
+    """Pass as `cursor` to get the next page; `null` on the last page."""
 
 
 class UploadItem(ApiModel):
@@ -138,5 +139,5 @@ class UploadResult(ApiModel):
 class TranscribeRequest(InputModel):
     """Options for re-transcribing a page."""
 
-    model: str | None = Field(default=None, min_length=1)
+    model: str | None = Field(default=None, min_length=1, pattern=NO_NUL)
     """Vision model to use instead of the configured one."""

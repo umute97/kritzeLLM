@@ -35,7 +35,8 @@ an agent that cites the exact page and spot. 🖍️
   `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed
   IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.
 - **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as
-  `cursor`. `nextCursor` is `null` on the last page.
+  `cursor`. `nextCursor` is `null` on the last page. A cursor is the ID of the last item you got,
+  so it stays valid even if that item is deleted meanwhile.
 - **Long-running work** (transcribing, re-indexing, exports) answers `202 Accepted` with a `Job`
   and a `Location` header. Poll the job until it finishes.
 - **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`

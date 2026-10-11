@@ -5,7 +5,7 @@ from typing import Self
 
 from pydantic import Field, model_validator
 
-from .common import ApiModel, BlockId, InputModel, PageId
+from .common import NO_NUL, ApiModel, BlockId, InputModel, PageId
 from .jobs import Job
 
 
@@ -102,7 +102,7 @@ class BlockInput(InputModel):
     id: BlockId | None = None
     """Set to update an existing block in place; omit to create a new one."""
     kind: BlockKind
-    text: str = Field(min_length=1, max_length=20_000)
+    text: str = Field(min_length=1, max_length=20_000, pattern=NO_NUL)
     """The block's text."""
     uncertain: bool = False
     """Whether parts of the text are still unsure."""
@@ -128,7 +128,7 @@ class BlockUpdate(InputModel):
     """Corrections to a single block. Only the given fields change."""
 
     kind: BlockKind | None = None
-    text: str | None = Field(default=None, min_length=1, max_length=20_000)
+    text: str | None = Field(default=None, min_length=1, max_length=20_000, pattern=NO_NUL)
     """Corrected text."""
     uncertain: bool | None = None
     """Whether parts of the text are still unsure."""
