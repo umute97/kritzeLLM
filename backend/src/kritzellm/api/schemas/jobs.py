@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import Field
 
-from .common import ApiModel, Cursor, JobId, Problem, Timestamp
+from .common import ApiModel, JobId, Problem, Timestamp
 
 
 class JobKind(StrEnum):
@@ -75,4 +75,5 @@ class JobList(ApiModel):
     """A page of jobs."""
 
     items: list[Job]
-    next_cursor: Cursor
+    next_cursor: JobId | None
+    """Pass as `cursor` to get the next page; `null` on the last page."""

@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .api.app import API_PREFIX, create_api
+from .api.errors import install_problem_handlers
 from .config import Settings, get_settings
 
 
@@ -18,6 +19,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await api.state.db_engine.dispose()
 
     app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, lifespan=lifespan)
+    install_problem_handlers(app)
     app.mount(API_PREFIX, api)
     return app
 

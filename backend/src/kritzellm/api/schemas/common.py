@@ -35,12 +35,11 @@ ConversationId = Annotated[str, _type_id("cnv"), Field(description="TypeID of a 
 MessageId = Annotated[str, _type_id("msg"), Field(description="TypeID of a message.")]
 JobId = Annotated[str, _type_id("job"), Field(description="TypeID of a job.")]
 
+NO_NUL = r"^[^\x00]*$"
+"""Pattern for free-text inputs: anything but NUL characters, which Postgres can't store."""
+
 Timestamp = Annotated[datetime, Field(description="RFC 3339 timestamp in UTC.")]
 Day = Annotated[date, Field(description="A calendar day.")]
-Cursor = Annotated[
-    str | None,
-    Field(description="Pass as `cursor` to get the next page; `null` on the last page."),
-]
 
 
 class ProblemError(ApiModel):

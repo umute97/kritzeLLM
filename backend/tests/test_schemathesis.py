@@ -1,0 +1,34 @@
+"""Schemathesis fuzzes the built endpoints from api/openapi.json and checks every answer against it.
+
+Add an operation to FUZZED once it does real work.
+"""
+
+import pytest
+import schemathesis
+from hypothesis import settings
+from pydantic import PostgresDsn, SecretStr
+
+from kritzellm.config import Settings
+from kritzellm.main import create_app
+
+pytestmark = pytest.mark.db
+
+TOKEN = "fuzz-token"
+
+FUZZED = ["listJournals", "createJournal", "getJournal", "updateJournal", "deleteJournal"]
+
+
+@pytest.fixture
+def api_schema(database_url: str) -> schemathesis.BaseSchema:
+    settings = Settings(api_token=SecretStr(TOKEN), database_url=PostgresDsn(database_url))
+    app = create_app(settings)
+    return schemathesis.openapi.from_asgi("/api/v1/openapi.json", app)
+
+
+schema = schemathesis.pytest.from_fixture("api_schema").include(operation_id=FUZZED)
+
+
+@schema.parametrize()
+@settings(max_examples=50, deadline=None)
+def test_api_matches_its_spec(case: schemathesis.Case) -> None:
+    case.call_and_validate(headers={"Authorization": f"Bearer {TOKEN}"})
