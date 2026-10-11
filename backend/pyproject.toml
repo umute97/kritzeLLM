@@ -22,6 +22,7 @@ dev = [
     "pyright>=1.1.414",
     "pytest>=9.1.1",
     "ruff>=0.16.9",
+    "schemathesis>=4.30.1",
 ]
 
 [build-system]
