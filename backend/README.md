@@ -51,6 +51,10 @@ so never point it at real data. `just backend-test` uses `kritzellm_test` in the
 (`just up db`). Without a reachable database those tests are skipped; CI sets `KRITZELLM_REQUIRE_DB=1`,
 which makes them fail instead. One of them fails when a model changed without a migration.
 
+[Schemathesis](https://schemathesis.readthedocs.io) fuzzes every built endpoint against `api/openapi.json`
+([`tests/test_schemathesis.py`](tests/test_schemathesis.py)), checking status codes, response bodies, auth
+and input validation. When an endpoint stops being a stub, add its operation ID to `FUZZED` there.
+
 ## Docker
 
 `just up` builds the image from the [`Dockerfile`](Dockerfile) and starts it next to Postgres.
