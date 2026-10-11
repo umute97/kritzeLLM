@@ -134,3 +134,38 @@ def test_unknown_routes_are_404_problems(client: TestClient) -> None:
     response = client.get("/nope")
     assert response.status_code == 404
     assert response.headers["content-type"] == "application/problem+json"
+
+
+def test_repeated_query_parameters_are_422(client: TestClient) -> None:
+    response = client.get("/pages?limit=5&limit=50")
+    assert response.status_code == 422
+    assert response.json()["errors"] == [
+        {"detail": "Give this parameter only once", "parameter": "limit"}
+    ]
+
+
+def test_paths_outside_the_api_are_404_problems(client: TestClient) -> None:
+    response = client.get("http://test/nope%0A")
+    assert response.status_code == 404
+    assert response.headers["content-type"] == "application/problem+json"
+
+
+def test_unknown_query_parameters_are_422(client: TestClient) -> None:
+    response = client.get("/pages?limt=5")
+    assert response.status_code == 422
+    assert response.json()["errors"] == [{"detail": "Unknown query parameter", "parameter": "limt"}]
+
+
+@pytest.mark.parametrize(
+    ("path", "allow"),
+    [
+        ("/journals", "GET, POST"),
+        (f"/journals/{JOURNAL_ID}", "DELETE, GET, PATCH"),
+        ("/health", "GET"),
+    ],
+)
+def test_405_lists_every_allowed_method(client: TestClient, path: str, allow: str) -> None:
+    response = client.request("TRACE", path)
+    assert response.status_code == 405
+    assert response.headers["content-type"] == "application/problem+json"
+    assert response.headers["allow"] == allow

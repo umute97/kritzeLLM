@@ -14,6 +14,7 @@ from kritzellm.config import Settings
 from kritzellm.db import create_engine, create_sessionmaker
 
 from .auth import require_token
+from .deps import check_query_params
 from .errors import PROBLEM_JSON, install_problem_handlers
 from .routes import blocks, conversations, docs, health, jobs, journals, pages, search
 from .schemas.conversations import ChatStreamEvent
@@ -75,6 +76,7 @@ def create_api(settings: Settings | None = None) -> FastAPI:
         separate_input_output_schemas=False,
         docs_url=None,
         redoc_url=None,
+        dependencies=[Depends(check_query_params)],
     )
     api.state.settings = settings = settings or Settings()
     api.state.db_engine = create_engine(settings)
