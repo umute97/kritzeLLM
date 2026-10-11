@@ -23,7 +23,7 @@ def client(make_client: Callable[..., TestClient]) -> TestClient:
     ids=["missing", "wrong", "longer", "not-bearer"],
 )
 def test_wrong_or_missing_token_is_401(client: TestClient, headers: dict[str, str]) -> None:
-    response = client.get("/journals", headers=headers)
+    response = client.get("/conversations", headers=headers)
     assert response.status_code == 401
     assert response.headers["content-type"] == "application/problem+json"
     assert response.headers["www-authenticate"] == "Bearer"
@@ -31,7 +31,7 @@ def test_wrong_or_missing_token_is_401(client: TestClient, headers: dict[str, st
 
 
 def test_right_token_gets_through(client: TestClient) -> None:
-    response = client.get("/journals", headers={"Authorization": f"Bearer {TOKEN}"})
+    response = client.get("/conversations", headers={"Authorization": f"Bearer {TOKEN}"})
     assert response.status_code == 501  # past auth; the route itself isn't built yet
 
 
@@ -48,5 +48,5 @@ def test_some_paths_never_need_a_token(client: TestClient, path: str) -> None:
 def test_everything_is_open_without_a_configured_token(
     make_client: Callable[..., TestClient],
 ) -> None:
-    response = make_client().get("/journals")
+    response = make_client().get("/conversations")
     assert response.status_code == 501

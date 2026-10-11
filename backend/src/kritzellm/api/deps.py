@@ -1,9 +1,9 @@
 """Dependencies shared by the routes."""
 
 from collections.abc import AsyncGenerator
-from typing import Any, get_args, get_origin
+from typing import Annotated, Any, get_args, get_origin
 
-from fastapi import Request
+from fastapi import Depends, Request
 from fastapi.dependencies.models import Dependant
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -24,6 +24,9 @@ async def get_session(request: Request) -> AsyncGenerator[AsyncSession]:
     """A database session for one request. Routes commit their own changes."""
     async with request.app.state.sessionmaker() as session:
         yield session
+
+
+Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 def _is_list(annotation: Any) -> bool:

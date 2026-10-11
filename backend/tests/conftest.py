@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import PostgresDsn
 from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
@@ -65,6 +66,14 @@ def database_url() -> Iterator[str]:
     upgrade(url)
     yield url
     asyncio.run(_recreate_database(url, create=False))
+
+
+@pytest.fixture
+def db_client(database_url: str) -> Iterator[TestClient]:
+    """An API client backed by the test database. One event loop serves the whole test."""
+    app = create_app(Settings(api_token=None, database_url=PostgresDsn(database_url)))
+    with TestClient(app, base_url="http://test/api/v1") as client:
+        yield client
 
 
 @pytest.fixture

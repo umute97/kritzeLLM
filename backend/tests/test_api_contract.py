@@ -44,11 +44,6 @@ def test_spec_writes_whole_numbers_like_javascript() -> None:
 
 # Every designed operation that still answers 501 (uploads are multipart, so they're tested below).
 STUB_CASES = [
-    ("GET", "/journals", None),
-    ("POST", "/journals", {"name": "Summer 2026"}),
-    ("GET", f"/journals/{JOURNAL_ID}", None),
-    ("PATCH", f"/journals/{JOURNAL_ID}", {"name": "Summer 2026 🌻"}),
-    ("DELETE", f"/journals/{JOURNAL_ID}", None),
     ("POST", f"/journals/{JOURNAL_ID}/exports", {"format": "markdown"}),
     ("GET", "/pages", None),
     ("GET", f"/pages/{PAGE_ID}", None),
@@ -84,11 +79,25 @@ def test_stubs_answer_501_problem(
     assert response.json()["title"] == "Not Implemented"
 
 
-def test_every_operation_has_a_stub_test() -> None:
+# Operations that do real work now; they have their own tests.
+BUILT = {
+    "getHealth",
+    "listJournals",
+    "createJournal",
+    "getJournal",
+    "updateJournal",
+    "deleteJournal",
+}
+
+
+def test_every_operation_is_built_or_has_a_stub_test() -> None:
     spec = json.loads(render_openapi())
-    operations = sum(len(methods) for methods in spec["paths"].values())
-    # Uploads (multipart) are covered separately below, and /health is already built.
-    assert len(STUB_CASES) == operations - 2
+    operation_ids = {
+        op["operationId"] for methods in spec["paths"].values() for op in methods.values()
+    }
+    assert operation_ids >= BUILT
+    # Uploads (multipart) are covered separately below.
+    assert len(STUB_CASES) == len(operation_ids) - len(BUILT) - 1
 
 
 def test_upload_stub_answers_501(client: TestClient) -> None:

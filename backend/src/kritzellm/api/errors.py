@@ -58,6 +58,10 @@ def problem(
     )
 
 
+def not_found(what: str) -> NoReturn:
+    raise StarletteHTTPException(404, f"{what} not found.")
+
+
 class NotImplementedYetError(Exception):
     """Raised by routes whose behaviour hasn't been built yet."""
 
