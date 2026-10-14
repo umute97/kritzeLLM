@@ -3,7 +3,7 @@
 FROM ghcr.io/astral-sh/uv:0.13.0 AS uv
 
 # --- Build: install the app and its dependencies into /app/.venv -----------------------
-FROM python:3.14.8-slim-trixie AS build
+FROM python:3.15.0rc2-slim-trixie AS build
 
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-editable
 
 # --- Runtime: just the virtualenv ---------------------------------------------------------
-FROM python:3.14.8-slim-trixie
+FROM python:3.15.0rc2-slim-trixie
 
 ARG APP_VERSION=dev
 LABEL org.opencontainers.image.title="kritzellm-api" \
