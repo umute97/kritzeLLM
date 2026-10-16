@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/umute97/kritzeLLM/compare/v0.2.0...v0.3.0) (2026-10-16)
+
+
+### Features
+
+* **api:** upload pages and serve their images 📸 ([#43](https://github.com/umute97/kritzeLLM/issues/43)) ([60f3d0f](https://github.com/umute97/kritzeLLM/commit/60f3d0f0f891d8abe498082ee33c2d42e75da05b))
+
 ## [0.2.0](https://github.com/umute97/kritzeLLM/compare/v0.1.0...v0.2.0) (2026-10-11)
 
 
