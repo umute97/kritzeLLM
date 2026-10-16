@@ -1,9 +1,10 @@
 """Building blocks shared by all API schemas."""
 
+import re
 from datetime import date, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 from pydantic.alias_generators import to_camel
 
 
@@ -39,7 +40,17 @@ NO_NUL = r"^[^\x00]*$"
 """Pattern for free-text inputs: anything but NUL characters, which Postgres can't store."""
 
 Timestamp = Annotated[datetime, Field(description="RFC 3339 timestamp in UTC.")]
-Day = Annotated[date, Field(description="A calendar day.")]
+_ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def _iso_day(value: Any) -> Any:
+    """Only `YYYY-MM-DD` strings (and dates): pydantic would also read numbers as Unix times."""
+    if isinstance(value, int | float) or (isinstance(value, str) and not _ISO_DAY.fullmatch(value)):
+        raise ValueError("Use the YYYY-MM-DD format")
+    return value
+
+
+Day = Annotated[date, BeforeValidator(_iso_day), Field(description="A calendar day.")]
 
 
 class ProblemError(ApiModel):

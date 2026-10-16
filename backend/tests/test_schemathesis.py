@@ -3,6 +3,8 @@
 Add an operation to FUZZED once it does real work.
 """
 
+from pathlib import Path
+
 import pytest
 import schemathesis
 from hypothesis import settings
@@ -15,14 +17,31 @@ pytestmark = pytest.mark.db
 
 TOKEN = "fuzz-token"
 
-FUZZED = ["listJournals", "createJournal", "getJournal", "updateJournal", "deleteJournal"]
+FUZZED = [
+    "listJournals",
+    "createJournal",
+    "getJournal",
+    "updateJournal",
+    "deleteJournal",
+    "uploadPages",
+    "listPages",
+    "getPage",
+    "updatePage",
+    "deletePage",
+    "getPageImage",
+]
 
 
 @pytest.fixture
-def api_schema(database_url: str) -> schemathesis.BaseSchema:
-    settings = Settings(api_token=SecretStr(TOKEN), database_url=PostgresDsn(database_url))
+def api_schema(database_url: str, data_dir: Path) -> schemathesis.BaseSchema:
+    settings = Settings(
+        api_token=SecretStr(TOKEN), database_url=PostgresDsn(database_url), data_dir=data_dir
+    )
     app = create_app(settings)
-    return schemathesis.openapi.from_asgi("/api/v1/openapi.json", app)
+    api_schema = schemathesis.openapi.from_asgi("/api/v1/openapi.json", app)
+    # Through the config, so the fuzzer knows requests carry the token and can still leave it out.
+    api_schema.config.update(headers={"Authorization": f"Bearer {TOKEN}"})
+    return api_schema
 
 
 schema = schemathesis.pytest.from_fixture("api_schema").include(operation_id=FUZZED)
@@ -31,4 +50,4 @@ schema = schemathesis.pytest.from_fixture("api_schema").include(operation_id=FUZ
 @schema.parametrize()
 @settings(max_examples=50, deadline=None)
 def test_api_matches_its_spec(case: schemathesis.Case) -> None:
-    case.call_and_validate(headers={"Authorization": f"Bearer {TOKEN}"})
+    case.call_and_validate()

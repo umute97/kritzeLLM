@@ -13,13 +13,12 @@ from kritzellm import __version__
 from kritzellm.config import Settings
 from kritzellm.db import create_engine, create_sessionmaker
 
+from . import API_PREFIX
 from .auth import require_token
 from .deps import check_query_params
 from .errors import PROBLEM_JSON, install_problem_handlers
 from .routes import blocks, conversations, docs, health, jobs, journals, pages, search
 from .schemas.conversations import ChatStreamEvent
-
-API_PREFIX = "/api/v1"
 
 DESCRIPTION = """\
 Upload photos of handwritten journal pages, review their transcriptions, search them, and chat with
@@ -36,8 +35,8 @@ an agent that cites the exact page and spot. 🖍️
   `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed
   IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.
 - **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as
-  `cursor`. `nextCursor` is `null` on the last page. A cursor is the ID of the last item you got,
-  so it stays valid even if that item is deleted meanwhile.
+  `cursor`. `nextCursor` is `null` on the last page. Treat cursors as opaque strings; they stay
+  valid even if the last item you got is deleted meanwhile.
 - **Long-running work** (transcribing, re-indexing, exports) answers `202 Accepted` with a `Job`
   and a `Location` header. Poll the job until it finishes.
 - **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`

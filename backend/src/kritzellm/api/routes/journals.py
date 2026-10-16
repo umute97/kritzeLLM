@@ -1,19 +1,39 @@
+import asyncio
+import hashlib
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, Header, Request, Response, UploadFile, status
+from fastapi import APIRouter, File, Form, Request, Response, UploadFile, status
+from pydantic import WithJsonSchema
 from sqlalchemy import delete, func, select
 
+from kritzellm.core.images import (
+    ImageTooLargeError,
+    NormalizedImage,
+    UnsupportedImageError,
+    normalize,
+)
+from kritzellm.core.pages import (
+    JournalNotFoundError,
+    PageNumberTakenError,
+    StagedUpload,
+    add_pages,
+)
+from kritzellm.core.storage import Staging, delete_page_files
 from kritzellm.db import models as db
 
-from ..deps import Session
-from ..errors import not_found, not_implemented, problem_responses
+from ..deps import AppSettings, Session
+from ..errors import http_error, not_found, not_implemented, problem_responses
 from ..pagination import paginate
 from ..schemas.jobs import Job
 from ..schemas.journals import ExportCreate, Journal, JournalCreate, JournalList, JournalUpdate
-from ..schemas.pages import UploadResult
+from ..schemas.pages import MAX_PAGE_NUMBER, UploadItem, UploadResult
+from .pages import page_out
 from .params import JOB_LOCATION, JournalCursor, JournalIdPath, Limit, location_header
 
 router = APIRouter(tags=["journals"])
+
+MAX_FILE_BYTES = 25 * 1024 * 1024
+MAX_FILES = 100
 
 PAGE_COUNT = (
     select(func.count(db.Page.id))
@@ -75,7 +95,7 @@ async def create_journal(
     body: JournalCreate, session: Session, request: Request, response: Response
 ) -> Journal:
     """Creates an empty journal to upload pages into."""
-    journal = db.Journal(**body.model_dump())
+    journal = db.Journal(**body.model_dump(by_alias=False))
     session.add(journal)
     await session.commit()
     await session.refresh(journal)
@@ -105,7 +125,7 @@ async def update_journal(
     journal = await session.get(db.Journal, journal_id)
     if journal is None:
         not_found("Journal")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    for field, value in body.model_dump(exclude_unset=True, by_alias=False).items():
         setattr(journal, field, value)
     await session.commit()
     return await _get(session, journal_id)
@@ -118,17 +138,55 @@ async def update_journal(
     summary="Delete a journal",
     responses=problem_responses(400, 401, 404, 422),
 )
-async def delete_journal(journal_id: JournalIdPath, session: Session) -> None:
+async def delete_journal(
+    journal_id: JournalIdPath, session: Session, settings: AppSettings
+) -> None:
     """Deletes a journal with all of its pages, images, blocks and search index entries.
 
     This can't be undone.
     """
+    # Locks the journal, so no pages can be added to it before it's gone.
     deleted = await session.scalar(
-        delete(db.Journal).where(db.Journal.id == journal_id).returning(db.Journal.id)
+        select(db.Journal.id).where(db.Journal.id == journal_id).with_for_update()
     )
     if deleted is None:
         not_found("Journal")
+    page_ids = (
+        await session.scalars(select(db.Page.id).where(db.Page.journal_id == journal_id))
+    ).all()
+    await session.execute(delete(db.Journal).where(db.Journal.id == journal_id))
     await session.commit()
+    await asyncio.to_thread(delete_page_files, settings.data_dir, page_ids)
+
+
+def _hash_and_normalize(data: bytes) -> tuple[bytes, NormalizedImage]:
+    return hashlib.sha256(data).digest(), normalize(data)
+
+
+async def _stage(file: UploadFile, staging: Staging) -> StagedUpload:
+    """Checks one uploaded file and stages its images. Raises a `413` or `415` for bad files."""
+    filename = (file.filename or "").replace("\x00", "")[:255]
+    too_big = f"{filename or 'A file'} is bigger than 25 MB."
+    if file.size is not None and file.size > MAX_FILE_BYTES:
+        http_error(413, too_big)
+    data = await file.read(MAX_FILE_BYTES + 1)
+    if len(data) > MAX_FILE_BYTES:
+        http_error(413, too_big)
+    try:
+        sha256, image = await asyncio.to_thread(_hash_and_normalize, data)
+    except UnsupportedImageError as exc:
+        http_error(415, f"{filename or 'A file'}: {exc} Use JPEG, PNG, HEIC/HEIF or WebP.")
+    except ImageTooLargeError as exc:
+        http_error(413, f"{filename or 'A file'}: {exc}")
+    folder = await asyncio.to_thread(staging.stage, data, image)
+    return StagedUpload(
+        filename=filename,
+        sha256=sha256,
+        media_type=image.media_type,
+        width=image.width,
+        height=image.height,
+        folder=folder,
+    )
 
 
 @router.post(
@@ -136,46 +194,68 @@ async def delete_journal(journal_id: JournalIdPath, session: Session) -> None:
     status_code=status.HTTP_201_CREATED,
     summary="Upload pages",
     tags=["pages"],
-    responses=problem_responses(400, 401, 404, 413, 415, 422),
+    responses=problem_responses(400, 401, 404, 409, 413, 415, 422),
 )
 async def upload_pages(
     journal_id: JournalIdPath,
+    session: Session,
+    settings: AppSettings,
     files: Annotated[
         list[UploadFile],
         File(
-            description="Page images in page order. JPEG, PNG, HEIC/HEIF or WebP, up to 25 MB each.",
+            min_length=1,
+            max_length=MAX_FILES,
+            description=(
+                f"Page images in page order: JPEG, PNG, HEIC/HEIF or WebP, up to 25 MB each "
+                f"and {MAX_FILES} per upload."
+            ),
         ),
     ],
     start_page_number: Annotated[
         int | None,
+        # Multipart has no `null`: leave the field out instead.
+        WithJsonSchema({"type": "integer", "minimum": 1, "maximum": MAX_PAGE_NUMBER}),
         Form(
             alias="startPageNumber",
             ge=1,
+            le=MAX_PAGE_NUMBER,
             description=(
-                "Page number for the first file; the rest count up from it. "
+                "Page number for the first new page; the rest count up from it. "
                 "Defaults to the journal's next free page number."
             ),
-        ),
-    ] = None,
-    idempotency_key: Annotated[
-        str | None,
-        Header(
-            alias="Idempotency-Key",
-            min_length=1,
-            max_length=255,
-            description="Any unique string (e.g. a UUID). Retries with the same key return the first response.",
         ),
     ] = None,
 ) -> UploadResult:
     """Uploads page photos or scans into a journal.
 
-    Each new page gets an `ingestPage` job that normalizes the image, transcribes it and indexes it.
+    Each file is turned upright and stored with a normalized JPEG and a thumbnail, then becomes a
+    page that's transcribed and indexed in the background. If any file isn't a supported image or
+    is too big, nothing is stored.
 
-    Uploads are idempotent per file: a file whose SHA-256 already exists in this journal returns the
-    existing page with `duplicate: true` and no new job. Sending the same `Idempotency-Key` again
-    replays the original response.
+    Uploads are idempotent per file: a file whose SHA-256 is already in this journal (or earlier
+    in the same upload) returns the existing page with `duplicate: true` and takes no page number,
+    so a failed upload can simply be sent again.
     """
-    not_implemented()
+    if await session.get(db.Journal, journal_id) is None:
+        not_found("Journal")
+    async with Staging(settings.data_dir) as staging:
+        uploads = [await _stage(file, staging) for file in files]
+        try:
+            added = await add_pages(
+                session, staging, journal_id, uploads, start_page_number=start_page_number
+            )
+        except PageNumberTakenError:
+            http_error(409, "Some of the page numbers for the new pages are taken in this journal.")
+        except JournalNotFoundError:
+            not_found("Journal")
+    return UploadResult(
+        items=[
+            UploadItem(
+                filename=item.filename, page=page_out(item.page), duplicate=item.duplicate, job=None
+            )
+            for item in added
+        ]
+    )
 
 
 @router.post(
