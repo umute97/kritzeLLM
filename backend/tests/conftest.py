@@ -1,10 +1,13 @@
 import asyncio
+import io
 import os
 from collections.abc import AsyncIterator, Callable, Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import ExifTags, Image
 from pydantic import PostgresDsn
 from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -24,6 +27,30 @@ def make_client() -> Callable[..., TestClient]:
     def make(**settings: Any) -> TestClient:
         settings = {"api_token": None, "database_url": UNREACHABLE_DATABASE_URL, **settings}
         return TestClient(create_app(Settings(**settings)), base_url="http://test/api/v1")
+
+    return make
+
+
+@pytest.fixture
+def make_image() -> Callable[..., bytes]:
+    """Encodes a plain test picture, e.g. `make_image("PNG", size=(40, 30), color="blue")`."""
+
+    def make(
+        format: str = "JPEG",
+        *,
+        size: tuple[int, int] = (300, 200),
+        color: str | tuple[int, ...] = "red",
+        mode: str = "RGB",
+        orientation: int | None = None,
+    ) -> bytes:
+        image = Image.new(mode, size, color)
+        exif = Image.Exif()
+        if orientation is not None:
+            exif[ExifTags.Base.Orientation] = orientation
+            exif[ExifTags.Base.Make] = "Test camera"
+        buffer = io.BytesIO()
+        image.save(buffer, format, exif=exif)
+        return buffer.getvalue()
 
     return make
 
@@ -69,9 +96,15 @@ def database_url() -> Iterator[str]:
 
 
 @pytest.fixture
-def db_client(database_url: str) -> Iterator[TestClient]:
+def data_dir(tmp_path: Path) -> Path:
+    return tmp_path / "data"
+
+
+@pytest.fixture
+def db_client(database_url: str, data_dir: Path) -> Iterator[TestClient]:
     """An API client backed by the test database. One event loop serves the whole test."""
-    app = create_app(Settings(api_token=None, database_url=PostgresDsn(database_url)))
+    settings = Settings(api_token=None, database_url=PostgresDsn(database_url), data_dir=data_dir)
+    app = create_app(settings)
     with TestClient(app, base_url="http://test/api/v1") as client:
         yield client
 

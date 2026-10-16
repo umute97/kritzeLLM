@@ -42,14 +42,9 @@ def test_spec_writes_whole_numbers_like_javascript() -> None:
     assert not re.search(r":\s-?\d+\.0\b", render_openapi())
 
 
-# Every designed operation that still answers 501 (uploads are multipart, so they're tested below).
+# Every designed operation that still answers 501.
 STUB_CASES = [
     ("POST", f"/journals/{JOURNAL_ID}/exports", {"format": "markdown"}),
-    ("GET", "/pages", None),
-    ("GET", f"/pages/{PAGE_ID}", None),
-    ("PATCH", f"/pages/{PAGE_ID}", {"entryDates": ["2026-07-14"]}),
-    ("DELETE", f"/pages/{PAGE_ID}", None),
-    ("GET", f"/pages/{PAGE_ID}/image", None),
     ("PUT", f"/pages/{PAGE_ID}/blocks", {"blocks": []}),
     ("POST", f"/pages/{PAGE_ID}/transcribe", None),
     ("GET", f"/blocks/{BLOCK_ID}", None),
@@ -87,6 +82,12 @@ BUILT = {
     "getJournal",
     "updateJournal",
     "deleteJournal",
+    "uploadPages",
+    "listPages",
+    "getPage",
+    "updatePage",
+    "deletePage",
+    "getPageImage",
 }
 
 
@@ -96,19 +97,7 @@ def test_every_operation_is_built_or_has_a_stub_test() -> None:
         op["operationId"] for methods in spec["paths"].values() for op in methods.values()
     }
     assert operation_ids >= BUILT
-    # Uploads (multipart) are covered separately below.
-    assert len(STUB_CASES) == len(operation_ids) - len(BUILT) - 1
-
-
-def test_upload_stub_answers_501(client: TestClient) -> None:
-    files = [
-        ("files", ("p1.jpg", b"fake", "image/jpeg")),
-        ("files", ("p2.jpg", b"fake", "image/jpeg")),
-    ]
-    response = client.post(
-        f"/journals/{JOURNAL_ID}/pages", files=files, data={"startPageNumber": "3"}
-    )
-    assert response.status_code == 501
+    assert len(STUB_CASES) == len(operation_ids) - len(BUILT)
 
 
 def test_malformed_ids_are_422_problems(client: TestClient) -> None:

@@ -1,12 +1,19 @@
 """Pages: uploaded page images and their transcriptions."""
 
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import Field
+from pydantic import MISSING, Field, StringConstraints
 
 from .blocks import Block
 from .common import NO_NUL, ApiModel, Day, InputModel, JournalId, PageId, Problem, Timestamp
 from .jobs import Job
+
+MAX_PAGE_NUMBER = 1_000_000
+"""Highest page number a client may ask for."""
+
+PAGE_CURSOR = r"^jrn_[0-7][0-9a-hjkmnp-tv-z]{25}\.[1-9][0-9]{0,6}$"
+"""A `GET /pages` cursor: the journal and page number to continue after, e.g. `jrn_01k7….12`."""
 
 
 class PageStatus(StrEnum):
@@ -100,21 +107,21 @@ class PageSummary(ApiModel):
 class PageUpdate(InputModel):
     """Corrections to a page's metadata. Only the given fields change."""
 
-    journal_id: JournalId | None = None
-    """Move the page to this journal."""
-    page_number: int | None = Field(default=None, ge=1)
+    journal_id: JournalId | MISSING = MISSING
+    """Move the page to this journal. Without a `pageNumber` it goes after the journal's last page."""
+    page_number: int | MISSING = Field(default=MISSING, ge=1, le=MAX_PAGE_NUMBER)
     """New position in the journal. Must not be taken by another page."""
     page_label: str | None = Field(default=None, max_length=40, pattern=NO_NUL)
     """Label as written on the page; `null` clears it."""
-    entry_dates: list[Day] | None = None
-    """Corrected entry dates."""
+    entry_dates: list[Day] | MISSING = Field(default=MISSING, max_length=100)
+    """Corrected entry dates; `[]` clears them. Stored sorted, without repeats."""
 
 
 class PageList(ApiModel):
     """A page of pages."""
 
     items: list[Page]
-    next_cursor: PageId | None
+    next_cursor: Annotated[str, StringConstraints(pattern=PAGE_CURSOR)] | None
     """Pass as `cursor` to get the next page; `null` on the last page."""
 
 
@@ -125,9 +132,9 @@ class UploadItem(ApiModel):
     """The uploaded file's name."""
     page: Page
     duplicate: bool
-    """`true` if this exact file was already in the journal; `page` is then the existing page."""
+    """`true` if this exact file was already in the journal (or earlier in this upload); `page` is then the existing page."""
     job: Job | None
-    """The processing job for a new page; `null` for duplicates."""
+    """The job processing the page; `null` when there's none."""
 
 
 class UploadResult(ApiModel):
