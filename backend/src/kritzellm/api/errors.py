@@ -58,8 +58,12 @@ def problem(
     )
 
 
+def http_error(status: int, detail: str) -> NoReturn:
+    raise StarletteHTTPException(status, detail)
+
+
 def not_found(what: str) -> NoReturn:
-    raise StarletteHTTPException(404, f"{what} not found.")
+    http_error(404, f"{what} not found.")
 
 
 class NotImplementedYetError(Exception):

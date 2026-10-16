@@ -3,7 +3,7 @@
   "info": {
     "title": "kritzeLLM API",
     "summary": "Search and chat with a handwritten journal.",
-    "description": "Upload photos of handwritten journal pages, review their transcriptions, search them, and chat with\nan agent that cites the exact page and spot. 🖍️\n\n## Conventions\n\n- **Base path** `/api/v1`. JSON bodies use `camelCase`.\n- **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.\n- **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded\n  UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,\n  `cnv` conversation, `msg` message, `job` job.\n- **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.\n  `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed\n  IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.\n- **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as\n  `cursor`. `nextCursor` is `null` on the last page. A cursor is the ID of the last item you got,\n  so it stays valid even if that item is deleted meanwhile.\n- **Long-running work** (transcribing, re-indexing, exports) answers `202 Accepted` with a `Job`\n  and a `Location` header. Poll the job until it finishes.\n- **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`\n  needs `Authorization: Bearer <token>`.\n- **Locations on a page** are normalized to the page image: `0,0` is the top-left corner and `1,1`\n  the bottom-right, so they work for any image size.\n",
+    "description": "Upload photos of handwritten journal pages, review their transcriptions, search them, and chat with\nan agent that cites the exact page and spot. 🖍️\n\n## Conventions\n\n- **Base path** `/api/v1`. JSON bodies use `camelCase`.\n- **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.\n- **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded\n  UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,\n  `cnv` conversation, `msg` message, `job` job.\n- **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.\n  `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed\n  IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.\n- **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as\n  `cursor`. `nextCursor` is `null` on the last page. Treat cursors as opaque strings; they stay\n  valid even if the last item you got is deleted meanwhile.\n- **Long-running work** (transcribing, re-indexing, exports) answers `202 Accepted` with a `Job`\n  and a `Location` header. Poll the job until it finishes.\n- **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`\n  needs `Authorization: Bearer <token>`.\n- **Locations on a page** are normalized to the page image: `0,0` is the top-left corner and `1,1`\n  the bottom-right, so they work for any image size.\n",
     "version": "0.2.0"
   },
   "servers": [
@@ -452,7 +452,7 @@
           "pages"
         ],
         "summary": "Upload pages",
-        "description": "Uploads page photos or scans into a journal.\n\nEach new page gets an `ingestPage` job that normalizes the image, transcribes it and indexes it.\n\nUploads are idempotent per file: a file whose SHA-256 already exists in this journal returns the\nexisting page with `duplicate: true` and no new job. Sending the same `Idempotency-Key` again\nreplays the original response.",
+        "description": "Uploads page photos or scans into a journal.\n\nEach file is turned upright and stored with a normalized JPEG and a thumbnail, then becomes a\npage that's transcribed and indexed in the background. If any file isn't a supported image or\nis too big, nothing is stored.\n\nUploads are idempotent per file: a file whose SHA-256 is already in this journal (or earlier\nin the same upload) returns the existing page with `duplicate: true` and takes no page number,\nso a failed upload can simply be sent again.",
         "operationId": "uploadPages",
         "security": [
           {
@@ -471,26 +471,6 @@
               "title": "Journalid"
             },
             "description": "The journal's ID."
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 255
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Any unique string (e.g. a UUID). Retries with the same key return the first response.",
-              "title": "Idempotency-Key"
-            },
-            "description": "Any unique string (e.g. a UUID). Retries with the same key return the first response."
           }
         ],
         "requestBody": {
@@ -536,6 +516,16 @@
           },
           "404": {
             "description": "The resource doesn't exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state (e.g. a job is still running).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -683,7 +673,7 @@
           "pages"
         ],
         "summary": "List pages",
-        "description": "Lists pages, ordered by journal and page number.",
+        "description": "Lists pages: the newest journal's first, each journal's in page-number order.\n\nThe date filters keep pages with at least one entry dated within the range.",
         "operationId": "listPages",
         "security": [
           {
@@ -737,7 +727,8 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date",
+                  "description": "A calendar day."
                 },
                 {
                   "type": "null"
@@ -756,7 +747,8 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date",
+                  "description": "A calendar day."
                 },
                 {
                   "type": "null"
@@ -789,8 +781,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^pg_[0-7][0-9a-hjkmnp-tv-z]{25}$",
-                  "description": "TypeID of a page."
+                  "pattern": "^jrn_[0-7][0-9a-hjkmnp-tv-z]{25}\\.[1-9][0-9]{0,6}$"
                 },
                 {
                   "type": "null"
@@ -1104,7 +1095,7 @@
           "pages"
         ],
         "summary": "Get a page image",
-        "description": "Returns the page image.\n\n`normalized` (the default) is the rotated, resized JPEG that all block locations refer to.\n`original` is the uploaded file as-is, and `thumbnail` is a small JPEG preview.",
+        "description": "Returns the page image.\n\n`normalized` (the default) is the rotated, resized JPEG that all block locations refer to.\n`original` is the uploaded file as-is, and `thumbnail` is a small JPEG preview. A page's images\nnever change, so they may be cached for good.",
         "operationId": "getPageImage",
         "security": [
           {
@@ -1767,7 +1758,8 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date",
+                  "description": "A calendar day."
                 },
                 {
                   "type": "null"
@@ -1786,7 +1778,8 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date",
+                  "description": "A calendar day."
                 },
                 {
                   "type": "null"
@@ -4227,8 +4220,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^pg_[0-7][0-9a-hjkmnp-tv-z]{25}$",
-                "description": "TypeID of a page."
+                "pattern": "^jrn_[0-7][0-9a-hjkmnp-tv-z]{25}\\.[1-9][0-9]{0,6}$"
               },
               {
                 "type": "null"
@@ -4327,29 +4319,15 @@
       "PageUpdate": {
         "properties": {
           "journalId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^jrn_[0-7][0-9a-hjkmnp-tv-z]{25}$",
-                "description": "TypeID of a journal."
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "pattern": "^jrn_[0-7][0-9a-hjkmnp-tv-z]{25}$",
             "title": "Journalid",
-            "description": "Move the page to this journal."
+            "description": "Move the page to this journal. Without a `pageNumber` it goes after the journal's last page."
           },
           "pageNumber": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
+            "maximum": 1000000,
+            "minimum": 1,
             "title": "Pagenumber",
             "description": "New position in the journal. Must not be taken by another page."
           },
@@ -4368,21 +4346,15 @@
             "description": "Label as written on the page; `null` clears it."
           },
           "entryDates": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string",
-                  "format": "date",
-                  "description": "A calendar day."
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "items": {
+              "type": "string",
+              "format": "date",
+              "description": "A calendar day."
+            },
+            "type": "array",
+            "maxItems": 100,
             "title": "Entrydates",
-            "description": "Corrected entry dates."
+            "description": "Corrected entry dates; `[]` clears them. Stored sorted, without repeats."
           }
         },
         "additionalProperties": false,
@@ -4398,21 +4370,17 @@
               "contentMediaType": "application/octet-stream"
             },
             "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
             "title": "Files",
-            "description": "Page images in page order. JPEG, PNG, HEIC/HEIF or WebP, up to 25 MB each."
+            "description": "Page images in page order: JPEG, PNG, HEIC/HEIF or WebP, up to 25 MB each and 100 per upload."
           },
           "startPageNumber": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
+            "maximum": 1000000,
+            "minimum": 1,
             "title": "Startpagenumber",
-            "description": "Page number for the first file; the rest count up from it. Defaults to the journal's next free page number."
+            "description": "Page number for the first new page; the rest count up from it. Defaults to the journal's next free page number."
           }
         },
         "type": "object",
@@ -4817,7 +4785,7 @@
           "duplicate": {
             "type": "boolean",
             "title": "Duplicate",
-            "description": "`true` if this exact file was already in the journal; `page` is then the existing page."
+            "description": "`true` if this exact file was already in the journal (or earlier in this upload); `page` is then the existing page."
           },
           "job": {
             "anyOf": [
@@ -4828,7 +4796,7 @@
                 "type": "null"
               }
             ],
-            "description": "The processing job for a new page; `null` for duplicates."
+            "description": "The job processing the page; `null` when there's none."
           }
         },
         "type": "object",

@@ -16,6 +16,9 @@ def get_settings(request: Request) -> Settings:
     return request.app.state.settings
 
 
+AppSettings = Annotated[Settings, Depends(get_settings)]
+
+
 def get_db_engine(request: Request) -> AsyncEngine:
     return request.app.state.db_engine
 

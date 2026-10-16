@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .api.app import API_PREFIX, create_api
+from .api import API_PREFIX
+from .api.app import create_api
 from .api.errors import install_problem_handlers
 from .config import Settings, get_settings
 
