@@ -4796,7 +4796,7 @@
                 "type": "null"
               }
             ],
-            "description": "The job processing the page; `null` when there's none."
+            "description": "The page's newest job: for a new page the `ingestPage` job to poll, for a duplicate whatever ran on it last."
           }
         },
         "type": "object",

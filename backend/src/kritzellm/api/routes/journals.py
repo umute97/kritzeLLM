@@ -27,6 +27,7 @@ from ..pagination import paginate
 from ..schemas.jobs import Job
 from ..schemas.journals import ExportCreate, Journal, JournalCreate, JournalList, JournalUpdate
 from ..schemas.pages import MAX_PAGE_NUMBER, UploadItem, UploadResult
+from .jobs import job_out
 from .pages import page_out
 from .params import JOB_LOCATION, JournalCursor, JournalIdPath, Limit, location_header
 
@@ -251,7 +252,10 @@ async def upload_pages(
     return UploadResult(
         items=[
             UploadItem(
-                filename=item.filename, page=page_out(item.page), duplicate=item.duplicate, job=None
+                filename=item.filename,
+                page=page_out(item.page),
+                duplicate=item.duplicate,
+                job=job_out(item.job) if item.job else None,
             )
             for item in added
         ]

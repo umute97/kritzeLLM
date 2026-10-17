@@ -1,4 +1,4 @@
-"""Pages: listing them and adding uploaded ones."""
+"""Pages: listing them, adding uploaded ones and tracking their processing status."""
 
 import asyncio
 import re
@@ -6,14 +6,17 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Any
 
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from kritzellm.api.schemas.jobs import JobKind
 from kritzellm.api.schemas.pages import PAGE_CURSOR, PageStatus
 from kritzellm.db import models as db
 
+from .jobs import enqueue, latest_jobs
 from .storage import Staging, delete_page_files
 
 
@@ -118,6 +121,8 @@ class AddedPage:
     page: db.Page
     duplicate: bool
     """The file was already in the journal (or earlier in the same upload)."""
+    job: db.Job | None
+    """The page's newest job: the new ingest job, or for a duplicate whatever ran last."""
 
 
 async def add_pages(
@@ -161,6 +166,7 @@ async def _add_pages(
         select(db.Page).where(db.Page.journal_id == journal_id, db.Page.sha256.in_(hashes))
     )
     pages = {page.sha256: page for page in known}
+    jobs = await latest_jobs(session, [page.id for page in pages.values()])
 
     number = start_page_number or await next_page_number(session, journal_id)
     new_count = len(hashes - pages.keys())
@@ -171,10 +177,10 @@ async def _add_pages(
     ):
         raise PageNumberTakenError
 
-    added, new = [], []
+    outcomes, new = [], []
     for upload in uploads:
         if (page := pages.get(upload.sha256)) is not None:
-            added.append(AddedPage(upload.filename, page, duplicate=True))
+            outcomes.append((upload.filename, page, True))
             continue
         page = db.Page(
             journal_id=journal_id,
@@ -188,19 +194,41 @@ async def _add_pages(
         number += 1
         pages[upload.sha256] = page
         new.append((page, upload))
-        added.append(AddedPage(upload.filename, page, duplicate=False))
+        outcomes.append((upload.filename, page, False))
     session.add_all(page for page, _ in new)
-    await session.commit()
+    # Duplicate files surface here, before anything is moved, so `add_pages` can retry.
+    await session.flush()
 
+    # Pages, their files and their jobs appear together: the worker may start right on commit.
     published = []
     try:
         for page, upload in new:
             await asyncio.to_thread(staging.publish, upload.folder, page.id)
             published.append(page.id)
-    except BaseException:
-        new_ids = [page.id for page, _ in new]
-        await session.execute(delete(db.Page).where(db.Page.id.in_(new_ids)))
+        for page, _ in new:
+            jobs[page.id] = await enqueue(session, JobKind.INGEST_PAGE, page_id=page.id)
         await session.commit()
+    except BaseException:
         await asyncio.to_thread(delete_page_files, staging.data_dir, published)
         raise
-    return added
+    return [
+        AddedPage(filename, page, duplicate, jobs.get(page.id))
+        for filename, page, duplicate in outcomes
+    ]
+
+
+async def set_status(
+    session: AsyncSession,
+    page_id: str,
+    status: PageStatus,
+    *,
+    error: dict[str, Any] | None = None,
+) -> bool:
+    """Moves a page to `status` (with the problem if it failed). `False` if the page is gone."""
+    updated = await session.scalar(
+        update(db.Page)
+        .where(db.Page.id == page_id)
+        .values(status=status, error=error)
+        .returning(db.Page.id)
+    )
+    return updated is not None
