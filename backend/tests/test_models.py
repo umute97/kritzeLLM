@@ -6,7 +6,7 @@ from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kritzellm.api.schemas.blocks import BlockKind, Side
+from kritzellm.api.schemas.blocks import BlockKind
 from kritzellm.api.schemas.conversations import Role
 from kritzellm.api.schemas.pages import PageStatus
 from kritzellm.db.models import (
@@ -36,20 +36,7 @@ def _page(journal: Journal, number: int, content: bytes | None = None) -> Page:
 
 
 def _block(page: Page, seq: int, text: str) -> Block:
-    return Block(
-        page=page,
-        seq=seq,
-        kind=BlockKind.PARAGRAPH,
-        text=text,
-        band_start=seq + 1,
-        band_end=seq + 2,
-        band_total=24,
-        side=Side.FULL,
-        box_x=0.1,
-        box_y=0.05 * seq,
-        box_width=0.8,
-        box_height=0.08,
-    )
+    return Block(page=page, seq=seq, kind=BlockKind.PARAGRAPH, text=text)
 
 
 def _embedding(hot: int) -> list[float]:

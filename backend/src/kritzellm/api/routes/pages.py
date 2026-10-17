@@ -112,7 +112,7 @@ async def list_pages(
 async def get_page(page_id: PageIdPath, session: Session) -> PageDetail:
     """Returns a page with all of its transcribed blocks, in reading order."""
     page = await _get(session, page_id)
-    # Blocks only exist once pages are transcribed, which comes with the location labels.
+    # Blocks only exist once pages are transcribed.
     return PageDetail(**dict(page_out(page)), blocks=[])
 
 
@@ -203,7 +203,7 @@ async def get_page_image(
 ) -> Response:
     """Returns the page image.
 
-    `normalized` (the default) is the rotated, resized JPEG that all block locations refer to.
+    `normalized` (the default) is the rotated, resized JPEG that gets transcribed.
     `original` is the uploaded file as-is, and `thumbnail` is a small JPEG preview. A page's images
     never change, so they may be cached for good.
     """

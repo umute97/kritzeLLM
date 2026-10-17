@@ -24,7 +24,6 @@ class ToolName(StrEnum):
     FIND_EXACT = "findExact"
     LIST_PAGES = "listPages"
     READ_PAGE = "readPage"
-    VIEW_BLOCK_IMAGE = "viewBlockImage"
 
 
 class ToolCall(ApiModel):

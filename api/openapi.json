@@ -3,7 +3,7 @@
   "info": {
     "title": "kritzeLLM API",
     "summary": "Search and chat with a handwritten journal.",
-    "description": "Upload photos of handwritten journal pages, review their transcriptions, search them, and chat with\nan agent that cites the exact page and spot. 🖍️\n\n## Conventions\n\n- **Base path** `/api/v1`. JSON bodies use `camelCase`.\n- **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.\n- **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded\n  UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,\n  `cnv` conversation, `msg` message, `job` job.\n- **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.\n  `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed\n  IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.\n- **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as\n  `cursor`. `nextCursor` is `null` on the last page. Treat cursors as opaque strings; they stay\n  valid even if the last item you got is deleted meanwhile.\n- **Long-running work** (transcribing, re-indexing, exports) answers `202 Accepted` with a `Job`\n  and a `Location` header. Poll the job until it finishes.\n- **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`\n  needs `Authorization: Bearer <token>`.\n- **Locations on a page** are normalized to the page image: `0,0` is the top-left corner and `1,1`\n  the bottom-right, so they work for any image size.\n",
+    "description": "Upload photos of handwritten journal pages, review their transcriptions, search them, and chat with\nan agent that cites the exact page. 🖍️\n\n## Conventions\n\n- **Base path** `/api/v1`. JSON bodies use `camelCase`.\n- **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.\n- **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded\n  UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,\n  `cnv` conversation, `msg` message, `job` job.\n- **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.\n  `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed\n  IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.\n- **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as\n  `cursor`. `nextCursor` is `null` on the last page. Treat cursors as opaque strings; they stay\n  valid even if the last item you got is deleted meanwhile.\n- **Long-running work** (transcribing, re-indexing, exports) answers `202 Accepted` with a `Job`\n  and a `Location` header. Poll the job until it finishes.\n- **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`\n  needs `Authorization: Bearer <token>`.\n",
     "version": "0.3.0"
   },
   "servers": [
@@ -1095,7 +1095,7 @@
           "pages"
         ],
         "summary": "Get a page image",
-        "description": "Returns the page image.\n\n`normalized` (the default) is the rotated, resized JPEG that all block locations refer to.\n`original` is the uploaded file as-is, and `thumbnail` is a small JPEG preview. A page's images\nnever change, so they may be cached for good.",
+        "description": "Returns the page image.\n\n`normalized` (the default) is the rotated, resized JPEG that gets transcribed.\n`original` is the uploaded file as-is, and `thumbnail` is a small JPEG preview. A page's images\nnever change, so they may be cached for good.",
         "operationId": "getPageImage",
         "security": [
           {
@@ -1548,102 +1548,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BlockUpdateResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The request couldn't be parsed (e.g. malformed JSON or multipart).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or wrong bearer token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The resource doesn't exist.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Some values are invalid (including malformed IDs). Each one is listed in `errors`.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/blocks/{blockId}/image": {
-      "get": {
-        "tags": [
-          "blocks"
-        ],
-        "summary": "Get a block's image crop",
-        "description": "Returns the part of the normalized page image that the block covers, plus a little padding.",
-        "operationId": "getBlockImage",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "blockId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^blk_[0-7][0-9a-hjkmnp-tv-z]{25}$",
-              "description": "The block's ID.",
-              "title": "Blockid"
-            },
-            "description": "The block's ID."
-          },
-          {
-            "name": "padding",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number",
-              "maximum": 0.25,
-              "minimum": 0,
-              "description": "Extra margin around the block, as a fraction of the page height.",
-              "default": 0.02,
-              "title": "Padding"
-            },
-            "description": "Extra margin around the block, as a fraction of the page height."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A JPEG crop of the block.",
-            "content": {
-              "image/jpeg": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
                 }
               }
             }
@@ -2756,60 +2660,6 @@
   },
   "components": {
     "schemas": {
-      "BandRange": {
-        "properties": {
-          "start": {
-            "type": "integer",
-            "minimum": 1,
-            "title": "Start",
-            "description": "First band the block touches."
-          },
-          "end": {
-            "type": "integer",
-            "minimum": 1,
-            "title": "End",
-            "description": "Last band the block touches (≥ `start`)."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "start",
-          "end"
-        ],
-        "title": "BandRange",
-        "description": "A block's vertical extent in the page's ruler bands (see `Bands`)."
-      },
-      "Bands": {
-        "properties": {
-          "start": {
-            "type": "integer",
-            "minimum": 1,
-            "title": "Start",
-            "description": "First band the block touches."
-          },
-          "end": {
-            "type": "integer",
-            "minimum": 1,
-            "title": "End",
-            "description": "Last band the block touches (≥ `start`)."
-          },
-          "total": {
-            "type": "integer",
-            "minimum": 1,
-            "title": "Total",
-            "description": "How many bands the page was split into."
-          }
-        },
-        "type": "object",
-        "required": [
-          "start",
-          "end",
-          "total"
-        ],
-        "title": "Bands",
-        "description": "A block's vertical extent in ruler bands.\n\nWhile transcribing, the page is split into `total` equal horizontal bands numbered from 1 at\nthe top; the block covers bands `start` to `end`."
-      },
       "Block": {
         "properties": {
           "id": {
@@ -2842,9 +2692,6 @@
             "type": "boolean",
             "title": "Uncertain",
             "description": "`true` when the model wasn't sure about parts of this block."
-          },
-          "location": {
-            "$ref": "#/components/schemas/Location"
           }
         },
         "type": "object",
@@ -2854,11 +2701,10 @@
           "seq",
           "kind",
           "text",
-          "uncertain",
-          "location"
+          "uncertain"
         ],
         "title": "Block",
-        "description": "A located piece of text on a page."
+        "description": "A piece of text on a page."
       },
       "BlockInput": {
         "properties": {
@@ -2892,21 +2738,13 @@
             "title": "Uncertain",
             "description": "Whether parts of the text are still unsure.",
             "default": false
-          },
-          "bands": {
-            "$ref": "#/components/schemas/BandRange"
-          },
-          "side": {
-            "$ref": "#/components/schemas/Side"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "kind",
-          "text",
-          "bands",
-          "side"
+          "text"
         ],
         "title": "BlockInput",
         "description": "One block in a full replacement of a page's blocks."
@@ -3026,47 +2864,6 @@
         ],
         "title": "BlocksReplaceResult",
         "description": "A page's blocks after a replacement, plus the re-index job."
-      },
-      "Box": {
-        "properties": {
-          "x": {
-            "type": "number",
-            "maximum": 1,
-            "minimum": 0,
-            "title": "X",
-            "description": "Left edge."
-          },
-          "y": {
-            "type": "number",
-            "maximum": 1,
-            "minimum": 0,
-            "title": "Y",
-            "description": "Top edge."
-          },
-          "width": {
-            "type": "number",
-            "maximum": 1,
-            "minimum": 0,
-            "title": "Width",
-            "description": "Width."
-          },
-          "height": {
-            "type": "number",
-            "maximum": 1,
-            "minimum": 0,
-            "title": "Height",
-            "description": "Height."
-          }
-        },
-        "type": "object",
-        "required": [
-          "x",
-          "y",
-          "width",
-          "height"
-        ],
-        "title": "Box",
-        "description": "A rectangle in normalized page coordinates (`0,0` top-left, `1,1` bottom-right)."
       },
       "ChatStreamEvent": {
         "description": "One Server-Sent Event of a streamed answer. The SSE `event:` field equals `type`.",
@@ -3786,33 +3583,6 @@
         "title": "JournalUpdate",
         "description": "Changes to a journal. Only the given fields change."
       },
-      "Location": {
-        "properties": {
-          "box": {
-            "$ref": "#/components/schemas/Box"
-          },
-          "bands": {
-            "$ref": "#/components/schemas/Bands"
-          },
-          "side": {
-            "$ref": "#/components/schemas/Side"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label",
-            "description": "Human-friendly description of the spot, e.g. \"middle of the page, paragraph 3\"."
-          }
-        },
-        "type": "object",
-        "required": [
-          "box",
-          "bands",
-          "side",
-          "label"
-        ],
-        "title": "Location",
-        "description": "Where a block sits on its page."
-      },
       "Message": {
         "properties": {
           "id": {
@@ -4185,7 +3955,7 @@
           "normalized": {
             "type": "string",
             "title": "Normalized",
-            "description": "The rotated, resized image all block locations refer to."
+            "description": "The rotated, resized JPEG that gets transcribed."
           },
           "original": {
             "type": "string",
@@ -4577,16 +4347,6 @@
         "title": "SearchResults",
         "description": "Search hits, best first."
       },
-      "Side": {
-        "type": "string",
-        "enum": [
-          "left",
-          "right",
-          "full"
-        ],
-        "title": "Side",
-        "description": "Horizontal placement. `full` spans the text width; `left`/`right` are margin notes or columns."
-      },
       "Source": {
         "properties": {
           "ref": {
@@ -4718,8 +4478,7 @@
           "searchJournal",
           "findExact",
           "listPages",
-          "readPage",
-          "viewBlockImage"
+          "readPage"
         ],
         "title": "ToolName",
         "description": "Tools the agent can use."
@@ -4850,7 +4609,7 @@
     },
     {
       "name": "blocks",
-      "description": "Located text on a page (paragraphs, lists, margin notes)."
+      "description": "Text on a page (paragraphs, lists, margin notes)."
     },
     {
       "name": "search",

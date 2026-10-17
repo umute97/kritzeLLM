@@ -7,7 +7,6 @@ from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
-    REAL,
     CheckConstraint,
     Computed,
     Date,
@@ -26,7 +25,7 @@ from sqlalchemy import text as sql
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from kritzellm.api.schemas.blocks import BlockKind, Side
+from kritzellm.api.schemas.blocks import BlockKind
 from kritzellm.api.schemas.conversations import Role
 from kritzellm.api.schemas.jobs import JobKind, JobStatus
 from kritzellm.api.schemas.pages import PageStatus
@@ -137,17 +136,7 @@ class Block(Base):
     __table_args__ = (
         UniqueConstraint("page_id", "seq", deferrable=True, initially="DEFERRED"),
         CheckConstraint("seq >= 0", name="seq_not_negative"),
-        CheckConstraint(
-            "1 <= band_start AND band_start <= band_end AND band_end <= band_total",
-            name="bands_in_order",
-        ),
-        CheckConstraint(
-            "box_x BETWEEN 0 AND 1 AND box_y BETWEEN 0 AND 1"
-            " AND box_width BETWEEN 0 AND 1 AND box_height BETWEEN 0 AND 1",
-            name="box_normalized",
-        ),
         _one_of("kind", BlockKind),
-        _one_of("side", Side),
         Index(None, "text", postgresql_using="gin", postgresql_ops={"text": "gin_trgm_ops"}),
     )
 
@@ -160,15 +149,6 @@ class Block(Base):
     kind: Mapped[BlockKind] = mapped_column(_enum(BlockKind))
     text: Mapped[str]
     uncertain: Mapped[bool] = mapped_column(server_default=sql("false"))
-
-    band_start: Mapped[int]
-    band_end: Mapped[int]
-    band_total: Mapped[int]
-    side: Mapped[Side] = mapped_column(_enum(Side))
-    box_x: Mapped[float] = mapped_column(REAL)
-    box_y: Mapped[float] = mapped_column(REAL)
-    box_width: Mapped[float] = mapped_column(REAL)
-    box_height: Mapped[float] = mapped_column(REAL)
 
     page: Mapped[Page] = relationship(back_populates="blocks", lazy="raise")
 
