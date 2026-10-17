@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/umute97/kritzeLLM/compare/v0.3.0...v0.4.0) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** cite pages, not spots on them 📍 ([#47](https://github.com/umute97/kritzeLLM/issues/47))
+
+### Features
+
+* **api:** run background jobs from the jobs table ⏳ ([#45](https://github.com/umute97/kritzeLLM/issues/45)) ([989273b](https://github.com/umute97/kritzeLLM/commit/989273bfc4a35223e47eb22e8b22cae16dbd93ac))
+
+
+### Refactoring
+
+* **api:** cite pages, not spots on them 📍 ([#47](https://github.com/umute97/kritzeLLM/issues/47)) ([b19f553](https://github.com/umute97/kritzeLLM/commit/b19f5537533c75323522debe2d9643fc20085b3e))
+
 ## [0.3.0](https://github.com/umute97/kritzeLLM/compare/v0.2.0...v0.3.0) (2026-10-16)
 
 
