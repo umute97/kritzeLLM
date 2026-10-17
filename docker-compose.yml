@@ -55,6 +55,29 @@ services:
     volumes:
       - api-data:/data
 
+  # Runs background jobs (processing uploaded pages) from the queue in the database.
+  worker:
+    build: backend
+    image: kritzellm-api:local
+    command: ["python", "-m", "kritzellm.worker"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kritzellm}:${POSTGRES_PASSWORD:-kritzellm}@db:5432/${POSTGRES_DB:-kritzellm}
+      DATA_DIR: /data
+      TRANSCRIBE_MODEL: ${TRANSCRIBE_MODEL:-}
+      CHAT_MODEL: ${CHAT_MODEL:-}
+      EMBED_MODEL: ${EMBED_MODEL:-}
+    volumes:
+      - api-data:/data
+    # The image's healthcheck probes the API port, which the worker doesn't serve.
+    healthcheck:
+      disable: true
+
 volumes:
   db-data:
   api-data:

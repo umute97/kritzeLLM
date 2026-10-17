@@ -11,6 +11,7 @@ just backend-test        # tests, incl. "is api/openapi.json up to date?" and th
 uv run pyright           # typecheck
 just api-export          # regenerate api/openapi.json after changing the API
 just backend-dev         # run it with auto-reload on http://localhost:8000 (needs `just up db`)
+just worker-dev          # run the background worker next to it
 ```
 
 Once it's running, the interactive docs are at <http://localhost:8000/api/v1/docs> 🌸
@@ -55,8 +56,27 @@ which makes them fail instead. One of them fails when a model changed without a 
 ([`tests/test_schemathesis.py`](tests/test_schemathesis.py)), checking status codes, response bodies, auth
 and input validation. When an endpoint stops being a stub, add its operation ID to `FUZZED` there.
 
+## Background jobs
+
+Slow work (processing uploaded pages, later re-indexing and exports) runs in a separate worker
+process, [`src/kritzellm/worker.py`](src/kritzellm/worker.py). There's no extra queue service: the
+`jobs` table *is* the queue.
+
+- **Enqueue.** The API adds a `queued` row in the same transaction as the change it belongs to (an
+  upload adds each page and its `ingestPage` job together). A Postgres `NOTIFY` wakes the worker on
+  commit. The worker also polls every few seconds, in case it missed one.
+- **Run.** The worker claims the oldest queued job with `FOR UPDATE SKIP LOCKED` and runs one job at a
+  time. It updates `status`, `progress` and the page's status as it goes, and a failure stores an RFC
+  9457 problem on the job (and on its page). Clients poll `GET /jobs/{jobId}`.
+- **Restart.** A job that was running when the worker stopped goes back to `queued` on the next start.
+  That's only safe with a single worker, so run exactly one.
+
+Add a job kind by writing a handler and registering it in `HANDLERS` in `worker.py`.
+`just smoke` uploads a page to the running stack and waits for its job (CI runs it too).
+
 ## Docker
 
-`just up` builds the image from the [`Dockerfile`](Dockerfile) and starts it next to Postgres.
+`just up` builds the image from the [`Dockerfile`](Dockerfile) and starts it next to Postgres, once as
+`api` and once as `worker`.
 Released images are published as `ghcr.io/umute97/kritzellm-api`; run them with
 [`docker-compose.prod.yml`](../docker-compose.prod.yml), which insists on a `POSTGRES_PASSWORD` and an `API_TOKEN`.
