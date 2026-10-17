@@ -28,6 +28,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from kritzellm.api.schemas.blocks import BlockKind, Side
 from kritzellm.api.schemas.conversations import Role
+from kritzellm.api.schemas.jobs import JobKind, JobStatus
 from kritzellm.api.schemas.pages import PageStatus
 from kritzellm.ids import Prefix, new_id, new_uuid
 
@@ -235,3 +236,38 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages", lazy="raise")
+
+
+class Job(Base):
+    """Background work. Queued rows are the worker's queue; the API reads them for progress."""
+
+    __tablename__ = "jobs"
+    __table_args__ = (
+        CheckConstraint("page_id IS NULL OR journal_id IS NULL", name="one_target"),
+        CheckConstraint("progress_done BETWEEN 0 AND progress_total", name="progress_in_range"),
+        _one_of("kind", JobKind),
+        _one_of("status", JobStatus),
+        Index("ix_jobs_queued", "id", postgresql_where=sql("status = 'queued'")),
+    )
+
+    id: Mapped[str] = _id(Prefix.JOB)
+    """UUIDv7, so ordering by ID is ordering by time (and the queue is first in, first out)."""
+    kind: Mapped[JobKind] = mapped_column(_enum(JobKind))
+    status: Mapped[JobStatus] = mapped_column(
+        _enum(JobStatus), server_default=JobStatus.QUEUED.value
+    )
+    page_id: Mapped[str | None] = mapped_column(
+        TypeId(Prefix.PAGE), ForeignKey("pages.id", ondelete="CASCADE"), index=True
+    )
+    """The page the job works on, if any. Deleting the page deletes its jobs."""
+    journal_id: Mapped[str | None] = mapped_column(
+        TypeId(Prefix.JOURNAL), ForeignKey("journals.id", ondelete="CASCADE"), index=True
+    )
+    """The journal the job works on, if any. Deleting the journal deletes its jobs."""
+    progress_done: Mapped[int | None]
+    progress_total: Mapped[int | None]
+    error: Mapped[dict[str, Any] | None]
+    """The RFC 9457 problem that made the job fail."""
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    started_at: Mapped[datetime | None]
+    finished_at: Mapped[datetime | None]

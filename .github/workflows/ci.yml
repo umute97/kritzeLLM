@@ -101,6 +101,8 @@ jobs:
         run: uvx --from rust-just just db-check
       - name: Check the API
         run: uvx --from rust-just just api-check
+      - name: Upload a page and wait for its job
+        run: uvx --from rust-just just smoke
       - name: Logs on failure
         if: failure()
         run: docker compose logs

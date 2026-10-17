@@ -43,6 +43,10 @@ api-check:
     @curl -fsS "http://localhost:${API_PORT:-8000}/api/v1/health" && echo
     @curl -fsS -o /dev/null "http://localhost:${API_PORT:-8000}/api/v1/docs" && echo "docs ok"
 
+# Upload a page to the running stack and wait for its job to finish
+smoke:
+    python3 backend/scripts/smoke.py
+
 # Delete the local database and data volumes (asks first)
 [confirm("This deletes all local database data and page images. Continue?")]
 db-reset:
@@ -71,6 +75,10 @@ backend-test:
 # Run the API locally with auto-reload, against the compose database (`just up db`)
 backend-dev:
     uv run --project backend uvicorn kritzellm.main:app --reload --reload-dir backend/src --port "${API_PORT:-8000}"
+
+# Run the background worker locally, against the compose database (`just up db`)
+worker-dev:
+    uv run --project backend python -m kritzellm.worker
 
 # --- API contract ----------------------------------------------------------------
 

@@ -29,6 +29,8 @@ FUZZED = [
     "updatePage",
     "deletePage",
     "getPageImage",
+    "listJobs",
+    "getJob",
 ]
 
 

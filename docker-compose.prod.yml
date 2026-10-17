@@ -51,6 +51,28 @@ services:
     volumes:
       - api-data:/data
 
+  # Runs background jobs (processing uploaded pages) from the queue in the database.
+  worker:
+    image: ghcr.io/umute97/kritzellm-api:${KRITZELLM_VERSION:-latest}
+    command: ["python", "-m", "kritzellm.worker"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kritzellm}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-kritzellm}
+      DATA_DIR: /data
+      TRANSCRIBE_MODEL: ${TRANSCRIBE_MODEL:-}
+      CHAT_MODEL: ${CHAT_MODEL:-}
+      EMBED_MODEL: ${EMBED_MODEL:-}
+    volumes:
+      - api-data:/data
+    # The image's healthcheck probes the API port; the worker has a heartbeat instead.
+    healthcheck:
+      test: ["CMD", "python", "-m", "kritzellm.worker", "healthcheck"]
+
 volumes:
   db-data:
   api-data:

@@ -134,7 +134,7 @@ class UploadItem(ApiModel):
     duplicate: bool
     """`true` if this exact file was already in the journal (or earlier in this upload); `page` is then the existing page."""
     job: Job | None
-    """The job processing the page; `null` when there's none."""
+    """The page's newest job: for a new page the `ingestPage` job to poll, for a duplicate whatever ran on it last."""
 
 
 class UploadResult(ApiModel):

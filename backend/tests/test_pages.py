@@ -55,7 +55,7 @@ def test_upload_stores_and_serves_three_variants(
 
     assert [item["filename"] for item in items] == ["p1.jpg", "p2.heic"]
     assert [item["duplicate"] for item in items] == [False, False]
-    assert [item["job"] for item in items] == [None, None]
+    assert [item["job"]["kind"] for item in items] == ["ingestPage", "ingestPage"]
     first, second = (item["page"] for item in items)
     assert first["id"].startswith("pg_")
     assert (first["pageNumber"], second["pageNumber"]) == (1, 2)

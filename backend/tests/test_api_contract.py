@@ -57,8 +57,6 @@ STUB_CASES = [
     ("PATCH", f"/conversations/{CONVERSATION_ID}", {"title": "Lisbon"}),
     ("DELETE", f"/conversations/{CONVERSATION_ID}", None),
     ("POST", f"/conversations/{CONVERSATION_ID}/messages", {"content": "hi"}),
-    ("GET", "/jobs", None),
-    ("GET", f"/jobs/{JOB_ID}", None),
     ("GET", f"/jobs/{JOB_ID}/result", None),
     ("POST", "/admin/reindex", None),
 ]
@@ -88,6 +86,8 @@ BUILT = {
     "updatePage",
     "deletePage",
     "getPageImage",
+    "listJobs",
+    "getJob",
 }
 
 

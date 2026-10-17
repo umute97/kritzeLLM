@@ -16,6 +16,7 @@ class Prefix(StrEnum):
     BLOCK = "blk"
     CONVERSATION = "cnv"
     MESSAGE = "msg"
+    JOB = "job"
 
 
 def new_uuid() -> uuid.UUID:

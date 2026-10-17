@@ -9,7 +9,7 @@ from kritzellm.db.migrate import alembic_config
 
 pytestmark = pytest.mark.db
 
-TABLES = {"journals", "pages", "blocks", "chunks", "conversations", "messages"}
+TABLES = {"journals", "pages", "blocks", "chunks", "conversations", "messages", "jobs"}
 
 
 async def _query(url: str, sql: str) -> set[str]:
