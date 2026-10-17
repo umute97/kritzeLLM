@@ -70,6 +70,8 @@ process, [`src/kritzellm/worker.py`](src/kritzellm/worker.py). There's no extra 
   9457 problem on the job (and on its page). Clients poll `GET /jobs/{jobId}`.
 - **Restart.** A job that was running when the worker stopped goes back to `queued` on the next start.
   That's only safe with a single worker, so run exactly one.
+- **Health.** The worker touches a heartbeat file every 10 s, and
+  `python -m kritzellm.worker healthcheck` (the compose healthcheck) fails once it's 30 s old.
 
 Add a job kind by writing a handler and registering it in `HANDLERS` in `worker.py`.
 `just smoke` uploads a page to the running stack and waits for its job (CI runs it too).

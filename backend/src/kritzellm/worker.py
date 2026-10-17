@@ -3,14 +3,19 @@
 It runs queued jobs one at a time, oldest first. A `NOTIFY` wakes it as soon as jobs are queued;
 it also polls every few seconds in case one was missed. A job that was running when the worker
 stopped is queued again on the next start, which is safe because there's only ever one worker.
+
+`python -m kritzellm.worker healthcheck` exits non-zero unless the worker's heartbeat is fresh.
 """
 
 import asyncio
 import contextlib
 import logging
 import signal
+import sys
+import tempfile
 import time
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from types import TracebackType
 from typing import Self
 
@@ -30,6 +35,11 @@ logger = logging.getLogger("kritzellm.worker")
 
 POLL_SECONDS = 5.0
 """How long to sleep without a `NOTIFY` before looking for queued jobs anyway."""
+
+HEARTBEAT_FILE = Path(tempfile.gettempdir()) / "kritzellm-worker.heartbeat"
+"""Touched regularly while the worker's event loop runs, so a healthcheck can tell it's alive."""
+HEARTBEAT_SECONDS = 10.0
+HEARTBEAT_MAX_AGE_SECONDS = 30.0
 
 Handler = Callable[[AsyncSession, db.Job], Awaitable[None]]
 
@@ -140,19 +150,40 @@ class Worker:
         self._wakeup.set()
 
 
+async def heartbeat() -> None:
+    """Touches `HEARTBEAT_FILE` until cancelled. It stops when the event loop is stuck."""
+    while True:
+        await asyncio.to_thread(HEARTBEAT_FILE.touch)
+        await asyncio.sleep(HEARTBEAT_SECONDS)
+
+
+def is_alive() -> bool:
+    """Whether a worker touched the heartbeat file recently."""
+    try:
+        age = time.time() - HEARTBEAT_FILE.stat().st_mtime
+    except FileNotFoundError:
+        return False
+    return age < HEARTBEAT_MAX_AGE_SECONDS
+
+
 async def main() -> None:
     task = asyncio.current_task()
     assert task is not None
     loop = asyncio.get_running_loop()
     for stop in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(stop, task.cancel)
+    beating = asyncio.create_task(heartbeat())
     async with Worker(get_settings()) as worker:
         try:
             await worker.run()
         except asyncio.CancelledError:
             logger.info("Stopped")
+        finally:
+            beating.cancel()
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["healthcheck"]:
+        sys.exit(0 if is_alive() else 1)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s [%(name)s] %(message)s")
     asyncio.run(main())

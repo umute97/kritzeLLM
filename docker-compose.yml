@@ -74,9 +74,9 @@ services:
       EMBED_MODEL: ${EMBED_MODEL:-}
     volumes:
       - api-data:/data
-    # The image's healthcheck probes the API port, which the worker doesn't serve.
+    # The image's healthcheck probes the API port; the worker has a heartbeat instead.
     healthcheck:
-      disable: true
+      test: ["CMD", "python", "-m", "kritzellm.worker", "healthcheck"]
 
 volumes:
   db-data:

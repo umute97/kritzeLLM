@@ -1,5 +1,7 @@
 import asyncio
 import contextlib
+import os
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -293,3 +295,23 @@ def test_the_worker_wakes_up_for_new_jobs(
 
     # No handler for reindexAll yet, so it fails, but it ran.
     assert asyncio.run(scenario()) == JobStatus.FAILED
+
+
+def test_the_heartbeat_tells_whether_the_worker_is_alive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    beat = tmp_path / "heartbeat"
+    monkeypatch.setattr(worker_module, "HEARTBEAT_FILE", beat)
+    assert not worker_module.is_alive()
+
+    async def beat_once() -> None:
+        beating = asyncio.create_task(worker_module.heartbeat())
+        await asyncio.sleep(0.1)
+        beating.cancel()
+
+    asyncio.run(beat_once())
+    assert worker_module.is_alive()
+
+    stale = time.time() - worker_module.HEARTBEAT_MAX_AGE_SECONDS - 1
+    os.utime(beat, (stale, stale))
+    assert not worker_module.is_alive()
