@@ -1,9 +1,8 @@
-"""Blocks: located pieces of text on a page (paragraphs, lists, margin notes, ...)."""
+"""Blocks: pieces of text on a page (paragraphs, lists, margin notes, ...)."""
 
 from enum import StrEnum
-from typing import Self
 
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from .common import NO_NUL, ApiModel, BlockId, InputModel, PageId
 from .jobs import Job
@@ -20,69 +19,8 @@ class BlockKind(StrEnum):
     OTHER = "other"
 
 
-class Side(StrEnum):
-    """Horizontal placement. `full` spans the text width; `left`/`right` are margin notes or columns."""
-
-    LEFT = "left"
-    RIGHT = "right"
-    FULL = "full"
-
-
-class Bands(ApiModel):
-    """A block's vertical extent in ruler bands.
-
-    While transcribing, the page is split into `total` equal horizontal bands numbered from 1 at
-    the top; the block covers bands `start` to `end`.
-    """
-
-    start: int = Field(ge=1)
-    """First band the block touches."""
-    end: int = Field(ge=1)
-    """Last band the block touches (≥ `start`)."""
-    total: int = Field(ge=1)
-    """How many bands the page was split into."""
-
-
-class BandRange(InputModel):
-    """A block's vertical extent in the page's ruler bands (see `Bands`)."""
-
-    start: int = Field(ge=1)
-    """First band the block touches."""
-    end: int = Field(ge=1)
-    """Last band the block touches (≥ `start`)."""
-
-    @model_validator(mode="after")
-    def _end_after_start(self) -> Self:
-        if self.end < self.start:
-            raise ValueError("`end` must be ≥ `start`")
-        return self
-
-
-class Box(ApiModel):
-    """A rectangle in normalized page coordinates (`0,0` top-left, `1,1` bottom-right)."""
-
-    x: float = Field(ge=0, le=1)
-    """Left edge."""
-    y: float = Field(ge=0, le=1)
-    """Top edge."""
-    width: float = Field(ge=0, le=1)
-    """Width."""
-    height: float = Field(ge=0, le=1)
-    """Height."""
-
-
-class Location(ApiModel):
-    """Where a block sits on its page."""
-
-    box: Box
-    bands: Bands
-    side: Side
-    label: str
-    """Human-friendly description of the spot, e.g. "middle of the page, paragraph 3"."""
-
-
 class Block(ApiModel):
-    """A located piece of text on a page."""
+    """A piece of text on a page."""
 
     id: BlockId
     page_id: PageId
@@ -93,7 +31,6 @@ class Block(ApiModel):
     """The transcribed text. Unreadable words are written as `[?]`."""
     uncertain: bool
     """`true` when the model wasn't sure about parts of this block."""
-    location: Location
 
 
 class BlockInput(InputModel):
@@ -106,8 +43,6 @@ class BlockInput(InputModel):
     """The block's text."""
     uncertain: bool = False
     """Whether parts of the text are still unsure."""
-    bands: BandRange
-    side: Side
 
 
 class BlocksReplace(InputModel):

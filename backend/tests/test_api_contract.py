@@ -49,7 +49,6 @@ STUB_CASES = [
     ("POST", f"/pages/{PAGE_ID}/transcribe", None),
     ("GET", f"/blocks/{BLOCK_ID}", None),
     ("PATCH", f"/blocks/{BLOCK_ID}", {"text": "fixed"}),
-    ("GET", f"/blocks/{BLOCK_ID}/image", None),
     ("GET", "/search?q=lisbon", None),
     ("GET", "/conversations", None),
     ("POST", "/conversations", None),

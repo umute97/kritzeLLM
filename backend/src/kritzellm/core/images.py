@@ -13,7 +13,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 pillow_heif.register_heif_opener()
 
 NORMALIZED_LONG_EDGE = 2048
-"""The normalized image is at most this big on its long edge; block locations refer to it."""
+"""The normalized image is at most this big on its long edge; it's what gets transcribed."""
 THUMBNAIL_LONG_EDGE = 400
 
 _HEIC_BRANDS = {b"heic", b"heix", b"heim", b"heis", b"hevc", b"hevx"}

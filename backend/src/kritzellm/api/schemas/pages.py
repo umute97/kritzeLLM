@@ -42,7 +42,7 @@ class PageImageUrls(ApiModel):
     """Where to fetch each version of a page image."""
 
     normalized: str
-    """The rotated, resized image all block locations refer to."""
+    """The rotated, resized JPEG that gets transcribed."""
     original: str
     """The uploaded file as-is."""
     thumbnail: str

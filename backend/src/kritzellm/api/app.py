@@ -22,7 +22,7 @@ from .schemas.conversations import ChatStreamEvent
 
 DESCRIPTION = """\
 Upload photos of handwritten journal pages, review their transcriptions, search them, and chat with
-an agent that cites the exact page and spot. 🖍️
+an agent that cites the exact page. 🖍️
 
 ## Conventions
 
@@ -41,15 +41,13 @@ an agent that cites the exact page and spot. 🖍️
   and a `Location` header. Poll the job until it finishes.
 - **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`
   needs `Authorization: Bearer <token>`.
-- **Locations on a page** are normalized to the page image: `0,0` is the top-left corner and `1,1`
-  the bottom-right, so they work for any image size.
 """
 
 TAGS = [
     {"name": "health", "description": "Service status."},
     {"name": "journals", "description": "Notebooks (or volumes) that pages belong to."},
     {"name": "pages", "description": "Uploaded page images and their transcriptions."},
-    {"name": "blocks", "description": "Located text on a page (paragraphs, lists, margin notes)."},
+    {"name": "blocks", "description": "Text on a page (paragraphs, lists, margin notes)."},
     {"name": "search", "description": "Hybrid semantic + keyword search over all pages."},
     {"name": "conversations", "description": "Chat threads with the journal agent."},
     {"name": "jobs", "description": "Background work and its progress."},
