@@ -35,21 +35,34 @@ def upgrade() -> None:
         op.drop_column("blocks", name)
 
 
+# Old blocks come back located on the whole page: band 1 of 1, both sides, the full box.
+WHOLE_PAGE = {
+    "band_start": "1",
+    "band_end": "1",
+    "band_total": "1",
+    "side": "full",
+    "box_x": "0",
+    "box_y": "0",
+    "box_width": "1",
+    "box_height": "1",
+}
+
+
 def downgrade() -> None:
-    # The columns come back NOT NULL, as before, so this only works while `blocks` is empty.
-    op.add_column("blocks", sa.Column("band_start", sa.Integer(), nullable=False))
-    op.add_column("blocks", sa.Column("band_end", sa.Integer(), nullable=False))
-    op.add_column("blocks", sa.Column("band_total", sa.Integer(), nullable=False))
-    op.add_column(
-        "blocks",
-        sa.Column(
-            "side", sa.Enum("left", "right", "full", name="side", native_enum=False), nullable=False
-        ),
-    )
-    op.add_column("blocks", sa.Column("box_x", sa.REAL(), nullable=False))
-    op.add_column("blocks", sa.Column("box_y", sa.REAL(), nullable=False))
-    op.add_column("blocks", sa.Column("box_width", sa.REAL(), nullable=False))
-    op.add_column("blocks", sa.Column("box_height", sa.REAL(), nullable=False))
+    types = {
+        "band_start": sa.Integer(),
+        "band_end": sa.Integer(),
+        "band_total": sa.Integer(),
+        "side": sa.Enum("left", "right", "full", name="side", native_enum=False),
+        "box_x": sa.REAL(),
+        "box_y": sa.REAL(),
+        "box_width": sa.REAL(),
+        "box_height": sa.REAL(),
+    }
+    for name in COLUMNS:
+        column = sa.Column(name, types[name], nullable=False, server_default=WHOLE_PAGE[name])
+        op.add_column("blocks", column)
+        op.alter_column("blocks", name, server_default=None)
     op.create_check_constraint(
         op.f("ck_blocks_side_valid"), "blocks", "side IN ('left', 'right', 'full')"
     )
