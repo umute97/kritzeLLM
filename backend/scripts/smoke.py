@@ -82,7 +82,10 @@ def main() -> int:
 
     page = _request("GET", f"/pages/{item['page']['id']}")
     listed = any(each["id"] == job["id"] for each in _request("GET", "/jobs?limit=100")["items"])
-    print(f"Job {job['status']}, page {page['status']}, listed in /jobs: {listed}")
+    print(
+        f"Job {job['status']}, page {page['status']} with {len(page['blocks'])} block(s),"
+        f" listed in /jobs: {listed}"
+    )
     _request("DELETE", f"/journals/{journal['id']}")  # Takes the page and its job along.
     return 0 if job["status"] == "succeeded" and page["status"] == "ready" and listed else 1
 
