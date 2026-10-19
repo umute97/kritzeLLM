@@ -5,6 +5,7 @@ from fastapi import APIRouter, Body, Query, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
 from kritzellm.core import pages as core
 from kritzellm.core.storage import delete_page_files, variant_path
@@ -27,6 +28,7 @@ from ..schemas.pages import (
     PageUpdate,
     TranscribeRequest,
 )
+from .blocks import block_out
 from .params import BINARY, JOB_LOCATION, DateFrom, DateTo, Limit, PageCursor, PageIdPath
 
 router = APIRouter(tags=["pages"])
@@ -111,9 +113,10 @@ async def list_pages(
 )
 async def get_page(page_id: PageIdPath, session: Session) -> PageDetail:
     """Returns a page with all of its transcribed blocks, in reading order."""
-    page = await _get(session, page_id)
-    # Blocks only exist once pages are transcribed.
-    return PageDetail(**dict(page_out(page)), blocks=[])
+    page = await session.get(db.Page, page_id, options=[selectinload(db.Page.blocks)])
+    if page is None:
+        not_found("Page")
+    return PageDetail(**dict(page_out(page)), blocks=[block_out(block) for block in page.blocks])
 
 
 @router.patch(

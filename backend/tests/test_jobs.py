@@ -6,6 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from conftest import FakeVisionModel
 from fastapi.testclient import TestClient
 from pydantic import PostgresDsn
 from sqlalchemy import select, update
@@ -54,9 +55,26 @@ def _page(client: TestClient, page_id: str) -> dict:
     return response.json()
 
 
+PAGE = {
+    "page_label": "7",
+    "entry_dates": ["2026-03-15", "2026-03-14", "2026-03-15"],
+    "blocks": [
+        {"kind": "heading", "text": "14. März", "uncertain": False},
+        {"kind": "paragraph", "text": "Endlich beim Arzt gewesen.", "uncertain": False},
+        {"kind": "marginNote", "text": "anrufen [?]", "uncertain": True},
+    ],
+}
+
+
 @pytest.fixture
 def settings(database_url: str, data_dir: Path) -> Settings:
-    return Settings(api_token=None, database_url=PostgresDsn(database_url), data_dir=data_dir)
+    """The worker's settings: the fake `test` model, unless a test swaps in `vision_model`."""
+    return Settings(
+        api_token=None,
+        database_url=PostgresDsn(database_url),
+        data_dir=data_dir,
+        transcribe_model="test",
+    )
 
 
 @pytest.fixture
@@ -99,9 +117,13 @@ def test_a_duplicate_gets_the_pages_latest_job(
     assert again["job"]["id"] == twice["job"]["id"] == first["job"]["id"]
 
 
-def test_the_worker_walks_the_page_to_ready(
-    db_client: TestClient, make_image: MakeImage, work: Callable[[], None]
+def test_the_worker_transcribes_the_page(
+    db_client: TestClient,
+    make_image: MakeImage,
+    work: Callable[[], None],
+    vision_model: FakeVisionModel,
 ) -> None:
+    vision_model.outputs = [PAGE]
     (item,) = _upload(db_client, _journal(db_client), make_image(color="green"))
 
     work()
@@ -113,6 +135,96 @@ def test_the_worker_walks_the_page_to_ready(
     assert job["createdAt"] <= job["startedAt"] <= job["finishedAt"]
     page = _page(db_client, item["page"]["id"])
     assert (page["status"], page["error"]) == ("ready", None)
+    assert page["transcriptionModel"] == "test"
+    assert page["pageLabel"] == "7"
+    assert page["entryDates"] == ["2026-03-14", "2026-03-15"]
+    blocks = [(b["seq"], b["kind"], b["text"], b["uncertain"]) for b in page["blocks"]]
+    assert blocks == [
+        (0, "heading", "14. März", False),
+        (1, "paragraph", "Endlich beim Arzt gewesen.", False),
+        (2, "marginNote", "anrufen [?]", True),
+    ]
+    assert all(b["id"].startswith("blk_") and b["pageId"] == page["id"] for b in page["blocks"])
+    assert len(vision_model.calls) == 1
+
+
+def test_the_fake_model_needs_no_key(
+    db_client: TestClient, make_image: MakeImage, work: Callable[[], None]
+) -> None:
+    (item,) = _upload(db_client, _journal(db_client), make_image(color="lime"))
+
+    work()
+
+    page = _page(db_client, item["page"]["id"])
+    assert page["status"] == "ready"
+    assert page["blocks"]
+
+
+def test_label_and_dates_set_by_hand_are_kept(
+    db_client: TestClient,
+    make_image: MakeImage,
+    work: Callable[[], None],
+    vision_model: FakeVisionModel,
+) -> None:
+    vision_model.outputs = [PAGE]
+    (item,) = _upload(db_client, _journal(db_client), make_image(color="pink"))
+    page_id = item["page"]["id"]
+    fixed = {"pageLabel": "VII", "entryDates": ["2026-01-01"]}
+    assert db_client.patch(f"/pages/{page_id}", json=fixed).status_code == 200
+
+    work()
+
+    page = _page(db_client, page_id)
+    assert (page["pageLabel"], page["entryDates"]) == ("VII", ["2026-01-01"])
+    assert len(page["blocks"]) == 3
+
+
+def test_transcribing_again_replaces_the_blocks(
+    db_client: TestClient,
+    make_image: MakeImage,
+    settings: Settings,
+    work: Callable[[], None],
+    vision_model: FakeVisionModel,
+) -> None:
+    vision_model.outputs = [PAGE]
+    (item,) = _upload(db_client, _journal(db_client), make_image(color="cyan"))
+    work()
+
+    async def queue_again() -> None:
+        engine = create_async_engine(str(settings.database_url))
+        async with engine.begin() as connection:
+            await connection.execute(
+                update(db.Job).where(db.Job.id == item["job"]["id"]).values(status=JobStatus.QUEUED)
+            )
+        await engine.dispose()
+
+    asyncio.run(queue_again())
+    vision_model.outputs = [
+        {**PAGE, "blocks": [{"kind": "other", "text": "Neu", "uncertain": False}]}
+    ]
+    work()
+
+    page = _page(db_client, item["page"]["id"])
+    assert [(b["seq"], b["text"]) for b in page["blocks"]] == [(0, "Neu")]
+
+
+def test_a_model_that_keeps_answering_nonsense_fails_the_page(
+    db_client: TestClient,
+    make_image: MakeImage,
+    work: Callable[[], None],
+    vision_model: FakeVisionModel,
+) -> None:
+    vision_model.outputs = [{**PAGE, "entry_dates": ["someday"]}]
+    (item,) = _upload(db_client, _journal(db_client), make_image(color="brown"))
+
+    work()
+
+    job = _job(db_client, item["job"]["id"])
+    assert job["status"] == "failed"
+    assert len(vision_model.calls) == 2
+    page = _page(db_client, item["page"]["id"])
+    assert (page["status"], page["error"]) == ("failed", job["error"])
+    assert page["blocks"] == []
 
 
 def test_a_failing_job_fails_its_page(
@@ -121,7 +233,7 @@ def test_a_failing_job_fails_its_page(
     work: Callable[[], None],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def boom(session: AsyncSession, job: db.Job) -> None:
+    async def boom(session: AsyncSession, job: db.Job, settings: Settings) -> None:
         raise RuntimeError("The pen ran out of ink")
 
     monkeypatch.setitem(worker_module.HANDLERS, JobKind.INGEST_PAGE, boom)

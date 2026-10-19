@@ -1,10 +1,23 @@
 from fastapi import APIRouter
 
+from kritzellm.db import models as db
+
 from ..errors import not_implemented, problem_responses
 from ..schemas.blocks import Block, BlockUpdate, BlockUpdateResult
 from .params import BlockIdPath
 
 router = APIRouter(tags=["blocks"])
+
+
+def block_out(block: db.Block) -> Block:
+    return Block(
+        id=block.id,
+        page_id=block.page_id,
+        seq=block.seq,
+        kind=block.kind,
+        text=block.text,
+        uncertain=block.uncertain,
+    )
 
 
 @router.get(
