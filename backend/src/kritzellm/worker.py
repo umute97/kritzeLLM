@@ -23,10 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from kritzellm.api.schemas.common import Problem
 from kritzellm.api.schemas.jobs import JobKind
-from kritzellm.api.schemas.pages import PageStatus
+from kritzellm.api.schemas.pages import ImageVariant, PageStatus
 from kritzellm.config import Settings, get_settings
 from kritzellm.core import jobs
 from kritzellm.core import pages as core_pages
+from kritzellm.core.storage import variant_path
+from kritzellm.core.transcribe import transcribe
 from kritzellm.db import create_engine, create_sessionmaker
 from kritzellm.db import models as db
 
@@ -41,20 +43,37 @@ HEARTBEAT_FILE = Path(tempfile.gettempdir()) / "kritzellm-worker.heartbeat"
 HEARTBEAT_SECONDS = 10.0
 HEARTBEAT_MAX_AGE_SECONDS = 30.0
 
-Handler = Callable[[AsyncSession, db.Job], Awaitable[None]]
+Handler = Callable[[AsyncSession, db.Job, Settings], Awaitable[None]]
+
+INGEST_STEPS = 2
+"""Transcribing, then indexing."""
 
 
-async def ingest_page(session: AsyncSession, job: db.Job) -> None:
-    """Walks a new page through its statuses. A placeholder until pages are transcribed."""
-    assert job.page_id is not None
-    steps = (PageStatus.TRANSCRIBING, PageStatus.INDEXING)
-    for done, status in enumerate(steps):
-        if not await core_pages.set_status(session, job.page_id, status):
-            return  # The page was deleted, and its job with it.
-        await jobs.set_progress(session, job.id, done, len(steps))
-        await session.commit()
-    await core_pages.set_status(session, job.page_id, PageStatus.READY)
-    await jobs.set_progress(session, job.id, len(steps), len(steps))
+async def ingest_page(session: AsyncSession, job: db.Job, settings: Settings) -> None:
+    """Reads a new page into blocks. Indexing them for search is still a placeholder."""
+    job_id, page_id = job.id, job.page_id
+    assert page_id is not None
+    page = await session.get(db.Page, page_id)
+    if page is None:
+        return  # The page was deleted, and its job with it.
+    image_path = variant_path(
+        settings.data_dir, page_id, ImageVariant.NORMALIZED, page.original_media_type
+    )
+    await core_pages.set_status(session, page_id, PageStatus.TRANSCRIBING)
+    await jobs.set_progress(session, job_id, 0, INGEST_STEPS)
+    await session.commit()
+
+    image = await asyncio.to_thread(image_path.read_bytes)
+    model = settings.transcribe_model
+    transcription = await transcribe(image, settings, model=model)
+    if not await core_pages.save_transcription(session, page_id, transcription, model):
+        return
+    await core_pages.set_status(session, page_id, PageStatus.INDEXING)
+    await jobs.set_progress(session, job_id, 1, INGEST_STEPS)
+    await session.commit()
+
+    await core_pages.set_status(session, page_id, PageStatus.READY)
+    await jobs.set_progress(session, job_id, INGEST_STEPS, INGEST_STEPS)
 
 
 HANDLERS: dict[JobKind, Handler] = {JobKind.INGEST_PAGE: ingest_page}
@@ -71,6 +90,7 @@ class Worker:
     """Runs jobs against the configured database. Use it as an `async with` block."""
 
     def __init__(self, settings: Settings) -> None:
+        self.settings = settings
         self.engine = create_engine(settings)
         self.sessionmaker = create_sessionmaker(self.engine)
         self._wakeup = asyncio.Event()
@@ -124,7 +144,7 @@ class Worker:
                 handler = HANDLERS.get(kind)
                 if handler is None:
                     raise NotImplementedError(f"{kind} jobs aren't built yet")
-                await handler(session, job)
+                await handler(session, job, self.settings)
                 await jobs.succeed(session, job_id)
                 await session.commit()
             except Exception as exc:

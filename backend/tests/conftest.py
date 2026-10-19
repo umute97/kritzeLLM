@@ -9,10 +9,13 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import ExifTags, Image
 from pydantic import PostgresDsn
+from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from kritzellm.config import Settings
+from kritzellm.core import transcribe
 from kritzellm.db.migrate import upgrade
 from kritzellm.main import create_app
 
@@ -53,6 +56,35 @@ def make_image() -> Callable[..., bytes]:
         return buffer.getvalue()
 
     return make
+
+
+class FakeVisionModel:
+    """Stands in for the transcription model, answering with queued outputs.
+
+    Each call takes the next of `outputs` (the last one repeats). An output is what the model
+    returns as the transcription, or an exception to raise instead.
+    """
+
+    def __init__(self) -> None:
+        self.outputs: list[dict[str, Any] | Exception] = [
+            {"page_label": None, "entry_dates": [], "blocks": []}
+        ]
+        self.calls: list[tuple[list[ModelMessage], AgentInfo]] = []
+
+    def respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        self.calls.append((messages, info))
+        output = self.outputs.pop(0) if len(self.outputs) > 1 else self.outputs[0]
+        if isinstance(output, Exception):
+            raise output
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output)])
+
+
+@pytest.fixture
+def vision_model() -> Iterator[FakeVisionModel]:
+    """Replaces whatever model is configured for transcription."""
+    fake = FakeVisionModel()
+    with transcribe.agent.override(model=FunctionModel(fake.respond)):
+        yield fake
 
 
 @pytest.fixture

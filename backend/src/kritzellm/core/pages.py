@@ -1,4 +1,4 @@
-"""Pages: listing them, adding uploaded ones and tracking their processing status."""
+"""Pages: listing them, adding uploaded ones, tracking their processing and saving their text."""
 
 import asyncio
 import re
@@ -8,7 +8,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from kritzellm.db import models as db
 
 from .jobs import enqueue, latest_jobs
 from .storage import Staging, delete_page_files
+from .transcribe import PageTranscription
 
 
 class PageNumberTakenError(Exception):
@@ -232,3 +233,30 @@ async def set_status(
         .returning(db.Page.id)
     )
     return updated is not None
+
+
+async def save_transcription(
+    session: AsyncSession, page_id: str, transcription: PageTranscription, model: str
+) -> bool:
+    """Replaces the page's blocks with a fresh transcription by `model`. `False` if the page is gone.
+
+    The page label and entry dates are only filled in while they're still empty, so whatever was
+    set by hand wins.
+    """
+    page = await session.get(db.Page, page_id, with_for_update=True, populate_existing=True)
+    if page is None:
+        return False
+    await session.execute(delete(db.Block).where(db.Block.page_id == page_id))
+    session.add_all(
+        db.Block(
+            page_id=page_id, seq=seq, kind=block.kind, text=block.text, uncertain=block.uncertain
+        )
+        for seq, block in enumerate(transcription.blocks)
+    )
+    page.transcription_model = model
+    if page.page_label is None:
+        page.page_label = transcription.page_label or None
+    if not page.entry_dates:
+        page.entry_dates = sorted(set(transcription.entry_dates))
+    await session.flush()
+    return True
