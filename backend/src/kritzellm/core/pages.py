@@ -1,8 +1,9 @@
-"""Pages: listing them, adding uploaded ones, tracking their processing and saving their text."""
+"""Pages: listing, adding, correcting and deleting them, tracking their processing, saving their text."""
 
 import asyncio
+import hashlib
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -16,7 +17,8 @@ from kritzellm.api.schemas.jobs import JobKind
 from kritzellm.api.schemas.pages import PAGE_CURSOR, PageStatus
 from kritzellm.db import models as db
 
-from .errors import NotFoundError, PageNumberTakenError
+from .errors import ConflictError, NotFoundError, PageNumberTakenError, get_existing
+from .images import NormalizedImage, normalize
 from .jobs import enqueue, latest_jobs
 from .storage import Staging, delete_page_files
 from .transcribe import PageTranscription
@@ -110,6 +112,27 @@ class StagedUpload:
     width: int
     height: int
     folder: Path
+
+
+def _hash_and_normalize(data: bytes) -> tuple[bytes, NormalizedImage]:
+    return hashlib.sha256(data).digest(), normalize(data)
+
+
+async def stage_upload(staging: Staging, filename: str, data: bytes) -> StagedUpload:
+    """Checks an uploaded file and stages its images, ready for `add_pages`.
+
+    Raises `UnsupportedImageError` or `ImageTooLargeError` for files that aren't usable images.
+    """
+    sha256, image = await asyncio.to_thread(_hash_and_normalize, data)
+    folder = await asyncio.to_thread(staging.stage, data, image)
+    return StagedUpload(
+        filename=filename,
+        sha256=sha256,
+        media_type=image.media_type,
+        width=image.width,
+        height=image.height,
+        folder=folder,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,3 +279,56 @@ async def save_transcription(
         page.entry_dates = sorted(set(transcription.entry_dates))
     await session.flush()
     return True
+
+
+async def update_page(session: AsyncSession, page_id: str, changes: Mapping[str, Any]) -> db.Page:
+    """Corrects a page's metadata or moves it to another journal, then commits.
+
+    A moved page goes after the target journal's last page unless `changes` has a page number.
+    Raises `ConflictError` if that journal already has the same image, and `PageNumberTakenError`
+    if the number is taken there.
+    """
+    page = await get_existing(session, db.Page, page_id)
+    changes = dict(changes)
+    journal_id = changes.get("journal_id", page.journal_id)
+    if journal_id != page.journal_id:
+        await get_existing(session, db.Journal, journal_id)
+        twin = select(db.Page.id).where(
+            db.Page.journal_id == journal_id, db.Page.sha256 == page.sha256
+        )
+        if await session.scalar(twin) is not None:
+            raise ConflictError("That journal already has a page with this image.")
+        changes.setdefault("page_number", await next_page_number(session, journal_id))
+    if (number := changes.get("page_number")) is not None and await page_number_taken(
+        session, journal_id, number, number, besides=page.id
+    ):
+        raise PageNumberTakenError(f"Page number {number} is taken in that journal.")
+    if "entry_dates" in changes:
+        changes["entry_dates"] = sorted(set(changes["entry_dates"]))
+
+    for field, value in changes.items():
+        setattr(page, field, value)
+    try:
+        # Page numbers are only checked for clashes on commit.
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise ConflictError(
+            "Another change to that journal got in first. Please try again."
+        ) from None
+    await session.refresh(page)
+    return page
+
+
+async def delete_page(session: AsyncSession, data_dir: Path, page_id: str) -> None:
+    """Deletes a page with its blocks, jobs and images.
+
+    Commits, because the image files are only removed once the row is gone for good.
+    """
+    deleted = await session.scalar(
+        delete(db.Page).where(db.Page.id == page_id).returning(db.Page.id)
+    )
+    if deleted is None:
+        raise NotFoundError("Page")
+    await session.commit()
+    await asyncio.to_thread(delete_page_files, data_dir, [page_id])

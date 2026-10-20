@@ -16,11 +16,12 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    select,
 )
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import text as sql
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, column_property, mapped_column, relationship
 
 from kritzellm.api.schemas.blocks import BlockKind
 from kritzellm.api.schemas.jobs import JobKind, JobStatus
@@ -69,18 +70,6 @@ class Timestamps:
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
 
-class Journal(Timestamps, Base):
-    __tablename__ = "journals"
-
-    id: Mapped[str] = _id(Prefix.JOURNAL)
-    name: Mapped[str] = mapped_column(String(120))
-    description: Mapped[str | None]
-
-    pages: Mapped[list[Page]] = relationship(
-        back_populates="journal", lazy="raise", passive_deletes=True
-    )
-
-
 class Page(Timestamps, Base):
     __tablename__ = "pages"
     __table_args__ = (
@@ -117,6 +106,26 @@ class Page(Timestamps, Base):
     journal: Mapped[Journal] = relationship(back_populates="pages", lazy="raise")
     blocks: Mapped[list[Block]] = relationship(
         back_populates="page", lazy="raise", passive_deletes=True, order_by="Block.seq"
+    )
+
+
+class Journal(Timestamps, Base):
+    __tablename__ = "journals"
+
+    id: Mapped[str] = _id(Prefix.JOURNAL)
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str | None]
+
+    page_count: Mapped[int] = column_property(
+        select(func.count(Page.id))
+        .where(Page.journal_id == id)
+        .correlate_except(Page)
+        .scalar_subquery()
+    )
+    """How many pages the journal has, loaded along with it."""
+
+    pages: Mapped[list[Page]] = relationship(
+        back_populates="journal", lazy="raise", passive_deletes=True
     )
 
 
