@@ -27,9 +27,5 @@ async def get_health(
         status=HealthStatus.OK if database_up else HealthStatus.DEGRADED,
         version=__version__,
         database=DependencyStatus.OK if database_up else DependencyStatus.UNAVAILABLE,
-        models=ConfiguredModels(
-            transcribe=settings.transcribe_model,
-            chat=settings.chat_model,
-            embed=settings.embed_model,
-        ),
+        models=ConfiguredModels(transcribe=settings.transcribe_model),
     )

@@ -18,7 +18,6 @@ _DESCRIPTIONS = {
     400: "The request couldn't be parsed (e.g. malformed JSON or multipart).",
     401: "Missing or wrong bearer token.",
     404: "The resource doesn't exist.",
-    406: "The `Accept` header asks for a format this endpoint can't produce.",
     409: "The request conflicts with the current state (e.g. a job is still running).",
     413: "An uploaded file is too big.",
     415: "An uploaded file isn't a supported image type.",
@@ -66,14 +65,6 @@ def not_found(what: str) -> NoReturn:
     http_error(404, f"{what} not found.")
 
 
-class NotImplementedYetError(Exception):
-    """Raised by routes whose behaviour hasn't been built yet."""
-
-
-def not_implemented() -> NoReturn:
-    raise NotImplementedYetError
-
-
 def _validation_errors(exc: RequestValidationError) -> list[ProblemError]:
     errors = []
     for error in exc.errors():
@@ -117,7 +108,3 @@ def install_problem_handlers(app: FastAPI) -> None:
         errors = _validation_errors(exc)
         detail = f"The request has {len(errors)} invalid value{'s' if len(errors) != 1 else ''}."
         return problem(422, detail, request=request, errors=errors)
-
-    @app.exception_handler(NotImplementedYetError)
-    async def _not_implemented(request: Request, exc: NotImplementedYetError) -> ProblemResponse:
-        return problem(501, "This endpoint is designed but not built yet.", request=request)

@@ -1,14 +1,11 @@
 """The database tables."""
 
-import uuid
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
-from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     CheckConstraint,
-    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -22,19 +19,15 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import text as sql
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from kritzellm.api.schemas.blocks import BlockKind
-from kritzellm.api.schemas.conversations import Role
 from kritzellm.api.schemas.jobs import JobKind, JobStatus
 from kritzellm.api.schemas.pages import PageStatus
-from kritzellm.ids import Prefix, new_id, new_uuid
+from kritzellm.ids import Prefix, new_id
 
 from .types import TypeId
-
-EMBEDDING_DIMENSIONS = 1536
-"""Native size of `text-embedding-3-small`."""
 
 
 class Base(DeclarativeBase):
@@ -51,7 +44,6 @@ class Base(DeclarativeBase):
         str: Text(),
         datetime: DateTime(timezone=True),
         dict[str, Any]: JSONB(),
-        list[dict[str, Any]]: JSONB(),
     }
 
 
@@ -126,9 +118,6 @@ class Page(Timestamps, Base):
     blocks: Mapped[list[Block]] = relationship(
         back_populates="page", lazy="raise", passive_deletes=True, order_by="Block.seq"
     )
-    chunks: Mapped[list[Chunk]] = relationship(
-        back_populates="page", lazy="raise", passive_deletes=True
-    )
 
 
 class Block(Base):
@@ -137,7 +126,6 @@ class Block(Base):
         UniqueConstraint("page_id", "seq", deferrable=True, initially="DEFERRED"),
         CheckConstraint("seq >= 0", name="seq_not_negative"),
         _one_of("kind", BlockKind),
-        Index(None, "text", postgresql_using="gin", postgresql_ops={"text": "gin_trgm_ops"}),
     )
 
     id: Mapped[str] = _id(Prefix.BLOCK)
@@ -153,77 +141,11 @@ class Block(Base):
     page: Mapped[Page] = relationship(back_populates="blocks", lazy="raise")
 
 
-class Chunk(Base):
-    """A stretch of consecutive blocks on one page, embedded for search."""
-
-    __tablename__ = "chunks"
-    __table_args__ = (
-        Index(
-            None,
-            "embedding",
-            postgresql_using="hnsw",
-            postgresql_ops={"embedding": "vector_cosine_ops"},
-        ),
-        Index(None, "tsv", postgresql_using="gin"),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_uuid)
-    page_id: Mapped[str] = mapped_column(
-        TypeId(Prefix.PAGE), ForeignKey("pages.id", ondelete="CASCADE"), index=True
-    )
-    block_ids: Mapped[list[str]] = mapped_column(ARRAY(TypeId(Prefix.BLOCK)))
-    """The chunk's blocks, in reading order."""
-    text: Mapped[str]
-    embed_text: Mapped[str]
-    """`text` with a context header (journal, page, date): what was embedded."""
-    entry_date: Mapped[date | None]
-    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
-    embed_model: Mapped[str]
-    tsv: Mapped[str] = mapped_column(
-        TSVECTOR, Computed("to_tsvector('simple', text)", persisted=True)
-    )
-    """Keyword-search index of `text`, kept up to date by Postgres."""
-
-    page: Mapped[Page] = relationship(back_populates="chunks", lazy="raise")
-
-
-class Conversation(Timestamps, Base):
-    __tablename__ = "conversations"
-
-    id: Mapped[str] = _id(Prefix.CONVERSATION)
-    title: Mapped[str | None] = mapped_column(String(200))
-
-    messages: Mapped[list[Message]] = relationship(
-        back_populates="conversation", lazy="raise", passive_deletes=True, order_by="Message.id"
-    )
-
-
-class Message(Base):
-    __tablename__ = "messages"
-    __table_args__ = (Index(None, "conversation_id", "id"), _one_of("role", Role))
-
-    id: Mapped[str] = _id(Prefix.MESSAGE)
-    """UUIDv7, so ordering by ID is ordering by time."""
-    conversation_id: Mapped[str] = mapped_column(
-        TypeId(Prefix.CONVERSATION), ForeignKey("conversations.id", ondelete="CASCADE")
-    )
-    role: Mapped[Role] = mapped_column(_enum(Role))
-    content: Mapped[str]
-    tool_calls: Mapped[list[dict[str, Any]]] = mapped_column(server_default=sql("'[]'"))
-    """The API's `ToolCall`s, in order."""
-    sources: Mapped[list[dict[str, Any]]] = mapped_column(server_default=sql("'[]'"))
-    """The API's `Source`s, as they were when the answer was given."""
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-
-    conversation: Mapped[Conversation] = relationship(back_populates="messages", lazy="raise")
-
-
 class Job(Base):
     """Background work. Queued rows are the worker's queue; the API reads them for progress."""
 
     __tablename__ = "jobs"
     __table_args__ = (
-        CheckConstraint("page_id IS NULL OR journal_id IS NULL", name="one_target"),
         CheckConstraint("progress_done BETWEEN 0 AND progress_total", name="progress_in_range"),
         _one_of("kind", JobKind),
         _one_of("status", JobStatus),
@@ -236,14 +158,10 @@ class Job(Base):
     status: Mapped[JobStatus] = mapped_column(
         _enum(JobStatus), server_default=JobStatus.QUEUED.value
     )
-    page_id: Mapped[str | None] = mapped_column(
+    page_id: Mapped[str] = mapped_column(
         TypeId(Prefix.PAGE), ForeignKey("pages.id", ondelete="CASCADE"), index=True
     )
-    """The page the job works on, if any. Deleting the page deletes its jobs."""
-    journal_id: Mapped[str | None] = mapped_column(
-        TypeId(Prefix.JOURNAL), ForeignKey("journals.id", ondelete="CASCADE"), index=True
-    )
-    """The journal the job works on, if any. Deleting the journal deletes its jobs."""
+    """The page the job works on. Deleting the page deletes its jobs."""
     progress_done: Mapped[int | None]
     progress_total: Mapped[int | None]
     error: Mapped[dict[str, Any] | None]

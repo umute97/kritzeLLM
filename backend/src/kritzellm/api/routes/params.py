@@ -4,22 +4,18 @@ from typing import Annotated, Any
 
 from fastapi import Path, Query
 
-from ..schemas.common import BlockId, ConversationId, Day, JobId, JournalId, PageId
+from ..schemas.common import BlockId, Day, JobId, JournalId, PageId
 from ..schemas.pages import PAGE_CURSOR
 
 JournalIdPath = Annotated[JournalId, Path(alias="journalId", description="The journal's ID.")]
 PageIdPath = Annotated[PageId, Path(alias="pageId", description="The page's ID.")]
 BlockIdPath = Annotated[BlockId, Path(alias="blockId", description="The block's ID.")]
-ConversationIdPath = Annotated[
-    ConversationId, Path(alias="conversationId", description="The conversation's ID.")
-]
 JobIdPath = Annotated[JobId, Path(alias="jobId", description="The job's ID.")]
 
 Limit = Annotated[int, Query(ge=1, le=100, description="Maximum number of items to return.")]
 _CURSOR = "The `nextCursor` from the previous page. Omit for the first page."
 JournalCursor = Annotated[JournalId | None, Query(description=_CURSOR)]
 PageCursor = Annotated[str | None, Query(pattern=PAGE_CURSOR, description=_CURSOR)]
-ConversationCursor = Annotated[ConversationId | None, Query(description=_CURSOR)]
 JobCursor = Annotated[JobId | None, Query(description=_CURSOR)]
 DateFrom = Annotated[
     Day | None, Query(alias="dateFrom", description="Only entries dated on or after this day.")

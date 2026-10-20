@@ -17,16 +17,12 @@ class Settings(BaseSettings):
     api_token: SecretStr | None = None
     """When set, every API request (except `/health`) needs `Authorization: Bearer <token>`."""
     data_dir: Path = Path("data")
-    """Where page images and exports are stored."""
+    """Where page images are stored."""
 
     openai_api_key: SecretStr | None = None
     """Key for the OpenAI API. Not needed with `TRANSCRIBE_MODEL=test`."""
     transcribe_model: str = "gpt-6-luna"
     """OpenAI model that reads page images. `test` fakes it: made-up text, no API calls."""
-    chat_model: str = "gpt-6-luna"
-    """OpenAI model behind the chat agent."""
-    embed_model: str = "text-embedding-3-small"
-    """OpenAI embedding model used for search."""
 
 
 @lru_cache

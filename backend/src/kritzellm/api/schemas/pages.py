@@ -87,23 +87,6 @@ class PageDetail(Page):
     """Transcribed blocks in reading order."""
 
 
-class PageSummary(ApiModel):
-    """The bits of a page needed to show where something came from."""
-
-    id: PageId
-    journal_id: JournalId
-    journal_name: str
-    """Name of the page's journal."""
-    page_number: int = Field(ge=1)
-    """Position of the page in its journal."""
-    page_label: str | None
-    """Page number or label as written on the page itself, if any."""
-    entry_dates: list[Day]
-    """Dates of the entries on this page."""
-    thumbnail_url: str
-    """Small preview image."""
-
-
 class PageUpdate(InputModel):
     """Corrections to a page's metadata. Only the given fields change."""
 

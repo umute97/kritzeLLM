@@ -1,7 +1,5 @@
 """Journals: notebooks (or volumes) that pages belong to."""
 
-from enum import StrEnum
-
 from pydantic import MISSING, Field
 
 from .common import NO_NUL, ApiModel, InputModel, JournalId, Timestamp
@@ -45,16 +43,3 @@ class JournalList(ApiModel):
     items: list[Journal]
     next_cursor: JournalId | None
     """Pass as `cursor` to get the next page; `null` on the last page."""
-
-
-class ExportFormat(StrEnum):
-    """`markdown`: one file per page plus images. `json`: everything machine-readable. Both come zipped."""
-
-    MARKDOWN = "markdown"
-    JSON = "json"
-
-
-class ExportCreate(InputModel):
-    """Options for a journal export."""
-
-    format: ExportFormat

@@ -9,14 +9,9 @@ from kritzellm.api.routes import health
 
 
 def test_reports_version_and_models(make_client: Callable[..., TestClient]) -> None:
-    client = make_client(transcribe_model="gpt-6-sol", chat_model="gpt-6-luna")
-    body = client.get("/health").json()
+    body = make_client(transcribe_model="gpt-6-sol").get("/health").json()
     assert body["version"] == __version__
-    assert body["models"] == {
-        "transcribe": "gpt-6-sol",
-        "chat": "gpt-6-luna",
-        "embed": "text-embedding-3-small",
-    }
+    assert body["models"] == {"transcribe": "gpt-6-sol"}
 
 
 def test_degraded_when_the_database_is_down(make_client: Callable[..., TestClient]) -> None:

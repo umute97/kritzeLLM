@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import Field
 
-from .common import ApiModel, JobId, Problem, Timestamp
+from .common import ApiModel, JobId, PageId, Problem, Timestamp
 
 
 class JobKind(StrEnum):
@@ -13,8 +13,6 @@ class JobKind(StrEnum):
     INGEST_PAGE = "ingestPage"
     TRANSCRIBE_PAGE = "transcribePage"
     REINDEX_PAGE = "reindexPage"
-    REINDEX_ALL = "reindexAll"
-    EXPORT_JOURNAL = "exportJournal"
 
 
 class JobStatus(StrEnum):
@@ -30,16 +28,13 @@ class JobTargetType(StrEnum):
     """Kind of thing a job works on."""
 
     PAGE = "page"
-    JOURNAL = "journal"
-    ALL = "all"
 
 
 class JobTarget(ApiModel):
     """What the job works on."""
 
     type: JobTargetType
-    id: str | None
-    """ID of the page or journal; `null` for `all`."""
+    id: PageId
 
 
 class JobProgress(ApiModel):
@@ -60,8 +55,6 @@ class Job(ApiModel):
     target: JobTarget
     progress: JobProgress | None
     """How far along the job is, when it can tell."""
-    result_url: str | None
-    """Where to download the result once `succeeded` (exports only)."""
     error: Problem | None
     """Why the job failed; `null` unless `status` is `failed`."""
     created_at: Timestamp

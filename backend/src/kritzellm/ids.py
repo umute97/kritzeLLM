@@ -14,8 +14,6 @@ class Prefix(StrEnum):
     JOURNAL = "jrn"
     PAGE = "pg"
     BLOCK = "blk"
-    CONVERSATION = "cnv"
-    MESSAGE = "msg"
     JOB = "job"
 
 

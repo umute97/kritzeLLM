@@ -22,14 +22,13 @@ from kritzellm.core.storage import Staging, delete_page_files
 from kritzellm.db import models as db
 
 from ..deps import AppSettings, Session
-from ..errors import http_error, not_found, not_implemented, problem_responses
+from ..errors import http_error, not_found, problem_responses
 from ..pagination import paginate
-from ..schemas.jobs import Job
-from ..schemas.journals import ExportCreate, Journal, JournalCreate, JournalList, JournalUpdate
+from ..schemas.journals import Journal, JournalCreate, JournalList, JournalUpdate
 from ..schemas.pages import MAX_PAGE_NUMBER, UploadItem, UploadResult
 from .jobs import job_out
 from .pages import page_out
-from .params import JOB_LOCATION, JournalCursor, JournalIdPath, Limit, location_header
+from .params import JournalCursor, JournalIdPath, Limit, location_header
 
 router = APIRouter(tags=["journals"])
 
@@ -260,17 +259,3 @@ async def upload_pages(
             for item in added
         ]
     )
-
-
-@router.post(
-    "/journals/{journalId}/exports",
-    status_code=status.HTTP_202_ACCEPTED,
-    summary="Export a journal",
-    responses={202: {"headers": JOB_LOCATION}, **problem_responses(400, 401, 404, 422)},
-)
-async def export_journal(journal_id: JournalIdPath, body: ExportCreate) -> Job:
-    """Starts a zipped export of all pages and transcriptions.
-
-    When the job succeeds, download the file from its `resultUrl`.
-    """
-    not_implemented()

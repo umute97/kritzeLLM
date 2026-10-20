@@ -52,7 +52,6 @@ READ_STEPS = 2
 async def read_page(session: AsyncSession, job: db.Job, settings: Settings) -> None:
     """Reads a page into blocks (afresh, if it was read before), then indexes them."""
     job_id, page_id = job.id, job.page_id
-    assert page_id is not None
     page = await session.get(db.Page, page_id)
     if page is None:
         return  # The page was deleted, and its job with it.
@@ -73,7 +72,6 @@ async def read_page(session: AsyncSession, job: db.Job, settings: Settings) -> N
 
 async def reindex_page(session: AsyncSession, job: db.Job, settings: Settings) -> None:
     """Indexes a page again after its blocks were edited."""
-    assert job.page_id is not None
     await _index(session, job.id, job.page_id, done=0, total=1)
 
 
@@ -159,10 +157,7 @@ class Worker:
             logger.info("Running %s job %s", kind, job_id)
             started = time.perf_counter()
             try:
-                handler = HANDLERS.get(kind)
-                if handler is None:
-                    raise NotImplementedError(f"{kind} jobs aren't built yet")
-                await handler(session, job, self.settings)
+                await HANDLERS[kind](session, job, self.settings)
                 await jobs.succeed(session, job_id)
                 await session.commit()
             except Exception as exc:
@@ -170,8 +165,7 @@ class Worker:
                 await session.rollback()
                 problem = _problem(exc)
                 await jobs.fail(session, job_id, problem)
-                if page_id is not None:
-                    await core_pages.set_status(session, page_id, PageStatus.FAILED, error=problem)
+                await core_pages.set_status(session, page_id, PageStatus.FAILED, error=problem)
                 await session.commit()
             else:
                 elapsed = time.perf_counter() - started

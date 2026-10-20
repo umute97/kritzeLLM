@@ -11,8 +11,6 @@ from kritzellm.api.app import render_openapi
 SPEC_PATH = Path(__file__).resolve().parents[2] / "api" / "openapi.json"
 
 JOURNAL_ID = "jrn_01k7c8x2v4f6g8h9j0k1m2n3p4"
-CONVERSATION_ID = "cnv_01k7cbc5d7f9g1h3j5k7m9n1p3"
-JOB_ID = "job_01k7c9a4c6e8g0h2j4k6m8n0p2"
 
 
 @pytest.fixture
@@ -38,63 +36,6 @@ def test_committed_spec_matches_the_code() -> None:
 def test_spec_writes_whole_numbers_like_javascript() -> None:
     """release-please rewrites the spec with JSON.stringify, which writes `1.0` as `1`."""
     assert not re.search(r":\s-?\d+\.0\b", render_openapi())
-
-
-# Every designed operation that still answers 501.
-STUB_CASES = [
-    ("POST", f"/journals/{JOURNAL_ID}/exports", {"format": "markdown"}),
-    ("GET", "/search?q=lisbon", None),
-    ("GET", "/conversations", None),
-    ("POST", "/conversations", None),
-    ("GET", f"/conversations/{CONVERSATION_ID}", None),
-    ("PATCH", f"/conversations/{CONVERSATION_ID}", {"title": "Lisbon"}),
-    ("DELETE", f"/conversations/{CONVERSATION_ID}", None),
-    ("POST", f"/conversations/{CONVERSATION_ID}/messages", {"content": "hi"}),
-    ("GET", f"/jobs/{JOB_ID}/result", None),
-    ("POST", "/admin/reindex", None),
-]
-
-
-@pytest.mark.parametrize(("method", "path", "body"), STUB_CASES)
-def test_stubs_answer_501_problem(
-    client: TestClient, method: str, path: str, body: dict | None
-) -> None:
-    response = client.request(method, path, json=body)
-    assert response.status_code == 501
-    assert response.headers["content-type"] == "application/problem+json"
-    assert response.json()["title"] == "Not Implemented"
-
-
-# Operations that do real work now; they have their own tests.
-BUILT = {
-    "getHealth",
-    "listJournals",
-    "createJournal",
-    "getJournal",
-    "updateJournal",
-    "deleteJournal",
-    "uploadPages",
-    "listPages",
-    "getPage",
-    "updatePage",
-    "deletePage",
-    "getPageImage",
-    "replacePageBlocks",
-    "transcribePage",
-    "getBlock",
-    "updateBlock",
-    "listJobs",
-    "getJob",
-}
-
-
-def test_every_operation_is_built_or_has_a_stub_test() -> None:
-    spec = json.loads(render_openapi())
-    operation_ids = {
-        op["operationId"] for methods in spec["paths"].values() for op in methods.values()
-    }
-    assert operation_ids >= BUILT
-    assert len(STUB_CASES) == len(operation_ids) - len(BUILT)
 
 
 def test_malformed_ids_are_422_problems(client: TestClient) -> None:
