@@ -3,7 +3,7 @@ import uuid
 
 import pytest
 
-from kritzellm.ids import Prefix, decode, encode, new_id, new_uuid
+from kritzellm.ids import ALPHABET, SUFFIX_PATTERN, Prefix, decode, encode, new_id, new_uuid
 
 # From the TypeID spec's valid.yml (https://github.com/jetify-com/typeid/tree/main/spec).
 SPEC_VECTORS = [
@@ -53,3 +53,10 @@ def test_ids_match_the_api_pattern(prefix: Prefix) -> None:
 def test_decode_rejects_invalid_ids(typeid: str) -> None:
     with pytest.raises(ValueError, match="TypeID"):
         decode(Prefix.PAGE, typeid)
+
+
+def test_the_suffix_pattern_matches_the_alphabet() -> None:
+    """`decode` and the API's ID patterns rely on `SUFFIX_PATTERN` spelling out `ALPHABET`."""
+    char_class = SUFFIX_PATTERN.removeprefix("[0-7]").removesuffix("{25}")
+    allowed = {char for char in map(chr, range(128)) if re.fullmatch(char_class, char)}
+    assert allowed == set(ALPHABET)

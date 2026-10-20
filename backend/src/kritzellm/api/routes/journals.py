@@ -1,3 +1,4 @@
+from contextlib import aclosing
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Request, Response, UploadFile, status
@@ -12,33 +13,20 @@ from kritzellm.db import models as db
 
 from ..deps import AppSettings, Session
 from ..errors import http_error, problem_responses
+from ..schemas.jobs import Job
 from ..schemas.journals import Journal, JournalCreate, JournalList, JournalUpdate
-from ..schemas.pages import MAX_PAGE_NUMBER, UploadItem, UploadResult
-from .jobs import job_out
-from .pages import page_out
+from ..schemas.pages import MAX_PAGE_NUMBER, Page, UploadItem, UploadResult
 from .params import JournalCursor, JournalIdPath, Limit, location_header
 
-router = APIRouter(tags=["journals"])
+router = APIRouter(tags=["journals"], responses=problem_responses(400, 401, 422))
 
 MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_FILES = 100
 
 
-def _journal_out(journal: db.Journal) -> Journal:
-    return Journal(
-        id=journal.id,
-        name=journal.name,
-        description=journal.description,
-        page_count=journal.page_count,
-        created_at=journal.created_at,
-        updated_at=journal.updated_at,
-    )
-
-
 @router.get(
     "/journals",
     summary="List journals",
-    responses=problem_responses(400, 401, 422),
 )
 async def list_journals(
     session: Session, limit: Limit = 25, cursor: JournalCursor = None
@@ -46,7 +34,7 @@ async def list_journals(
     """Lists all journals, newest first."""
     journals, next_cursor = await core.list_journals(session, limit=limit, cursor=cursor)
     return JournalList(
-        items=[_journal_out(journal) for journal in journals], next_cursor=next_cursor
+        items=[Journal.model_validate(journal) for journal in journals], next_cursor=next_cursor
     )
 
 
@@ -56,7 +44,6 @@ async def list_journals(
     summary="Create a journal",
     responses={
         201: {"headers": location_header("URL of the new journal.")},
-        **problem_responses(400, 401, 422),
     },
 )
 async def create_journal(
@@ -66,23 +53,23 @@ async def create_journal(
     journal = await core.create_journal(session, **body.model_dump(by_alias=False))
     await session.commit()
     response.headers["Location"] = request.url_for("get_journal", journalId=journal.id).path
-    return _journal_out(journal)
+    return Journal.model_validate(journal)
 
 
 @router.get(
     "/journals/{journalId}",
     summary="Get a journal",
-    responses=problem_responses(400, 401, 404, 422),
+    responses=problem_responses(404),
 )
 async def get_journal(journal_id: JournalIdPath, session: Session) -> Journal:
     """Returns a single journal."""
-    return _journal_out(await get_existing(session, db.Journal, journal_id))
+    return Journal.model_validate(await get_existing(session, db.Journal, journal_id))
 
 
 @router.patch(
     "/journals/{journalId}",
     summary="Update a journal",
-    responses=problem_responses(400, 401, 404, 422),
+    responses=problem_responses(404),
 )
 async def update_journal(
     journal_id: JournalIdPath, body: JournalUpdate, session: Session
@@ -91,7 +78,7 @@ async def update_journal(
     changes = body.model_dump(exclude_unset=True, by_alias=False)
     journal = await core.update_journal(session, journal_id, changes)
     await session.commit()
-    return _journal_out(journal)
+    return Journal.model_validate(journal)
 
 
 @router.delete(
@@ -99,7 +86,7 @@ async def update_journal(
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
     summary="Delete a journal",
-    responses=problem_responses(400, 401, 404, 422),
+    responses=problem_responses(404),
 )
 async def delete_journal(
     journal_id: JournalIdPath, session: Session, settings: AppSettings
@@ -133,7 +120,7 @@ async def _stage(file: UploadFile, staging: Staging) -> StagedUpload:
     status_code=status.HTTP_201_CREATED,
     summary="Upload pages",
     tags=["pages"],
-    responses=problem_responses(400, 401, 404, 409, 413, 415, 422),
+    responses=problem_responses(404, 409, 413, 415),
 )
 async def upload_pages(
     journal_id: JournalIdPath,
@@ -176,7 +163,7 @@ async def upload_pages(
     so a failed upload can simply be sent again.
     """
     await get_existing(session, db.Journal, journal_id)
-    async with Staging(settings.data_dir) as staging:
+    async with aclosing(Staging(settings.data_dir)) as staging:
         uploads = [await _stage(file, staging) for file in files]
         added = await add_pages(
             session, staging, journal_id, uploads, start_page_number=start_page_number
@@ -185,9 +172,9 @@ async def upload_pages(
         items=[
             UploadItem(
                 filename=item.filename,
-                page=page_out(item.page),
+                page=Page.from_db(item.page),
                 duplicate=item.duplicate,
-                job=job_out(item.job) if item.job else None,
+                job=Job.from_db(item.job) if item.job else None,
             )
             for item in added
         ]

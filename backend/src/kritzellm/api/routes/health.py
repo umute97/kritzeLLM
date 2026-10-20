@@ -4,10 +4,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from kritzellm import __version__
-from kritzellm.config import Settings
 from kritzellm.db import database_is_up
 
-from ..deps import get_db_engine, get_settings
+from ..deps import AppSettings, get_db_engine
 from ..schemas.health import ConfiguredModels, DependencyStatus, Health, HealthStatus
 
 router = APIRouter(tags=["health"])
@@ -15,7 +14,7 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health", summary="Check service health", openapi_extra={"security": []})
 async def get_health(
-    settings: Annotated[Settings, Depends(get_settings)],
+    settings: AppSettings,
     engine: Annotated[AsyncEngine, Depends(get_db_engine)],
 ) -> Health:
     """Reports whether the service and its database are up, plus the version and configured models.

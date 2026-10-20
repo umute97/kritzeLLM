@@ -276,7 +276,7 @@ async def save_transcription(
     if page.page_label is None:
         page.page_label = transcription.page_label or None
     if not page.entry_dates:
-        page.entry_dates = sorted(set(transcription.entry_dates))
+        page.entry_dates = transcription.entry_dates
     await session.flush()
     return True
 
@@ -303,8 +303,6 @@ async def update_page(session: AsyncSession, page_id: str, changes: Mapping[str,
         session, journal_id, number, number, besides=page.id
     ):
         raise PageNumberTakenError(f"Page number {number} is taken in that journal.")
-    if "entry_dates" in changes:
-        changes["entry_dates"] = sorted(set(changes["entry_dates"]))
 
     for field, value in changes.items():
         setattr(page, field, value)

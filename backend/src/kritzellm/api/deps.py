@@ -11,12 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from kritzellm.config import Settings
 
 
-def get_settings(request: Request) -> Settings:
+def _app_settings(request: Request) -> Settings:
     """The settings the running API was created with."""
     return request.app.state.settings
 
 
-AppSettings = Annotated[Settings, Depends(get_settings)]
+AppSettings = Annotated[Settings, Depends(_app_settings)]
 
 
 def get_db_engine(request: Request) -> AsyncEngine:

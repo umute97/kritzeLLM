@@ -1,10 +1,14 @@
 """Background jobs."""
 
 from enum import StrEnum
+from typing import TYPE_CHECKING, Self
 
 from pydantic import Field
 
 from .common import ApiModel, JobId, PageId, Problem, Timestamp
+
+if TYPE_CHECKING:
+    from kritzellm.db import models as db
 
 
 class JobKind(StrEnum):
@@ -62,6 +66,26 @@ class Job(ApiModel):
     """When a worker picked the job up."""
     finished_at: Timestamp | None
     """When the job succeeded or failed."""
+
+    @classmethod
+    def from_db(cls, job: db.Job) -> Self:
+        """The API view of a stored job."""
+        progress = None
+        if job.progress_done is not None and job.progress_total is not None:
+            progress = {"done": job.progress_done, "total": job.progress_total}
+        return cls.model_validate(
+            {
+                "id": job.id,
+                "kind": job.kind,
+                "status": job.status,
+                "target": {"type": JobTargetType.PAGE, "id": job.page_id},
+                "progress": progress,
+                "error": job.error,
+                "created_at": job.created_at,
+                "started_at": job.started_at,
+                "finished_at": job.finished_at,
+            }
+        )
 
 
 class JobList(ApiModel):

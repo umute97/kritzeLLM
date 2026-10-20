@@ -2,12 +2,16 @@
 The database stores the bare UUID.
 """
 
+import re
 import uuid
 from enum import StrEnum
 
 ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz"
 _VALUES = {char: value for value, char in enumerate(ALPHABET)}
 _LENGTH = 26
+
+SUFFIX_PATTERN = "[0-7][0-9a-hjkmnp-tv-z]{25}"
+"""Regex for the part after the prefix: 26 `ALPHABET` characters, the first one at most `7`."""
 
 
 class Prefix(StrEnum):
@@ -37,7 +41,7 @@ def decode(prefix: Prefix, typeid: str) -> uuid.UUID:
     if given_prefix != prefix:
         raise ValueError(f"Expected a '{prefix}' TypeID, got {typeid!r}")
 
-    if len(suffix) != _LENGTH or suffix[0] > "7" or any(char not in _VALUES for char in suffix):
+    if not re.fullmatch(SUFFIX_PATTERN, suffix):
         raise ValueError(f"Malformed TypeID {typeid!r}")
 
     number = 0
