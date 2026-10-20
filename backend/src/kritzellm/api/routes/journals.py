@@ -6,23 +6,19 @@ from fastapi import APIRouter, File, Form, Request, Response, UploadFile, status
 from pydantic import WithJsonSchema
 from sqlalchemy import delete, func, select
 
+from kritzellm.core.errors import NotFoundError, get_existing
 from kritzellm.core.images import (
     ImageTooLargeError,
     NormalizedImage,
     UnsupportedImageError,
     normalize,
 )
-from kritzellm.core.pages import (
-    JournalNotFoundError,
-    PageNumberTakenError,
-    StagedUpload,
-    add_pages,
-)
+from kritzellm.core.pages import StagedUpload, add_pages
 from kritzellm.core.storage import Staging, delete_page_files
 from kritzellm.db import models as db
 
 from ..deps import AppSettings, Session
-from ..errors import http_error, not_found, problem_responses
+from ..errors import http_error, problem_responses
 from ..pagination import paginate
 from ..schemas.journals import Journal, JournalCreate, JournalList, JournalUpdate
 from ..schemas.pages import MAX_PAGE_NUMBER, UploadItem, UploadResult
@@ -59,7 +55,7 @@ async def _get(session: Session, journal_id: str) -> Journal:
         await session.execute(select(db.Journal, PAGE_COUNT).where(db.Journal.id == journal_id))
     ).one_or_none()
     if row is None:
-        not_found("Journal")
+        raise NotFoundError("Journal")
     return _journal_out(*row)
 
 
@@ -122,9 +118,7 @@ async def update_journal(
     journal_id: JournalIdPath, body: JournalUpdate, session: Session
 ) -> Journal:
     """Renames a journal or changes its description. Only the given fields change."""
-    journal = await session.get(db.Journal, journal_id)
-    if journal is None:
-        not_found("Journal")
+    journal = await get_existing(session, db.Journal, journal_id)
     for field, value in body.model_dump(exclude_unset=True, by_alias=False).items():
         setattr(journal, field, value)
     await session.commit()
@@ -150,7 +144,7 @@ async def delete_journal(
         select(db.Journal.id).where(db.Journal.id == journal_id).with_for_update()
     )
     if deleted is None:
-        not_found("Journal")
+        raise NotFoundError("Journal")
     page_ids = (
         await session.scalars(select(db.Page.id).where(db.Page.journal_id == journal_id))
     ).all()
@@ -236,18 +230,12 @@ async def upload_pages(
     in the same upload) returns the existing page with `duplicate: true` and takes no page number,
     so a failed upload can simply be sent again.
     """
-    if await session.get(db.Journal, journal_id) is None:
-        not_found("Journal")
+    await get_existing(session, db.Journal, journal_id)
     async with Staging(settings.data_dir) as staging:
         uploads = [await _stage(file, staging) for file in files]
-        try:
-            added = await add_pages(
-                session, staging, journal_id, uploads, start_page_number=start_page_number
-            )
-        except PageNumberTakenError:
-            http_error(409, "Some of the page numbers for the new pages are taken in this journal.")
-        except JournalNotFoundError:
-            not_found("Journal")
+        added = await add_pages(
+            session, staging, journal_id, uploads, start_page_number=start_page_number
+        )
     return UploadResult(
         items=[
             UploadItem(

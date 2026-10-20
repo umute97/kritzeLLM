@@ -15,14 +15,11 @@ from kritzellm.api.schemas.blocks import BlockInput
 from kritzellm.api.schemas.jobs import JobKind
 from kritzellm.db import models as db
 
+from .errors import NotFoundError, PageBusyError
 from .jobs import enqueue, enqueue_once, pending
 
 READING = (JobKind.INGEST_PAGE, JobKind.TRANSCRIBE_PAGE)
 """Jobs that replace a page's blocks with a fresh transcription."""
-
-
-class PageBusyError(Exception):
-    """The page is waiting to be read or being read, which would undo any change."""
 
 
 class BlockIdError(Exception):
@@ -34,10 +31,15 @@ class BlockIdError(Exception):
         """The index of each offending block, with what's wrong with its id."""
 
 
-async def _lock_editable(session: AsyncSession, page_id: str) -> db.Page | None:
-    """Locks the page for a change. `None` if it's gone; raises `PageBusyError` while it's read."""
+async def _lock_editable(session: AsyncSession, page_id: str, *, what: str = "Page") -> db.Page:
+    """Locks the page for a change.
+
+    Raises `NotFoundError` (about `what`) if the page is gone, and `PageBusyError` while it's read.
+    """
     page = await session.get(db.Page, page_id, with_for_update=True, populate_existing=True)
-    if page is not None and await pending(session, page_id, READING):
+    if page is None:
+        raise NotFoundError(what)
+    if await pending(session, page_id, READING):
         raise PageBusyError
     return page
 
@@ -52,17 +54,15 @@ async def _edited(session: AsyncSession, page: db.Page) -> db.Job:
 
 async def update_block(
     session: AsyncSession, block_id: str, changes: Mapping[str, Any]
-) -> tuple[db.Block, db.Job] | None:
-    """Applies `changes` to a block and queues its page's re-index. `None` if the block is gone.
-
-    The caller commits.
-    """
+) -> tuple[db.Block, db.Job]:
+    """Applies `changes` to a block and queues its page's re-index. The caller commits."""
     page_id = await session.scalar(select(db.Block.page_id).where(db.Block.id == block_id))
-    if page_id is None or (page := await _lock_editable(session, page_id)) is None:
-        return None
+    if page_id is None:
+        raise NotFoundError("Block")
+    page = await _lock_editable(session, page_id, what="Block")
     block = await session.get(db.Block, block_id, populate_existing=True)
     if block is None:
-        return None  # A transcription replaced it while we waited for the lock.
+        raise NotFoundError("Block")  # A transcription replaced it while we waited for the lock.
     for field, value in changes.items():
         setattr(block, field, value)
     return block, await _edited(session, page)
@@ -70,16 +70,14 @@ async def update_block(
 
 async def replace_blocks(
     session: AsyncSession, page_id: str, blocks: Sequence[BlockInput]
-) -> tuple[list[db.Block], db.Job] | None:
-    """Makes `blocks` the page's blocks, in order, and queues its re-index. `None` if it's gone.
+) -> tuple[list[db.Block], db.Job]:
+    """Makes `blocks` the page's blocks, in order, and queues its re-index.
 
     Blocks with an id are updated in place, those without one are created, and the page's other
     blocks are deleted. Raises `BlockIdError` for ids that aren't the page's or come twice. The
     caller commits.
     """
     page = await _lock_editable(session, page_id)
-    if page is None:
-        return None
     existing = {
         block.id: block
         for block in await session.scalars(select(db.Block).where(db.Block.page_id == page_id))
@@ -110,11 +108,10 @@ async def replace_blocks(
     return replaced, await _edited(session, page)
 
 
-async def request_transcription(session: AsyncSession, page_id: str) -> db.Job | None:
-    """Queues reading the page again. `None` if it's gone. The caller commits.
+async def request_transcription(session: AsyncSession, page_id: str) -> db.Job:
+    """Queues reading the page again. The caller commits.
 
     Raises `PageBusyError` if the page is already waiting to be read or being read.
     """
-    if await _lock_editable(session, page_id) is None:
-        return None
+    await _lock_editable(session, page_id)
     return await enqueue(session, JobKind.TRANSCRIBE_PAGE, page_id=page_id)

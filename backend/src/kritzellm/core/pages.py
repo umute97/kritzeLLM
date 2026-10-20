@@ -16,17 +16,10 @@ from kritzellm.api.schemas.jobs import JobKind
 from kritzellm.api.schemas.pages import PAGE_CURSOR, PageStatus
 from kritzellm.db import models as db
 
+from .errors import NotFoundError, PageNumberTakenError
 from .jobs import enqueue, latest_jobs
 from .storage import Staging, delete_page_files
 from .transcribe import PageTranscription
-
-
-class PageNumberTakenError(Exception):
-    """Another page of the journal already has the page number."""
-
-
-class JournalNotFoundError(Exception):
-    """The journal was deleted while pages were being added to it."""
 
 
 def encode_cursor(page: db.Page) -> str:
@@ -104,6 +97,9 @@ async def page_number_taken(
     return await session.scalar(query.limit(1)) is not None
 
 
+PAGE_NUMBERS_TAKEN = "Some of the page numbers for the new pages are taken in this journal."
+
+
 @dataclass(frozen=True, slots=True)
 class StagedUpload:
     """An uploaded file whose images are staged and ready to become a page."""
@@ -146,9 +142,9 @@ async def add_pages(
             await session.rollback()
             message = str(exc.orig)
             if "uq_pages_journal_id_page_number" in message:
-                raise PageNumberTakenError from exc
+                raise PageNumberTakenError(PAGE_NUMBERS_TAKEN) from exc
             if "fk_pages_journal_id_journals" in message:
-                raise JournalNotFoundError from exc
+                raise NotFoundError("Journal") from exc  # Deleted while the pages were added.
             # Another upload added some of the same files meanwhile: once more, as duplicates.
             if "uq_pages_journal_id_sha256" not in message or attempt:
                 raise
@@ -176,7 +172,7 @@ async def _add_pages(
         and new_count
         and await page_number_taken(session, journal_id, number, number + new_count - 1)
     ):
-        raise PageNumberTakenError
+        raise PageNumberTakenError(PAGE_NUMBERS_TAKEN)
 
     outcomes, new = [], []
     for upload in uploads:

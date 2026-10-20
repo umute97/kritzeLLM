@@ -10,12 +10,13 @@ from sqlalchemy.orm import selectinload
 
 from kritzellm.core import blocks as core_blocks
 from kritzellm.core import pages as core
+from kritzellm.core.errors import ConflictError, NotFoundError, PageNumberTakenError, get_existing
 from kritzellm.core.storage import delete_page_files, variant_path
 from kritzellm.db import models as db
 
 from .. import API_PREFIX
 from ..deps import AppSettings, Session
-from ..errors import http_error, not_found, problem_responses
+from ..errors import problem_responses
 from ..schemas.blocks import BlocksReplace, BlocksReplaceResult
 from ..schemas.common import JournalId, Problem
 from ..schemas.jobs import Job
@@ -29,7 +30,7 @@ from ..schemas.pages import (
     PageStatus,
     PageUpdate,
 )
-from .blocks import PAGE_BUSY, block_out
+from .blocks import block_out
 from .jobs import job_out
 from .params import BINARY, JOB_LOCATION, DateFrom, DateTo, Limit, PageCursor, PageIdPath
 
@@ -65,13 +66,6 @@ def page_out(page: db.Page) -> Page:
         created_at=page.created_at,
         updated_at=page.updated_at,
     )
-
-
-async def _get(session: Session, page_id: str) -> db.Page:
-    page = await session.get(db.Page, page_id)
-    if page is None:
-        not_found("Page")
-    return page
 
 
 @router.get(
@@ -115,9 +109,7 @@ async def list_pages(
 )
 async def get_page(page_id: PageIdPath, session: Session) -> PageDetail:
     """Returns a page with all of its transcribed blocks, in reading order."""
-    page = await session.get(db.Page, page_id, options=[selectinload(db.Page.blocks)])
-    if page is None:
-        not_found("Page")
+    page = await get_existing(session, db.Page, page_id, options=[selectinload(db.Page.blocks)])
     return PageDetail(**dict(page_out(page)), blocks=[block_out(block) for block in page.blocks])
 
 
@@ -131,23 +123,22 @@ async def update_page(page_id: PageIdPath, body: PageUpdate, session: Session) -
 
     Changing dates or the journal re-indexes the page.
     """
-    page = await _get(session, page_id)
+    page = await get_existing(session, db.Page, page_id)
     changes = body.model_dump(exclude_unset=True, by_alias=False)
 
     journal_id = changes.get("journal_id", page.journal_id)
     if journal_id != page.journal_id:
-        if await session.get(db.Journal, journal_id) is None:
-            not_found("Journal")
+        await get_existing(session, db.Journal, journal_id)
         twin = select(db.Page.id).where(
             db.Page.journal_id == journal_id, db.Page.sha256 == page.sha256
         )
         if await session.scalar(twin) is not None:
-            http_error(409, "That journal already has a page with this image.")
+            raise ConflictError("That journal already has a page with this image.")
         changes.setdefault("page_number", await core.next_page_number(session, journal_id))
     if (number := changes.get("page_number")) is not None and await core.page_number_taken(
         session, journal_id, number, number, besides=page.id
     ):
-        http_error(409, f"Page number {number} is taken in that journal.")
+        raise PageNumberTakenError(f"Page number {number} is taken in that journal.")
     if "entry_dates" in changes:
         changes["entry_dates"] = sorted(set(changes["entry_dates"]))
 
@@ -157,7 +148,9 @@ async def update_page(page_id: PageIdPath, body: PageUpdate, session: Session) -
         await session.commit()
     except IntegrityError:
         await session.rollback()
-        http_error(409, "Another change to that journal got in first. Please try again.")
+        raise ConflictError(
+            "Another change to that journal got in first. Please try again."
+        ) from None
     await session.refresh(page)
     return page_out(page)
 
@@ -175,7 +168,7 @@ async def delete_page(page_id: PageIdPath, session: Session, settings: AppSettin
         delete(db.Page).where(db.Page.id == page_id).returning(db.Page.id)
     )
     if deleted is None:
-        not_found("Page")
+        raise NotFoundError("Page")
     await session.commit()
     await asyncio.to_thread(delete_page_files, settings.data_dir, [page_id])
 
@@ -212,10 +205,10 @@ async def get_page_image(
     `original` is the uploaded file as-is, and `thumbnail` is a small JPEG preview. A page's images
     never change, so they may be cached for good.
     """
-    page = await _get(session, page_id)
+    page = await get_existing(session, db.Page, page_id)
     path = variant_path(settings.data_dir, page.id, variant, page.original_media_type)
     if not await asyncio.to_thread(path.is_file):
-        not_found("Image file")
+        raise NotFoundError("Image file")
     media_type = page.original_media_type if variant is ImageVariant.ORIGINAL else "image/jpeg"
     return FileResponse(path, media_type=media_type, headers={"Cache-Control": IMMUTABLE})
 
@@ -236,19 +229,14 @@ async def replace_page_blocks(
     the background. Returns `409` while the page is waiting to be read or being read.
     """
     try:
-        replaced = await core_blocks.replace_blocks(session, page_id, body.blocks)
-    except core_blocks.PageBusyError:
-        http_error(409, PAGE_BUSY)
+        blocks, job = await core_blocks.replace_blocks(session, page_id, body.blocks)
     except core_blocks.BlockIdError as exc:
         errors = [
             {"type": "value_error", "loc": ("body", "blocks", index, "id"), "msg": message}
             for index, message in exc.problems
         ]
         raise RequestValidationError(errors) from None
-    if replaced is None:
-        not_found("Page")
     await session.commit()
-    blocks, job = replaced
     return BlocksReplaceResult(blocks=[block_out(block) for block in blocks], job=job_out(job))
 
 
@@ -265,12 +253,7 @@ async def transcribe_page(
 
     Manual edits are lost. Returns `409` while the page is already waiting to be read or being read.
     """
-    try:
-        job = await core_blocks.request_transcription(session, page_id)
-    except core_blocks.PageBusyError:
-        http_error(409, "This page is already being read.")
-    if job is None:
-        not_found("Page")
+    job = await core_blocks.request_transcription(session, page_id)
     await session.commit()
     response.headers["Location"] = request.url_for("get_job", jobId=job.id).path
     return job_out(job)

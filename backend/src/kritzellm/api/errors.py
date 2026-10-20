@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.routing import Match
 
+from kritzellm.core.errors import ConflictError, NotFoundError
+
 from .schemas.common import Problem, ProblemError
 
 PROBLEM_JSON = "application/problem+json"
@@ -61,8 +63,8 @@ def http_error(status: int, detail: str) -> NoReturn:
     raise StarletteHTTPException(status, detail)
 
 
-def not_found(what: str) -> NoReturn:
-    http_error(404, f"{what} not found.")
+STATUSES: dict[type[Exception], int] = {NotFoundError: 404, ConflictError: 409}
+"""The status each domain error answers with."""
 
 
 def _validation_errors(exc: RequestValidationError) -> list[ProblemError]:
@@ -108,3 +110,10 @@ def install_problem_handlers(app: FastAPI) -> None:
         errors = _validation_errors(exc)
         detail = f"The request has {len(errors)} invalid value{'s' if len(errors) != 1 else ''}."
         return problem(422, detail, request=request, errors=errors)
+
+    async def _domain(request: Request, exc: Exception) -> ProblemResponse:
+        status = next(status for error, status in STATUSES.items() if isinstance(exc, error))
+        return problem(status, str(exc), request=request)
+
+    for error in STATUSES:
+        app.add_exception_handler(error, _domain)
