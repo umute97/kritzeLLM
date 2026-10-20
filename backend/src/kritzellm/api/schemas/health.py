@@ -24,10 +24,6 @@ class ConfiguredModels(ApiModel):
 
     transcribe: str
     """Model that reads page images."""
-    chat: str
-    """Model behind the chat agent."""
-    embed: str
-    """Embedding model used for search."""
 
 
 class Health(ApiModel):

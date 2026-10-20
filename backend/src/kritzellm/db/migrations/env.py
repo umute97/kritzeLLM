@@ -5,7 +5,6 @@ from typing import Any, Literal
 
 from alembic import context
 from alembic.autogenerate.api import AutogenContext
-from pgvector.sqlalchemy import Vector
 from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -21,9 +20,6 @@ def render_item(type_: str, obj: Any, autogen_context: AutogenContext) -> str | 
     if type_ == "type" and isinstance(obj, TypeId):
         autogen_context.imports.add("from sqlalchemy.dialects import postgresql")
         return "postgresql.UUID(as_uuid=True)"
-    if type_ == "type" and isinstance(obj, Vector):
-        autogen_context.imports.add("import pgvector.sqlalchemy")
-        return f"pgvector.sqlalchemy.Vector({obj.dim})"
     return False
 
 

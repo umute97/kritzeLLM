@@ -44,8 +44,6 @@ services:
       API_TOKEN: ${API_TOKEN:?Set API_TOKEN}
       DATA_DIR: /data
       TRANSCRIBE_MODEL: ${TRANSCRIBE_MODEL:-}
-      CHAT_MODEL: ${CHAT_MODEL:-}
-      EMBED_MODEL: ${EMBED_MODEL:-}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
@@ -66,8 +64,6 @@ services:
       DATA_DIR: /data
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       TRANSCRIBE_MODEL: ${TRANSCRIBE_MODEL:-}
-      CHAT_MODEL: ${CHAT_MODEL:-}
-      EMBED_MODEL: ${EMBED_MODEL:-}
     volumes:
       - api-data:/data
     # The image's healthcheck probes the API port; the worker has a heartbeat instead.

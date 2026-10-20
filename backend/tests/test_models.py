@@ -1,5 +1,4 @@
 import hashlib
-from datetime import date
 
 import pytest
 from sqlalchemy import delete, func, select, text
@@ -7,17 +6,8 @@ from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kritzellm.api.schemas.blocks import BlockKind
-from kritzellm.api.schemas.conversations import Role
 from kritzellm.api.schemas.pages import PageStatus
-from kritzellm.db.models import (
-    EMBEDDING_DIMENSIONS,
-    Block,
-    Chunk,
-    Conversation,
-    Journal,
-    Message,
-    Page,
-)
+from kritzellm.db.models import Block, Journal, Page
 from kritzellm.ids import Prefix, decode, new_id
 
 pytestmark = [pytest.mark.db, pytest.mark.anyio]
@@ -39,32 +29,16 @@ def _block(page: Page, seq: int, text: str) -> Block:
     return Block(page=page, seq=seq, kind=BlockKind.PARAGRAPH, text=text)
 
 
-def _embedding(hot: int) -> list[float]:
-    return [1.0 if i == hot else 0.0 for i in range(EMBEDDING_DIMENSIONS)]
-
-
-async def _journal_with_a_chunk(session: AsyncSession) -> tuple[Journal, Page, Chunk]:
+async def _journal_with_a_page(session: AsyncSession) -> tuple[Journal, Page]:
     journal = Journal(name="Summer 2026")
     page = _page(journal, 1)
-    blocks = [_block(page, 0, "Flew to Lisbon today."), _block(page, 1, "Pastéis de nata!")]
-    session.add_all([journal, page, *blocks])
-    await session.flush()
-    chunk = Chunk(
-        page=page,
-        block_ids=[block.id for block in blocks],
-        text="Flew to Lisbon today. Pastéis de nata!",
-        embed_text="Summer 2026, page 1, 2026-07-14\n\nFlew to Lisbon today. Pastéis de nata!",
-        entry_date=date(2026, 7, 14),
-        embedding=_embedding(7),
-        embed_model="text-embedding-3-small",
-    )
-    session.add(chunk)
+    session.add_all([journal, page, _block(page, 0, "Flew to Lisbon today.")])
     await session.commit()
-    return journal, page, chunk
+    return journal, page
 
 
 async def test_rows_round_trip_with_typeids(session: AsyncSession) -> None:
-    journal, page, chunk = await _journal_with_a_chunk(session)
+    journal, page = await _journal_with_a_page(session)
     session.expunge_all()
 
     stored = await session.scalar(select(Page).where(Page.id == page.id))
@@ -76,38 +50,9 @@ async def test_rows_round_trip_with_typeids(session: AsyncSession) -> None:
     assert stored.entry_dates == []
     assert stored.created_at.tzinfo is not None
 
-    stored_chunk = await session.get_one(Chunk, chunk.id)
-    assert all(block_id.startswith("blk_") for block_id in stored_chunk.block_ids)
-    assert stored_chunk.block_ids == chunk.block_ids
-    assert len(stored_chunk.embedding) == EMBEDDING_DIMENSIONS
-    assert "lisbon" in stored_chunk.tsv
-
-
-async def test_vector_keyword_and_trigram_search(session: AsyncSession) -> None:
-    _, page, chunk = await _journal_with_a_chunk(session)
-
-    nearest = await session.scalar(
-        select(Chunk.id)
-        .where(Chunk.page_id == page.id)
-        .order_by(Chunk.embedding.cosine_distance(_embedding(7)))
-        .limit(1)
-    )
-    assert nearest == chunk.id
-
-    keyword = await session.scalar(
-        select(Chunk.id).where(
-            Chunk.page_id == page.id,
-            Chunk.tsv.op("@@")(func.websearch_to_tsquery("simple", "lisbon")),
-        )
-    )
-    assert keyword == chunk.id
-
-    fuzzy = await session.scalar(
-        select(Block.text).where(
-            Block.page_id == page.id, Block.text.op("%")("Flew to Lisbn today")
-        )
-    )
-    assert fuzzy == "Flew to Lisbon today."
+    block = await session.scalar(select(Block).where(Block.page_id == page.id))
+    assert block is not None
+    assert block.id.startswith("blk_")
 
 
 async def test_same_file_twice_in_a_journal_is_rejected(session: AsyncSession) -> None:
@@ -140,7 +85,7 @@ async def test_page_numbers_stay_unique(session: AsyncSession) -> None:
 
 
 async def test_enum_columns_only_take_api_values(session: AsyncSession) -> None:
-    _, page, _ = await _journal_with_a_chunk(session)
+    _, page = await _journal_with_a_page(session)
     with pytest.raises(IntegrityError, match="ck_pages_status_valid"):
         await session.execute(
             text("UPDATE pages SET status = 'done' WHERE id = :id"),
@@ -153,35 +98,10 @@ async def test_ids_with_the_wrong_prefix_are_rejected(session: AsyncSession) -> 
         await session.get(Page, new_id(Prefix.JOURNAL))
 
 
-async def test_deleting_a_journal_deletes_its_pages_blocks_and_chunks(
-    session: AsyncSession,
-) -> None:
-    journal, page, _ = await _journal_with_a_chunk(session)
+async def test_deleting_a_journal_deletes_its_pages_and_blocks(session: AsyncSession) -> None:
+    journal, page = await _journal_with_a_page(session)
     await session.execute(delete(Journal).where(Journal.id == journal.id))
     await session.commit()
 
-    for page_column in (Page.id, Block.page_id, Chunk.page_id):
+    for page_column in (Page.id, Block.page_id):
         assert await session.scalar(select(func.count()).where(page_column == page.id)) == 0
-
-
-async def test_deleting_a_conversation_deletes_its_messages(session: AsyncSession) -> None:
-    conversation = Conversation(title="Lisbon")
-    session.add_all(
-        [
-            conversation,
-            Message(conversation=conversation, role=Role.USER, content="When was I in Lisbon?"),
-            Message(conversation=conversation, role=Role.ASSISTANT, content="In July [1]."),
-        ]
-    )
-    await session.commit()
-    stored = await session.scalars(
-        select(Message).where(Message.conversation_id == conversation.id).order_by(Message.id)
-    )
-    assert [message.role for message in stored] == [Role.USER, Role.ASSISTANT]
-
-    await session.execute(delete(Conversation).where(Conversation.id == conversation.id))
-    await session.commit()
-    remaining = await session.scalar(
-        select(func.count()).where(Message.conversation_id == conversation.id)
-    )
-    assert remaining == 0

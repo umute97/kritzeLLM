@@ -75,7 +75,7 @@ def test_upload_queues_an_ingest_job_per_new_page(
     assert job["kind"] == "ingestPage"
     assert job["status"] == "queued"
     assert job["target"] == {"type": "page", "id": items[0]["page"]["id"]}
-    assert (job["progress"], job["error"], job["resultUrl"]) == (None, None, None)
+    assert (job["progress"], job["error"]) == (None, None)
     assert (job["startedAt"], job["finishedAt"]) == (None, None)
     assert _job(db_client, job["id"]) == job
 
@@ -228,25 +228,8 @@ def test_a_failing_job_fails_its_page(
     assert (page["status"], page["error"]) == ("failed", job["error"])
 
 
-def test_kinds_without_a_handler_fail(
-    db_client: TestClient, settings: Settings, work: Callable[[], None]
-) -> None:
-    async def queue() -> str:
-        engine = create_async_engine(str(settings.database_url))
-        async with AsyncSession(engine, expire_on_commit=False) as session:
-            job = await jobs.enqueue(session, JobKind.REINDEX_ALL)
-            await session.commit()
-        await engine.dispose()
-        return job.id
-
-    job_id = asyncio.run(queue())
-    assert _job(db_client, job_id)["target"] == {"type": "all", "id": None}
-
-    work()
-
-    job = _job(db_client, job_id)
-    assert job["status"] == "failed"
-    assert job["error"]["detail"] == "reindexAll jobs aren't built yet"
+def test_every_job_kind_has_a_handler() -> None:
+    assert worker_module.HANDLERS.keys() == set(JobKind)
 
 
 def test_interrupted_jobs_run_again(
@@ -344,7 +327,7 @@ def test_list_filters(
     assert queued["job"]["id"] in ids(status="queued")
     assert done["job"]["id"] not in ids(status="queued")
     assert done["job"]["id"] in ids(status="succeeded", kind="ingestPage")
-    assert not ids(kind="exportJournal")
+    assert done["job"]["id"] not in ids(kind="reindexPage")
 
 
 def test_unknown_job_is_404(db_client: TestClient) -> None:
@@ -365,9 +348,20 @@ def test_the_worker_wakes_up_for_new_jobs(
             Worker(settings) as worker,
             AsyncSession(engine, expire_on_commit=False) as session,
         ):
+            page = db.Page(
+                journal=db.Journal(name="Wake up"),
+                page_number=1,
+                original_filename="a.jpg",
+                original_media_type="image/jpeg",
+                sha256=os.urandom(32),
+                width=1,
+                height=1,
+            )
+            session.add(page)
+            await session.commit()
             running = asyncio.create_task(worker.run())
             await asyncio.sleep(0.5)  # Let it catch up and go to sleep.
-            job = await jobs.enqueue(session, JobKind.REINDEX_ALL)
+            job = await jobs.enqueue(session, JobKind.REINDEX_PAGE, page_id=page.id)
             await session.commit()
             status_query = select(db.Job.status).where(db.Job.id == job.id)
             status = None
@@ -382,8 +376,7 @@ def test_the_worker_wakes_up_for_new_jobs(
         await engine.dispose()
         return status
 
-    # No handler for reindexAll yet, so it fails, but it ran.
-    assert asyncio.run(scenario()) == JobStatus.FAILED
+    assert asyncio.run(scenario()) == JobStatus.SUCCEEDED
 
 
 def test_the_heartbeat_tells_whether_the_worker_is_alive(

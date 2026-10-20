@@ -24,16 +24,14 @@ Everything comes from environment variables (see [`.env.example`](../.env.exampl
 |---|---|---|
 | `DATABASE_URL` | `postgresql+asyncpg://kritzellm:kritzellm@localhost:5432/kritzellm` | Postgres to use |
 | `API_TOKEN` | *(unset)* | When set, every request except `GET /health` needs `Authorization: Bearer <token>` |
-| `DATA_DIR` | `data` | Where page images and exports are stored |
+| `DATA_DIR` | `data` | Where page images are stored |
 | `TRANSCRIBE_MODEL` | `gpt-6-luna` | OpenAI model that reads the pages |
-| `CHAT_MODEL` | `gpt-6-luna` | OpenAI model behind the chat agent |
-| `EMBED_MODEL` | `text-embedding-3-small` | OpenAI embedding model for search |
 
 Empty values count as unset.
 
 ## Database
 
-Postgres with [pgvector](https://github.com/pgvector/pgvector). The tables are SQLAlchemy models in
+Postgres (the image ships [pgvector](https://github.com/pgvector/pgvector) for search, coming later). The tables are SQLAlchemy models in
 [`src/kritzellm/db/models.py`](src/kritzellm/db/models.py), and the schema is managed with Alembic.
 Migrations live in [`src/kritzellm/db/migrations`](src/kritzellm/db/migrations), so they ship with the image.
 
@@ -52,9 +50,9 @@ so never point it at real data. `just backend-test` uses `kritzellm_test` in the
 (`just up db`). Without a reachable database those tests are skipped; CI sets `KRITZELLM_REQUIRE_DB=1`,
 which makes them fail instead. One of them fails when a model changed without a migration.
 
-[Schemathesis](https://schemathesis.readthedocs.io) fuzzes every built endpoint against `api/openapi.json`
+[Schemathesis](https://schemathesis.readthedocs.io) fuzzes every endpoint against `api/openapi.json`
 ([`tests/test_schemathesis.py`](tests/test_schemathesis.py)), checking status codes, response bodies, auth
-and input validation. When an endpoint stops being a stub, add its operation ID to `FUZZED` there.
+and input validation.
 
 ## Background jobs
 

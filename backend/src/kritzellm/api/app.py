@@ -6,7 +6,6 @@ from typing import Any
 from fastapi import Depends, FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
-from pydantic import TypeAdapter
 from pydantic.alias_generators import to_camel
 
 from kritzellm import __version__
@@ -17,12 +16,11 @@ from . import API_PREFIX
 from .auth import require_token
 from .deps import check_query_params
 from .errors import PROBLEM_JSON, install_problem_handlers
-from .routes import blocks, conversations, docs, health, jobs, journals, pages, search
-from .schemas.conversations import ChatStreamEvent
+from .routes import blocks, docs, health, jobs, journals, pages
 
 DESCRIPTION = """\
-Upload photos of handwritten journal pages, review their transcriptions, search them, and chat with
-an agent that cites the exact page. 🖍️
+Upload photos of handwritten journal pages and review their transcriptions. Search and a chat agent
+that cites the exact page are coming. 🖍️
 
 ## Conventions
 
@@ -30,14 +28,14 @@ an agent that cites the exact page. 🖍️
 - **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.
 - **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded
   UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,
-  `cnv` conversation, `msg` message, `job` job.
+  `job` job.
 - **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.
   `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed
   IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.
 - **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as
   `cursor`. `nextCursor` is `null` on the last page. Treat cursors as opaque strings; they stay
   valid even if the last item you got is deleted meanwhile.
-- **Long-running work** (transcribing, re-indexing, exports) answers `202 Accepted` with a `Job`
+- **Long-running work** (transcribing, re-indexing) answers `202 Accepted` with a `Job`
   and a `Location` header. Poll the job until it finishes.
 - **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`
   needs `Authorization: Bearer <token>`.
@@ -48,10 +46,7 @@ TAGS = [
     {"name": "journals", "description": "Notebooks (or volumes) that pages belong to."},
     {"name": "pages", "description": "Uploaded page images and their transcriptions."},
     {"name": "blocks", "description": "Text on a page (paragraphs, lists, margin notes)."},
-    {"name": "search", "description": "Hybrid semantic + keyword search over all pages."},
-    {"name": "conversations", "description": "Chat threads with the journal agent."},
     {"name": "jobs", "description": "Background work and its progress."},
-    {"name": "admin", "description": "Maintenance operations."},
 ]
 
 
@@ -83,7 +78,7 @@ def create_api(settings: Settings | None = None) -> FastAPI:
     api.include_router(docs.router)
     api.include_router(health.router)
     authed = [Depends(require_token)]
-    for module in (journals, pages, blocks, search, conversations, jobs):
+    for module in (journals, pages, blocks, jobs):
         api.include_router(module.router, dependencies=authed)
 
     def openapi() -> dict[str, Any]:
@@ -139,17 +134,6 @@ def build_openapi(api: FastAPI) -> dict[str, Any]:
 
     # The multipart upload body gets a proper name.
     renames = {name: "PageUpload" for name in schemas if name.startswith("Body_uploadPages")}
-
-    # SSE replacements
-    event_schema = TypeAdapter(ChatStreamEvent).json_schema(
-        ref_template="#/components/schemas/{model}", mode="serialization", by_alias=True
-    )
-    for name, definition in event_schema.pop("$defs", {}).items():
-        schemas.setdefault(name, definition)
-    schemas["ChatStreamEvent"] = {
-        "description": "One Server-Sent Event of a streamed answer. The SSE `event:` field equals `type`.",
-        **event_schema,
-    }
 
     text = json.dumps(spec)
     for old, new in renames.items():

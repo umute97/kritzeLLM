@@ -9,7 +9,7 @@ from kritzellm.db.migrate import alembic_config
 
 pytestmark = pytest.mark.db
 
-TABLES = {"journals", "pages", "blocks", "chunks", "conversations", "messages", "jobs"}
+TABLES = {"journals", "pages", "blocks", "jobs"}
 
 
 async def _query(url: str, sql: str) -> set[str]:
@@ -27,17 +27,6 @@ def _tables(url: str) -> set[str]:
 
 def test_fresh_database_reaches_head(database_url: str) -> None:
     assert _tables(database_url) == TABLES | {"alembic_version"}
-    extensions = asyncio.run(_query(database_url, "SELECT extname FROM pg_extension"))
-    assert {"vector", "pg_trgm"} <= extensions
-
-
-def test_search_indexes_exist(database_url: str) -> None:
-    indexes = asyncio.run(
-        _query(database_url, "SELECT indexdef FROM pg_indexes WHERE schemaname = 'public'")
-    )
-    assert any("USING hnsw (embedding vector_cosine_ops)" in index for index in indexes)
-    assert any("USING gin (tsv)" in index for index in indexes)
-    assert any("USING gin (text gin_trgm_ops)" in index for index in indexes)
 
 
 def test_models_match_the_migrations(database_url: str) -> None:

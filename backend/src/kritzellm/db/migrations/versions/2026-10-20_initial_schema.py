@@ -1,42 +1,21 @@
 """initial schema
 
-Created: 2026-10-10 16:09:30.495859
+Created: 2026-10-20 22:47:22.279476
 """
 
 from collections.abc import Sequence
 
-import pgvector.sqlalchemy
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0848061d24cd"
+revision: str = "37c8472ca615"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute("CREATE EXTENSION IF NOT EXISTS vector")
-    op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
-    op.create_table(
-        "conversations",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("title", sa.String(length=200), nullable=True),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_conversations")),
-    )
     op.create_table(
         "journals",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -55,44 +34,6 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_journals")),
-    )
-    op.create_table(
-        "messages",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("conversation_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column(
-            "role", sa.Enum("user", "assistant", name="role", native_enum=False), nullable=False
-        ),
-        sa.Column("content", sa.Text(), nullable=False),
-        sa.Column(
-            "tool_calls",
-            postgresql.JSONB(astext_type=sa.Text()),
-            server_default=sa.text("'[]'"),
-            nullable=False,
-        ),
-        sa.Column(
-            "sources",
-            postgresql.JSONB(astext_type=sa.Text()),
-            server_default=sa.text("'[]'"),
-            nullable=False,
-        ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.CheckConstraint("role IN ('user', 'assistant')", name=op.f("ck_messages_role_valid")),
-        sa.ForeignKeyConstraint(
-            ["conversation_id"],
-            ["conversations.id"],
-            name=op.f("fk_messages_conversation_id_conversations"),
-            ondelete="CASCADE",
-        ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_messages")),
-    )
-    op.create_index(
-        op.f("ix_messages_conversation_id_id"), "messages", ["conversation_id", "id"], unique=False
     )
     op.create_table(
         "pages",
@@ -182,28 +123,9 @@ def upgrade() -> None:
         ),
         sa.Column("text", sa.Text(), nullable=False),
         sa.Column("uncertain", sa.Boolean(), server_default=sa.text("false"), nullable=False),
-        sa.Column("band_start", sa.Integer(), nullable=False),
-        sa.Column("band_end", sa.Integer(), nullable=False),
-        sa.Column("band_total", sa.Integer(), nullable=False),
-        sa.Column(
-            "side", sa.Enum("left", "right", "full", name="side", native_enum=False), nullable=False
-        ),
-        sa.Column("box_x", sa.REAL(), nullable=False),
-        sa.Column("box_y", sa.REAL(), nullable=False),
-        sa.Column("box_width", sa.REAL(), nullable=False),
-        sa.Column("box_height", sa.REAL(), nullable=False),
         sa.CheckConstraint(
             "kind IN ('heading', 'paragraph', 'list', 'marginNote', 'drawing', 'other')",
             name=op.f("ck_blocks_kind_valid"),
-        ),
-        sa.CheckConstraint("side IN ('left', 'right', 'full')", name=op.f("ck_blocks_side_valid")),
-        sa.CheckConstraint(
-            "1 <= band_start AND band_start <= band_end AND band_end <= band_total",
-            name=op.f("ck_blocks_bands_in_order"),
-        ),
-        sa.CheckConstraint(
-            "box_x BETWEEN 0 AND 1 AND box_y BETWEEN 0 AND 1 AND box_width BETWEEN 0 AND 1 AND box_height BETWEEN 0 AND 1",
-            name=op.f("ck_blocks_box_normalized"),
         ),
         sa.CheckConstraint("seq >= 0", name=op.f("ck_blocks_seq_not_negative")),
         sa.ForeignKeyConstraint(
@@ -218,67 +140,68 @@ def upgrade() -> None:
             name=op.f("uq_blocks_page_id_seq"),
         ),
     )
-    op.create_index(
-        op.f("ix_blocks_text"),
-        "blocks",
-        ["text"],
-        unique=False,
-        postgresql_using="gin",
-        postgresql_ops={"text": "gin_trgm_ops"},
-    )
     op.create_table(
-        "chunks",
-        sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("page_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("block_ids", postgresql.ARRAY(postgresql.UUID(as_uuid=True)), nullable=False),
-        sa.Column("text", sa.Text(), nullable=False),
-        sa.Column("embed_text", sa.Text(), nullable=False),
-        sa.Column("entry_date", sa.Date(), nullable=True),
-        sa.Column("embedding", pgvector.sqlalchemy.Vector(1536), nullable=False),
-        sa.Column("embed_model", sa.Text(), nullable=False),
+        "jobs",
+        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(
-            "tsv",
-            postgresql.TSVECTOR(),
-            sa.Computed("to_tsvector('simple', text)", persisted=True),
+            "kind",
+            sa.Enum(
+                "ingestPage", "transcribePage", "reindexPage", name="jobkind", native_enum=False
+            ),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(
-            ["page_id"], ["pages.id"], name=op.f("fk_chunks_page_id_pages"), ondelete="CASCADE"
+        sa.Column(
+            "status",
+            sa.Enum(
+                "queued", "running", "succeeded", "failed", name="jobstatus", native_enum=False
+            ),
+            server_default="queued",
+            nullable=False,
         ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_chunks")),
+        sa.Column("page_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("progress_done", sa.Integer(), nullable=True),
+        sa.Column("progress_total", sa.Integer(), nullable=True),
+        sa.Column("error", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
+        sa.CheckConstraint(
+            "kind IN ('ingestPage', 'transcribePage', 'reindexPage')",
+            name=op.f("ck_jobs_kind_valid"),
+        ),
+        sa.CheckConstraint(
+            "status IN ('queued', 'running', 'succeeded', 'failed')",
+            name=op.f("ck_jobs_status_valid"),
+        ),
+        sa.CheckConstraint(
+            "progress_done BETWEEN 0 AND progress_total", name=op.f("ck_jobs_progress_in_range")
+        ),
+        sa.ForeignKeyConstraint(
+            ["page_id"], ["pages.id"], name=op.f("fk_jobs_page_id_pages"), ondelete="CASCADE"
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_jobs")),
     )
+    op.create_index(op.f("ix_jobs_page_id"), "jobs", ["page_id"], unique=False)
     op.create_index(
-        op.f("ix_chunks_embedding"),
-        "chunks",
-        ["embedding"],
+        "ix_jobs_queued",
+        "jobs",
+        ["id"],
         unique=False,
-        postgresql_using="hnsw",
-        postgresql_ops={"embedding": "vector_cosine_ops"},
+        postgresql_where=sa.text("status = 'queued'"),
     )
-    op.create_index(op.f("ix_chunks_page_id"), "chunks", ["page_id"], unique=False)
-    op.create_index(op.f("ix_chunks_tsv"), "chunks", ["tsv"], unique=False, postgresql_using="gin")
 
 
 def downgrade() -> None:
-    # Leaves the extensions in place; other database objects may use them.
-    op.drop_index(op.f("ix_chunks_tsv"), table_name="chunks", postgresql_using="gin")
-    op.drop_index(op.f("ix_chunks_page_id"), table_name="chunks")
     op.drop_index(
-        op.f("ix_chunks_embedding"),
-        table_name="chunks",
-        postgresql_using="hnsw",
-        postgresql_ops={"embedding": "vector_cosine_ops"},
+        "ix_jobs_queued", table_name="jobs", postgresql_where=sa.text("status = 'queued'")
     )
-    op.drop_table("chunks")
-    op.drop_index(
-        op.f("ix_blocks_text"),
-        table_name="blocks",
-        postgresql_using="gin",
-        postgresql_ops={"text": "gin_trgm_ops"},
-    )
+    op.drop_index(op.f("ix_jobs_page_id"), table_name="jobs")
+    op.drop_table("jobs")
     op.drop_table("blocks")
     op.drop_table("pages")
-    op.drop_index(op.f("ix_messages_conversation_id_id"), table_name="messages")
-    op.drop_table("messages")
     op.drop_table("journals")
-    op.drop_table("conversations")

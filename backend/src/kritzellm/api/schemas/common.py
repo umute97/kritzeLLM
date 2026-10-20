@@ -32,8 +32,6 @@ def _type_id(prefix: str) -> StringConstraints:
 JournalId = Annotated[str, _type_id("jrn"), Field(description="TypeID of a journal.")]
 PageId = Annotated[str, _type_id("pg"), Field(description="TypeID of a page.")]
 BlockId = Annotated[str, _type_id("blk"), Field(description="TypeID of a block.")]
-ConversationId = Annotated[str, _type_id("cnv"), Field(description="TypeID of a conversation.")]
-MessageId = Annotated[str, _type_id("msg"), Field(description="TypeID of a message.")]
 JobId = Annotated[str, _type_id("job"), Field(description="TypeID of a job.")]
 
 NO_NUL = r"^[^\x00]*$"

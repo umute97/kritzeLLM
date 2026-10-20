@@ -4,7 +4,7 @@ import pytest
 
 from kritzellm.config import Settings
 
-VARS = ("DATABASE_URL", "API_TOKEN", "DATA_DIR", "TRANSCRIBE_MODEL", "CHAT_MODEL", "EMBED_MODEL")
+VARS = ("DATABASE_URL", "API_TOKEN", "DATA_DIR", "TRANSCRIBE_MODEL")
 
 
 @pytest.fixture(autouse=True)
@@ -19,19 +19,17 @@ def test_defaults() -> None:
     assert settings.api_token is None
     assert settings.data_dir == Path("data")
     assert settings.transcribe_model == "gpt-6-luna"
-    assert settings.chat_model == "gpt-6-luna"
-    assert settings.embed_model == "text-embedding-3-small"
 
 
 def test_reads_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("API_TOKEN", "s3cret")
     monkeypatch.setenv("DATA_DIR", "/data")
-    monkeypatch.setenv("CHAT_MODEL", "gpt-6-sol")
+    monkeypatch.setenv("TRANSCRIBE_MODEL", "gpt-6-sol")
     settings = Settings()
     assert settings.api_token is not None
     assert settings.api_token.get_secret_value() == "s3cret"
     assert settings.data_dir == Path("/data")
-    assert settings.chat_model == "gpt-6-sol"
+    assert settings.transcribe_model == "gpt-6-sol"
 
 
 def test_empty_values_fall_back_to_the_defaults(monkeypatch: pytest.MonkeyPatch) -> None:

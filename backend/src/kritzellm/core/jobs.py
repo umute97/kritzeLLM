@@ -19,15 +19,9 @@ CHANNEL = "kritzellm_jobs"
 """Postgres `NOTIFY` channel that wakes the worker when jobs are queued."""
 
 
-async def enqueue(
-    session: AsyncSession,
-    kind: JobKind,
-    *,
-    page_id: str | None = None,
-    journal_id: str | None = None,
-) -> db.Job:
+async def enqueue(session: AsyncSession, kind: JobKind, *, page_id: str) -> db.Job:
     """Queues a job as part of the session's transaction. The caller commits."""
-    job = db.Job(kind=kind, page_id=page_id, journal_id=journal_id)
+    job = db.Job(kind=kind, page_id=page_id)
     session.add(job)
     await session.flush()
     # Delivered on commit, and not at all on rollback.
@@ -68,7 +62,7 @@ async def latest_jobs(session: AsyncSession, page_ids: Collection[str]) -> dict[
         .ext(distinct_on(db.Job.page_id))
         .order_by(db.Job.page_id, db.Job.id.desc())
     )
-    return {job.page_id: job for job in await session.scalars(query) if job.page_id}
+    return {job.page_id: job for job in await session.scalars(query)}
 
 
 async def claim_next(session: AsyncSession) -> db.Job | None:

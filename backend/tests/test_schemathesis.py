@@ -1,7 +1,4 @@
-"""Schemathesis fuzzes the built endpoints from api/openapi.json and checks every answer against it.
-
-Add an operation to FUZZED once it does real work.
-"""
+"""Schemathesis fuzzes every endpoint from api/openapi.json and checks every answer against it."""
 
 from pathlib import Path
 
@@ -17,26 +14,6 @@ pytestmark = pytest.mark.db
 
 TOKEN = "fuzz-token"
 
-FUZZED = [
-    "listJournals",
-    "createJournal",
-    "getJournal",
-    "updateJournal",
-    "deleteJournal",
-    "uploadPages",
-    "listPages",
-    "getPage",
-    "updatePage",
-    "deletePage",
-    "getPageImage",
-    "replacePageBlocks",
-    "transcribePage",
-    "getBlock",
-    "updateBlock",
-    "listJobs",
-    "getJob",
-]
-
 
 @pytest.fixture
 def api_schema(database_url: str, data_dir: Path) -> schemathesis.BaseSchema:
@@ -50,7 +27,7 @@ def api_schema(database_url: str, data_dir: Path) -> schemathesis.BaseSchema:
     return api_schema
 
 
-schema = schemathesis.pytest.from_fixture("api_schema").include(operation_id=FUZZED)
+schema = schemathesis.pytest.from_fixture("api_schema")
 
 
 @schema.parametrize()
