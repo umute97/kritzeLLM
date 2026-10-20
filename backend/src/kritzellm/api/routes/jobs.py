@@ -3,10 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from sqlalchemy import select
 
+from kritzellm.core.errors import get_existing
 from kritzellm.db import models as db
 
 from ..deps import Session
-from ..errors import not_found, problem_responses
+from ..errors import problem_responses
 from ..pagination import paginate
 from ..schemas.common import Problem
 from ..schemas.jobs import (
@@ -73,7 +74,4 @@ async def list_jobs(
 )
 async def get_job(job_id: JobIdPath, session: Session) -> Job:
     """Returns a job's status and progress. Poll this after a `202 Accepted`."""
-    job = await session.get(db.Job, job_id)
-    if job is None:
-        not_found("Job")
-    return job_out(job)
+    return job_out(await get_existing(session, db.Job, job_id))
