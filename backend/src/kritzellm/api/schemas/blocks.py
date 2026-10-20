@@ -2,7 +2,7 @@
 
 from enum import StrEnum
 
-from pydantic import Field
+from pydantic import MISSING, Field
 
 from .common import NO_NUL, ApiModel, BlockId, InputModel, PageId
 from .jobs import Job
@@ -62,10 +62,10 @@ class BlocksReplaceResult(ApiModel):
 class BlockUpdate(InputModel):
     """Corrections to a single block. Only the given fields change."""
 
-    kind: BlockKind | None = None
-    text: str | None = Field(default=None, min_length=1, max_length=20_000, pattern=NO_NUL)
+    kind: BlockKind | MISSING = MISSING
+    text: str | MISSING = Field(default=MISSING, min_length=1, max_length=20_000, pattern=NO_NUL)
     """Corrected text."""
-    uncertain: bool | None = None
+    uncertain: bool | MISSING = MISSING
     """Whether parts of the text are still unsure."""
 
 

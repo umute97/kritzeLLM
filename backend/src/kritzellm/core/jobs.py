@@ -35,6 +35,29 @@ async def enqueue(
     return job
 
 
+async def enqueue_once(session: AsyncSession, kind: JobKind, *, page_id: str) -> db.Job:
+    """The page's queued job of this kind, or a newly queued one. The caller commits.
+
+    A queued job hasn't started, so it'll still see whatever changed since it was queued.
+    """
+    queued = await session.scalar(
+        select(db.Job)
+        .where(db.Job.page_id == page_id, db.Job.kind == kind, db.Job.status == JobStatus.QUEUED)
+        .limit(1)
+    )
+    return queued or await enqueue(session, kind, page_id=page_id)
+
+
+async def pending(session: AsyncSession, page_id: str, kinds: Collection[JobKind]) -> bool:
+    """Whether the page has a queued or running job of one of `kinds`."""
+    query = select(db.Job.id).where(
+        db.Job.page_id == page_id,
+        db.Job.kind.in_(kinds),
+        db.Job.status.in_((JobStatus.QUEUED, JobStatus.RUNNING)),
+    )
+    return await session.scalar(query.limit(1)) is not None
+
+
 async def latest_jobs(session: AsyncSession, page_ids: Collection[str]) -> dict[str, db.Job]:
     """The newest job of each of the pages that has one."""
     if not page_ids:

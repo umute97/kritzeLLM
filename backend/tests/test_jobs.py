@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 from conftest import FakeVisionModel
 from fastapi.testclient import TestClient
-from pydantic import PostgresDsn
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
@@ -64,28 +63,6 @@ PAGE = {
         {"kind": "marginNote", "text": "anrufen [?]", "uncertain": True},
     ],
 }
-
-
-@pytest.fixture
-def settings(database_url: str, data_dir: Path) -> Settings:
-    """The worker's settings: the fake `test` model, unless a test swaps in `vision_model`."""
-    return Settings(
-        api_token=None,
-        database_url=PostgresDsn(database_url),
-        data_dir=data_dir,
-        transcribe_model="test",
-    )
-
-
-@pytest.fixture
-def work(settings: Settings) -> Callable[[], None]:
-    """Runs the worker until no jobs are queued."""
-
-    async def run() -> None:
-        async with Worker(settings) as worker:
-            await worker.run_until_idle()
-
-    return lambda: asyncio.run(run())
 
 
 def test_upload_queues_an_ingest_job_per_new_page(
