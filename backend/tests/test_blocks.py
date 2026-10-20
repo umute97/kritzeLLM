@@ -1,7 +1,7 @@
 from collections.abc import Callable
 
 import pytest
-from conftest import FakeVisionModel
+from conftest import FakeVisionModel, get_job, get_page, new_journal, upload
 from fastapi.testclient import TestClient
 
 from kritzellm.ids import Prefix, new_id
@@ -19,29 +19,6 @@ PAGE = {
         {"kind": "marginNote", "text": "anrufen [?]", "uncertain": True},
     ],
 }
-
-
-def _upload(client: TestClient, image: bytes) -> dict:
-    """Uploads `image` into a new journal and returns the item for it."""
-    journal = client.post("/journals", json={"name": "Blocks"})
-    assert journal.status_code == 201, journal.text
-    response = client.post(
-        f"/journals/{journal.json()['id']}/pages", files=[("files", ("p.jpg", image, "image/jpeg"))]
-    )
-    assert response.status_code == 201, response.text
-    return response.json()["items"][0]
-
-
-def _page(client: TestClient, page_id: str) -> dict:
-    response = client.get(f"/pages/{page_id}")
-    assert response.status_code == 200, response.text
-    return response.json()
-
-
-def _job(client: TestClient, job_id: str) -> dict:
-    response = client.get(f"/jobs/{job_id}")
-    assert response.status_code == 200, response.text
-    return response.json()
 
 
 def _patch(client: TestClient, block_id: str, **changes: object) -> dict:
@@ -69,9 +46,9 @@ def page(
 ) -> dict:
     """A page the worker read into PAGE's three blocks."""
     vision_model.outputs = [PAGE]
-    item = _upload(db_client, make_image())
+    item = upload(db_client, new_journal(db_client), make_image())[0]
     work()
-    return _page(db_client, item["page"]["id"])
+    return get_page(db_client, item["page"]["id"])
 
 
 def test_get_block(db_client: TestClient, page: dict) -> None:
@@ -102,7 +79,7 @@ def test_patch_changes_only_the_given_fields(db_client: TestClient, page: dict) 
     job = result["job"]
     assert (job["kind"], job["status"]) == ("reindexPage", "queued")
     assert job["target"] == {"type": "page", "id": page["id"]}
-    fixed = _page(db_client, page["id"])
+    fixed = get_page(db_client, page["id"])
     assert fixed["blocks"][2] == result["block"]
     assert fixed["updatedAt"] > page["updatedAt"]
 
@@ -133,9 +110,9 @@ def test_edits_in_a_row_share_the_queued_reindex(
 
     work()
 
-    done = _job(db_client, job["id"])
+    done = get_job(db_client, job["id"])
     assert (done["status"], done["progress"]) == ("succeeded", {"done": 1, "total": 1})
-    fixed = _page(db_client, page["id"])
+    fixed = get_page(db_client, page["id"])
     assert (fixed["status"], fixed["error"]) == ("ready", None)
     assert _texts(fixed["blocks"]) == [(0, "Alles neu.")]
     # That job is done, so the next edit gets a new one.
@@ -165,21 +142,21 @@ def test_put_reorders_keeps_creates_and_deletes(db_client: TestClient, page: dic
     assert blocks[2]["id"] == heading["id"]
     assert all(block["pageId"] == page["id"] for block in blocks)
     assert result["job"]["kind"] == "reindexPage"
-    assert _page(db_client, page["id"])["blocks"] == blocks
+    assert get_page(db_client, page["id"])["blocks"] == blocks
     assert db_client.get(f"/blocks/{paragraph['id']}").status_code == 404
 
 
 def test_put_nothing_clears_the_page(db_client: TestClient, page: dict) -> None:
     assert _put(db_client, page["id"], [])["blocks"] == []
-    assert _page(db_client, page["id"])["blocks"] == []
+    assert get_page(db_client, page["id"])["blocks"] == []
 
 
 def test_put_rejects_foreign_and_repeated_ids(
     db_client: TestClient, page: dict, make_image: MakeImage, work: Callable[[], None]
 ) -> None:
-    other = _upload(db_client, make_image(color="blue"))
+    other = upload(db_client, new_journal(db_client), make_image(color="blue"))[0]
     work()
-    foreign = _page(db_client, other["page"]["id"])["blocks"][0]["id"]
+    foreign = get_page(db_client, other["page"]["id"])["blocks"][0]["id"]
     mine = page["blocks"][0]["id"]
 
     response = db_client.put(
@@ -200,7 +177,7 @@ def test_put_rejects_foreign_and_repeated_ids(
         {"detail": "Not a block of this page", "pointer": "/blocks/2/id"},
         {"detail": "Not a block of this page", "pointer": "/blocks/3/id"},
     ]
-    assert _page(db_client, page["id"])["blocks"] == page["blocks"]
+    assert get_page(db_client, page["id"])["blocks"] == page["blocks"]
 
 
 def test_unknown_page_is_404(db_client: TestClient) -> None:
@@ -230,9 +207,9 @@ def test_transcribing_again_reads_the_page_afresh(
 
     work()
 
-    done = _job(db_client, job["id"])
+    done = get_job(db_client, job["id"])
     assert (done["status"], done["progress"]) == ("succeeded", {"done": 2, "total": 2})
-    read = _page(db_client, page["id"])
+    read = get_page(db_client, page["id"])
     assert read["status"] == "ready"
     assert _texts(read["blocks"]) == [(0, "Neu")]
     assert db_client.get(f"/blocks/{page['blocks'][0]['id']}").status_code == 404
@@ -241,7 +218,7 @@ def test_transcribing_again_reads_the_page_afresh(
 def test_a_page_waiting_to_be_read_cannot_be_changed(
     db_client: TestClient, page: dict, make_image: MakeImage
 ) -> None:
-    unread = _upload(db_client, make_image(color="green"))["page"]["id"]
+    unread = upload(db_client, new_journal(db_client), make_image(color="green"))[0]["page"]["id"]
     assert db_client.post(f"/pages/{page['id']}/transcribe").status_code == 202
 
     for response in (
@@ -253,7 +230,7 @@ def test_a_page_waiting_to_be_read_cannot_be_changed(
     ):
         assert response.status_code == 409, response.text
         assert response.headers["content-type"] == "application/problem+json"
-    assert _page(db_client, page["id"])["blocks"] == page["blocks"]
+    assert get_page(db_client, page["id"])["blocks"] == page["blocks"]
 
 
 def test_a_failed_page_can_be_typed_up_by_hand(
@@ -263,14 +240,14 @@ def test_a_failed_page_can_be_typed_up_by_hand(
     vision_model: FakeVisionModel,
 ) -> None:
     vision_model.outputs = [{**PAGE, "entry_dates": ["someday"]}]
-    page_id = _upload(db_client, make_image(color="brown"))["page"]["id"]
+    page_id = upload(db_client, new_journal(db_client), make_image(color="brown"))[0]["page"]["id"]
     work()
-    assert _page(db_client, page_id)["status"] == "failed"
+    assert get_page(db_client, page_id)["status"] == "failed"
 
     _put(db_client, page_id, [{"kind": "paragraph", "text": "Selbst abgetippt."}])
     work()
 
-    page = _page(db_client, page_id)
+    page = get_page(db_client, page_id)
     assert (page["status"], page["error"]) == ("ready", None)
     assert _texts(page["blocks"]) == [(0, "Selbst abgetippt.")]
 
