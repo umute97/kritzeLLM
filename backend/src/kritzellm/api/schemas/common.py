@@ -4,18 +4,31 @@ import re
 from datetime import date, datetime
 from typing import Annotated, Any
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+)
 from pydantic.alias_generators import to_camel
+
+from kritzellm.ids import SUFFIX_PATTERN, Prefix
 
 
 class ApiModel(BaseModel):
-    """Base for everything the API sends: camelCase on the wire, snake_case in Python."""
+    """Base for everything the API sends: camelCase on the wire, snake_case in Python.
+
+    `Model.model_validate(row)` reads a database row's attributes.
+    """
 
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,
         serialize_by_alias=True,
         use_attribute_docstrings=True,
+        from_attributes=True,
     )
 
 
@@ -25,14 +38,14 @@ class InputModel(ApiModel):
     model_config = ConfigDict(extra="forbid")
 
 
-def _type_id(prefix: str) -> StringConstraints:
-    return StringConstraints(pattern=rf"^{prefix}_[0-7][0-9a-hjkmnp-tv-z]{{25}}$")
+def _type_id(prefix: Prefix) -> StringConstraints:
+    return StringConstraints(pattern=rf"^{prefix}_{SUFFIX_PATTERN}$")
 
 
-JournalId = Annotated[str, _type_id("jrn"), Field(description="TypeID of a journal.")]
-PageId = Annotated[str, _type_id("pg"), Field(description="TypeID of a page.")]
-BlockId = Annotated[str, _type_id("blk"), Field(description="TypeID of a block.")]
-JobId = Annotated[str, _type_id("job"), Field(description="TypeID of a job.")]
+JournalId = Annotated[str, _type_id(Prefix.JOURNAL), Field(description="TypeID of a journal.")]
+PageId = Annotated[str, _type_id(Prefix.PAGE), Field(description="TypeID of a page.")]
+BlockId = Annotated[str, _type_id(Prefix.BLOCK), Field(description="TypeID of a block.")]
+JobId = Annotated[str, _type_id(Prefix.JOB), Field(description="TypeID of a job.")]
 
 NO_NUL = r"^[^\x00]*$"
 """Pattern for free-text inputs: anything but NUL characters, which Postgres can't store."""
@@ -49,6 +62,8 @@ def _iso_day(value: Any) -> Any:
 
 
 Day = Annotated[date, BeforeValidator(_iso_day), Field(description="A calendar day.")]
+SortedDays = Annotated[list[Day], AfterValidator(lambda days: sorted(set(days)))]
+"""Days, sorted and without repeats."""
 
 
 class ProblemError(ApiModel):

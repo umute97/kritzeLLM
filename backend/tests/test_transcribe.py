@@ -34,8 +34,8 @@ def _settings(**overrides: Any) -> Settings:
     return Settings(**{"transcribe_model": "gpt-test", "openai_api_key": "sk-test", **overrides})
 
 
-def _read(settings: Settings | None = None, **kwargs: str) -> PageTranscription:
-    return asyncio.run(transcribe(IMAGE, settings or _settings(), **kwargs))
+def _read(settings: Settings | None = None) -> PageTranscription:
+    return asyncio.run(transcribe(IMAGE, settings or _settings()))
 
 
 def test_the_page_is_read_into_blocks(vision_model: FakeVisionModel) -> None:

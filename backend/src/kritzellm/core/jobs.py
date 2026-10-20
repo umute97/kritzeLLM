@@ -94,24 +94,18 @@ async def requeue_interrupted(session: AsyncSession) -> int:
     return len(requeued.all())
 
 
+async def _update(session: AsyncSession, job_id: str, **values: Any) -> None:
+    await session.execute(update(db.Job).where(db.Job.id == job_id).values(**values))
+
+
 async def set_progress(session: AsyncSession, job_id: str, done: int, total: int) -> None:
-    await session.execute(
-        update(db.Job).where(db.Job.id == job_id).values(progress_done=done, progress_total=total)
-    )
+    await _update(session, job_id, progress_done=done, progress_total=total)
 
 
 async def succeed(session: AsyncSession, job_id: str) -> None:
-    await session.execute(
-        update(db.Job)
-        .where(db.Job.id == job_id)
-        .values(status=JobStatus.SUCCEEDED, finished_at=func.now())
-    )
+    await _update(session, job_id, status=JobStatus.SUCCEEDED, finished_at=func.now())
 
 
 async def fail(session: AsyncSession, job_id: str, problem: dict[str, Any]) -> None:
     """Marks the job failed with an RFC 9457 problem."""
-    await session.execute(
-        update(db.Job)
-        .where(db.Job.id == job_id)
-        .values(status=JobStatus.FAILED, error=problem, finished_at=func.now())
-    )
+    await _update(session, job_id, status=JobStatus.FAILED, error=problem, finished_at=func.now())

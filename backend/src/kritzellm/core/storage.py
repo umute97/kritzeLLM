@@ -11,8 +11,6 @@ import shutil
 import uuid
 from collections.abc import Iterable
 from pathlib import Path
-from types import TracebackType
-from typing import Self
 
 from kritzellm.api.schemas.pages import ImageVariant
 
@@ -41,21 +39,14 @@ def delete_page_files(data_dir: Path, page_ids: Iterable[str]) -> None:
 
 
 class Staging:
-    """A scratch folder for one upload, removed on exit with whatever wasn't published."""
+    """A scratch folder for one upload. Use it as `async with aclosing(Staging(…))`: closing
+    removes it, with whatever wasn't published."""
 
     def __init__(self, data_dir: Path) -> None:
         self.data_dir = data_dir
         self.root = data_dir / "tmp" / uuid.uuid4().hex
 
-    async def __aenter__(self) -> Self:
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
+    async def aclose(self) -> None:
         await asyncio.to_thread(shutil.rmtree, self.root, ignore_errors=True)
 
     def stage(self, original: bytes, image: NormalizedImage) -> Path:

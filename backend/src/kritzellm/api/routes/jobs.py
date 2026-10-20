@@ -9,42 +9,20 @@ from kritzellm.db import models as db
 
 from ..deps import Session
 from ..errors import problem_responses
-from ..schemas.common import Problem
 from ..schemas.jobs import (
     Job,
     JobKind,
     JobList,
-    JobProgress,
     JobStatus,
-    JobTarget,
-    JobTargetType,
 )
 from .params import JobCursor, JobIdPath, Limit
 
-router = APIRouter(tags=["jobs"])
-
-
-def job_out(job: db.Job) -> Job:
-    progress = None
-    if job.progress_done is not None and job.progress_total is not None:
-        progress = JobProgress(done=job.progress_done, total=job.progress_total)
-    return Job(
-        id=job.id,
-        kind=job.kind,
-        status=job.status,
-        target=JobTarget(type=JobTargetType.PAGE, id=job.page_id),
-        progress=progress,
-        error=Problem.model_validate(job.error) if job.error else None,
-        created_at=job.created_at,
-        started_at=job.started_at,
-        finished_at=job.finished_at,
-    )
+router = APIRouter(tags=["jobs"], responses=problem_responses(400, 401, 422))
 
 
 @router.get(
     "/jobs",
     summary="List jobs",
-    responses=problem_responses(400, 401, 422),
 )
 async def list_jobs(
     session: Session,
@@ -64,14 +42,14 @@ async def list_jobs(
     rows, next_cursor = await paginate(
         session, query, id_column=db.Job.id, limit=limit, cursor=cursor
     )
-    return JobList(items=[job_out(job) for (job,) in rows], next_cursor=next_cursor)
+    return JobList(items=[Job.from_db(job) for (job,) in rows], next_cursor=next_cursor)
 
 
 @router.get(
     "/jobs/{jobId}",
     summary="Get a job",
-    responses=problem_responses(400, 401, 404, 422),
+    responses=problem_responses(404),
 )
 async def get_job(job_id: JobIdPath, session: Session) -> Job:
     """Returns a job's status and progress. Poll this after a `202 Accepted`."""
-    return job_out(await get_existing(session, db.Job, job_id))
+    return Job.from_db(await get_existing(session, db.Job, job_id))

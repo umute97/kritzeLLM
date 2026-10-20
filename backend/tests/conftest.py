@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import io
 import os
 from collections.abc import AsyncIterator, Callable, Iterator
@@ -158,7 +159,7 @@ def work(settings: Settings) -> Callable[[], None]:
     """Runs the worker until no jobs are queued."""
 
     async def run() -> None:
-        async with Worker(settings) as worker:
+        async with contextlib.aclosing(Worker(settings)) as worker:
             await worker.run_until_idle()
 
     return lambda: asyncio.run(run())

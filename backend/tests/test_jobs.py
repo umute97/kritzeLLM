@@ -345,7 +345,7 @@ def test_the_worker_wakes_up_for_new_jobs(
     async def scenario() -> JobStatus | None:
         engine = create_async_engine(str(settings.database_url))
         async with (
-            Worker(settings) as worker,
+            contextlib.aclosing(Worker(settings)) as worker,
             AsyncSession(engine, expire_on_commit=False) as session,
         ):
             page = db.Page(

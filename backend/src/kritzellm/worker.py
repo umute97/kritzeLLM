@@ -16,8 +16,6 @@ import tempfile
 import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from types import TracebackType
-from typing import Self
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -63,8 +61,8 @@ async def read_page(session: AsyncSession, job: db.Job, settings: Settings) -> N
     await session.commit()
 
     image = await asyncio.to_thread(image_path.read_bytes)
+    transcription = await transcribe(image, settings)
     model = settings.transcribe_model
-    transcription = await transcribe(image, settings, model=model)
     if not await core_pages.save_transcription(session, page_id, transcription, model):
         return
     await _index(session, job_id, page_id, done=1, total=READ_STEPS)
@@ -103,7 +101,7 @@ def _problem(exc: Exception) -> dict[str, object]:
 
 
 class Worker:
-    """Runs jobs against the configured database. Use it as an `async with` block."""
+    """Runs jobs against the configured database. Use it as `async with aclosing(Worker(…))`."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -111,15 +109,7 @@ class Worker:
         self.sessionmaker = create_sessionmaker(self.engine)
         self._wakeup = asyncio.Event()
 
-    async def __aenter__(self) -> Self:
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
+    async def aclose(self) -> None:
         await self.engine.dispose()
 
     async def run(self) -> None:
@@ -205,7 +195,7 @@ async def main() -> None:
     for stop in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(stop, task.cancel)
     beating = asyncio.create_task(heartbeat())
-    async with Worker(get_settings()) as worker:
+    async with contextlib.aclosing(Worker(get_settings())) as worker:
         try:
             await worker.run()
         except asyncio.CancelledError:

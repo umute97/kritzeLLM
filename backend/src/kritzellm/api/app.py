@@ -120,10 +120,11 @@ def build_openapi(api: FastAPI) -> dict[str, Any]:
     )
     schemas: dict[str, Any] = spec["components"]["schemas"]
 
-    # Errors are problem+json
+    # Errors are problem+json, and responses are listed by status code
     for operations in spec["paths"].values():
         for operation in operations.values():
-            for code, response in operation.get("responses", {}).items():
+            operation["responses"] = dict(sorted(operation["responses"].items()))
+            for code, response in operation["responses"].items():
                 content = response.get("content", {})
                 if code.startswith(("4", "5")) and "application/json" in content:
                     content[PROBLEM_JSON] = content.pop("application/json")

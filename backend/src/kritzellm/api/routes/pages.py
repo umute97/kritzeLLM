@@ -12,64 +12,30 @@ from kritzellm.core.errors import NotFoundError, get_existing
 from kritzellm.core.storage import variant_path
 from kritzellm.db import models as db
 
-from .. import API_PREFIX
 from ..deps import AppSettings, Session
 from ..errors import problem_responses
-from ..schemas.blocks import BlocksReplace, BlocksReplaceResult
-from ..schemas.common import JournalId, Problem
+from ..schemas.blocks import Block, BlocksReplace, BlocksReplaceResult
+from ..schemas.common import JournalId
 from ..schemas.jobs import Job
 from ..schemas.pages import (
     ImageVariant,
     Page,
     PageDetail,
-    PageImage,
-    PageImageUrls,
     PageList,
     PageStatus,
     PageUpdate,
 )
-from .blocks import block_out
-from .jobs import job_out
 from .params import BINARY, JOB_LOCATION, DateFrom, DateTo, Limit, PageCursor, PageIdPath
 
-router = APIRouter(tags=["pages"])
+router = APIRouter(tags=["pages"], responses=problem_responses(400, 401, 422))
 
 IMMUTABLE = "private, max-age=31536000, immutable"
 """A page's images never change, so clients may cache them for good."""
 
 
-def _image_url(page_id: str, variant: ImageVariant) -> str:
-    return f"{API_PREFIX}/pages/{page_id}/image?variant={variant.value}"
-
-
-def page_out(page: db.Page) -> Page:
-    return Page(
-        id=page.id,
-        journal_id=page.journal_id,
-        page_number=page.page_number,
-        page_label=page.page_label,
-        entry_dates=page.entry_dates,
-        status=page.status,
-        error=Problem.model_validate(page.error) if page.error else None,
-        image=PageImage(
-            width=page.width,
-            height=page.height,
-            urls=PageImageUrls(
-                normalized=_image_url(page.id, ImageVariant.NORMALIZED),
-                original=_image_url(page.id, ImageVariant.ORIGINAL),
-                thumbnail=_image_url(page.id, ImageVariant.THUMBNAIL),
-            ),
-        ),
-        transcription_model=page.transcription_model,
-        created_at=page.created_at,
-        updated_at=page.updated_at,
-    )
-
-
 @router.get(
     "/pages",
     summary="List pages",
-    responses=problem_responses(400, 401, 422),
 )
 async def list_pages(
     session: Session,
@@ -97,24 +63,24 @@ async def list_pages(
         limit=limit,
         cursor=cursor,
     )
-    return PageList(items=[page_out(page) for page in pages], next_cursor=next_cursor)
+    return PageList(items=[Page.from_db(page) for page in pages], next_cursor=next_cursor)
 
 
 @router.get(
     "/pages/{pageId}",
     summary="Get a page",
-    responses=problem_responses(400, 401, 404, 422),
+    responses=problem_responses(404),
 )
 async def get_page(page_id: PageIdPath, session: Session) -> PageDetail:
     """Returns a page with all of its transcribed blocks, in reading order."""
     page = await get_existing(session, db.Page, page_id, options=[selectinload(db.Page.blocks)])
-    return PageDetail(**dict(page_out(page)), blocks=[block_out(block) for block in page.blocks])
+    return PageDetail.from_db(page, blocks=page.blocks)
 
 
 @router.patch(
     "/pages/{pageId}",
     summary="Update a page",
-    responses=problem_responses(400, 401, 404, 409, 422),
+    responses=problem_responses(404, 409),
 )
 async def update_page(page_id: PageIdPath, body: PageUpdate, session: Session) -> Page:
     """Corrects page metadata (number, label, dates) or moves the page to another journal.
@@ -122,7 +88,7 @@ async def update_page(page_id: PageIdPath, body: PageUpdate, session: Session) -
     Changing dates or the journal re-indexes the page.
     """
     changes = body.model_dump(exclude_unset=True, by_alias=False)
-    return page_out(await core.update_page(session, page_id, changes))
+    return Page.from_db(await core.update_page(session, page_id, changes))
 
 
 @router.delete(
@@ -130,7 +96,7 @@ async def update_page(page_id: PageIdPath, body: PageUpdate, session: Session) -
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
     summary="Delete a page",
-    responses=problem_responses(400, 401, 404, 422),
+    responses=problem_responses(404),
 )
 async def delete_page(page_id: PageIdPath, session: Session, settings: AppSettings) -> None:
     """Deletes a page, its images, blocks and search index entries. This can't be undone."""
@@ -152,7 +118,7 @@ async def delete_page(page_id: PageIdPath, session: Session, settings: AppSettin
                 "image/webp": BINARY,
             },
         },
-        **problem_responses(400, 401, 404, 422),
+        **problem_responses(404),
     },
 )
 async def get_page_image(
@@ -181,7 +147,7 @@ async def get_page_image(
     "/pages/{pageId}/blocks",
     summary="Replace a page's blocks",
     tags=["blocks"],
-    responses=problem_responses(400, 401, 404, 409, 422),
+    responses=problem_responses(404, 409),
 )
 async def replace_page_blocks(
     page_id: PageIdPath, body: BlocksReplace, session: Session
@@ -201,14 +167,16 @@ async def replace_page_blocks(
         ]
         raise RequestValidationError(errors) from None
     await session.commit()
-    return BlocksReplaceResult(blocks=[block_out(block) for block in blocks], job=job_out(job))
+    return BlocksReplaceResult(
+        blocks=[Block.model_validate(block) for block in blocks], job=Job.from_db(job)
+    )
 
 
 @router.post(
     "/pages/{pageId}/transcribe",
     status_code=status.HTTP_202_ACCEPTED,
     summary="Re-transcribe a page",
-    responses={202: {"headers": JOB_LOCATION}, **problem_responses(400, 401, 404, 409, 422)},
+    responses={202: {"headers": JOB_LOCATION}, **problem_responses(404, 409)},
 )
 async def transcribe_page(
     page_id: PageIdPath, session: Session, request: Request, response: Response
@@ -220,4 +188,4 @@ async def transcribe_page(
     job = await core_blocks.request_transcription(session, page_id)
     await session.commit()
     response.headers["Location"] = request.url_for("get_job", jobId=job.id).path
-    return job_out(job)
+    return Job.from_db(job)

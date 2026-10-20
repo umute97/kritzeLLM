@@ -6,9 +6,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from kritzellm.config import Settings
-
-from .deps import get_settings
+from .deps import AppSettings
 
 bearer = HTTPBearer(
     scheme_name="bearerAuth",
@@ -19,7 +17,7 @@ bearer = HTTPBearer(
 
 async def require_token(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
-    settings: Annotated[Settings, Depends(get_settings)],
+    settings: AppSettings,
 ) -> None:
     """Rejects the request with a `401` unless it carries the configured token."""
     if settings.api_token is None:
