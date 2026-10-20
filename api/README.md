@@ -11,11 +11,13 @@ backend test fails when it's out of date.
 
 ```sh
 just api-export    # regenerate openapi.json from the backend code
-just api-install   # Redocly, Prism and Scalar (pinned in package.json)
+just api-install   # Redocly and Prism (pinned in package.json)
 just api-lint      # lint the spec (rules in redocly.yaml)
 just api-mock      # mock server on http://localhost:4010 with random but valid data
-just api-docs      # docs preview on http://localhost:4011, reloads on save
 ```
+
+For browsable docs, run the backend (`just up` or `just backend-dev`) and open
+http://localhost:8000/api/v1/docs.
 
 > Heads up: Prism can't parse repeated multipart fields, so `POST /journals/{journalId}/pages`
 > always answers `422` in the mock. Try uploads against the real backend.

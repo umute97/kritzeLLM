@@ -86,7 +86,7 @@ worker-dev:
 api-export:
     cd backend && uv run python scripts/export_openapi.py
 
-# Install the API contract tooling (Redocly, Prism, Scalar)
+# Install the API contract tooling (Redocly, Prism)
 api-install:
     npm --prefix api ci
 
@@ -97,7 +97,3 @@ api-lint:
 # Serve a mock API (random but valid data) on http://localhost:4010
 api-mock:
     npm --prefix api run mock
-
-# Preview the API docs on http://localhost:4011
-api-docs:
-    npm --prefix api run docs
