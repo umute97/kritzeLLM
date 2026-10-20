@@ -18,7 +18,7 @@ Images and PDFs are rejected by a pre-commit hook unless they live under a `test
 
 ## Workflow
 
-1. Branch off `main`: `<type>/<short-slug>`, e.g. `feat/page-upload`, `fix/band-offset`.
+1. Branch off `main`: `<type>/<short-slug>`, e.g. `feat/page-upload`, `fix/upload-retry`.
 2. Open a PR. One PR per issue where practical; put `Closes #<issue>` in the body.
 3. PRs are **squash-merged**. The PR title becomes the commit on `main`, so it must follow
    [Conventional Commits](https://www.conventionalcommits.org/):

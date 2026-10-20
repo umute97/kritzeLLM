@@ -2,6 +2,23 @@
 # Needs POSTGRES_PASSWORD and API_TOKEN (in the environment or a `.env` next to this file).
 name: kritzellm
 
+# Shared by the three services that run the released image.
+x-backend: &backend
+  image: ghcr.io/umute97/kritzellm-api:${KRITZELLM_VERSION:-latest}
+  restart: unless-stopped
+  depends_on:
+    db:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+  volumes:
+    - api-data:/data
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kritzellm}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-kritzellm}
+  DATA_DIR: /data
+  TRANSCRIBE_MODEL: ${TRANSCRIBE_MODEL:-}
+
 services:
   db:
     image: pgvector/pgvector:0.8.7-pg18-trixie
@@ -22,50 +39,29 @@ services:
 
   # Brings the schema up to date, then exits. api waits for it.
   migrate:
-    image: ghcr.io/umute97/kritzellm-api:${KRITZELLM_VERSION:-latest}
+    <<: *backend
     command: ["python", "-m", "kritzellm.db.migrate"]
     restart: "no"
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kritzellm}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-kritzellm}
+    environment: *backend-env
 
   api:
-    image: ghcr.io/umute97/kritzellm-api:${KRITZELLM_VERSION:-latest}
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
+    <<: *backend
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kritzellm}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-kritzellm}
+      <<: *backend-env
       API_TOKEN: ${API_TOKEN:?Set API_TOKEN}
-      DATA_DIR: /data
-      TRANSCRIBE_MODEL: ${TRANSCRIBE_MODEL:-}
     ports:
       - "${API_PORT:-8000}:8000"
-    volumes:
-      - api-data:/data
 
   # Runs background jobs (processing uploaded pages) from the queue in the database.
   worker:
-    image: ghcr.io/umute97/kritzellm-api:${KRITZELLM_VERSION:-latest}
+    <<: *backend
     command: ["python", "-m", "kritzellm.worker"]
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kritzellm}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-kritzellm}
-      DATA_DIR: /data
+      <<: *backend-env
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      TRANSCRIBE_MODEL: ${TRANSCRIBE_MODEL:-}
-    volumes:
-      - api-data:/data
     # The image's healthcheck probes the API port; the worker has a heartbeat instead.
     healthcheck:
       test: ["CMD", "python", "-m", "kritzellm.worker", "healthcheck"]
