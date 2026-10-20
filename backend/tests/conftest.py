@@ -18,6 +18,7 @@ from kritzellm.config import Settings
 from kritzellm.core import transcribe
 from kritzellm.db.migrate import upgrade
 from kritzellm.main import create_app
+from kritzellm.worker import Worker
 
 # Nothing listens on port 1, so connecting fails right away.
 UNREACHABLE_DATABASE_URL = "postgresql+asyncpg://kritzellm:kritzellm@127.0.0.1:1/kritzellm"
@@ -139,6 +140,28 @@ def db_client(database_url: str, data_dir: Path) -> Iterator[TestClient]:
     app = create_app(settings)
     with TestClient(app, base_url="http://test/api/v1") as client:
         yield client
+
+
+@pytest.fixture
+def settings(database_url: str, data_dir: Path) -> Settings:
+    """The worker's settings: the fake `test` model, unless a test swaps in `vision_model`."""
+    return Settings(
+        api_token=None,
+        database_url=PostgresDsn(database_url),
+        data_dir=data_dir,
+        transcribe_model="test",
+    )
+
+
+@pytest.fixture
+def work(settings: Settings) -> Callable[[], None]:
+    """Runs the worker until no jobs are queued."""
+
+    async def run() -> None:
+        async with Worker(settings) as worker:
+            await worker.run_until_idle()
+
+    return lambda: asyncio.run(run())
 
 
 @pytest.fixture

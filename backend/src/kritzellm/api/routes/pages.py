@@ -1,19 +1,21 @@
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Query, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
+from kritzellm.core import blocks as core_blocks
 from kritzellm.core import pages as core
 from kritzellm.core.storage import delete_page_files, variant_path
 from kritzellm.db import models as db
 
 from .. import API_PREFIX
 from ..deps import AppSettings, Session
-from ..errors import http_error, not_found, not_implemented, problem_responses
+from ..errors import http_error, not_found, problem_responses
 from ..schemas.blocks import BlocksReplace, BlocksReplaceResult
 from ..schemas.common import JournalId, Problem
 from ..schemas.jobs import Job
@@ -26,9 +28,9 @@ from ..schemas.pages import (
     PageList,
     PageStatus,
     PageUpdate,
-    TranscribeRequest,
 )
-from .blocks import block_out
+from .blocks import PAGE_BUSY, block_out
+from .jobs import job_out
 from .params import BINARY, JOB_LOCATION, DateFrom, DateTo, Limit, PageCursor, PageIdPath
 
 router = APIRouter(tags=["pages"])
@@ -224,14 +226,30 @@ async def get_page_image(
     tags=["blocks"],
     responses=problem_responses(400, 401, 404, 409, 422),
 )
-async def replace_page_blocks(page_id: PageIdPath, body: BlocksReplace) -> BlocksReplaceResult:
+async def replace_page_blocks(
+    page_id: PageIdPath, body: BlocksReplace, session: Session
+) -> BlocksReplaceResult:
     """Replaces the whole transcription of a page, in reading order.
 
     Blocks sent with an `id` are updated in place (so existing chat sources keep working); blocks
     without one are created; existing blocks that aren't sent are deleted. The page is re-indexed in
-    the background.
+    the background. Returns `409` while the page is waiting to be read or being read.
     """
-    not_implemented()
+    try:
+        replaced = await core_blocks.replace_blocks(session, page_id, body.blocks)
+    except core_blocks.PageBusyError:
+        http_error(409, PAGE_BUSY)
+    except core_blocks.BlockIdError as exc:
+        errors = [
+            {"type": "value_error", "loc": ("body", "blocks", index, "id"), "msg": message}
+            for index, message in exc.problems
+        ]
+        raise RequestValidationError(errors) from None
+    if replaced is None:
+        not_found("Page")
+    await session.commit()
+    blocks, job = replaced
+    return BlocksReplaceResult(blocks=[block_out(block) for block in blocks], job=job_out(job))
 
 
 @router.post(
@@ -241,10 +259,18 @@ async def replace_page_blocks(page_id: PageIdPath, body: BlocksReplace) -> Block
     responses={202: {"headers": JOB_LOCATION}, **problem_responses(400, 401, 404, 409, 422)},
 )
 async def transcribe_page(
-    page_id: PageIdPath, body: Annotated[TranscribeRequest | None, Body()] = None
+    page_id: PageIdPath, session: Session, request: Request, response: Response
 ) -> Job:
-    """Throws away the current blocks and reads the page again, optionally with another model.
+    """Throws away the current blocks and reads the page again.
 
-    Manual edits are lost.
+    Manual edits are lost. Returns `409` while the page is already waiting to be read or being read.
     """
-    not_implemented()
+    try:
+        job = await core_blocks.request_transcription(session, page_id)
+    except core_blocks.PageBusyError:
+        http_error(409, "This page is already being read.")
+    if job is None:
+        not_found("Page")
+    await session.commit()
+    response.headers["Location"] = request.url_for("get_job", jobId=job.id).path
+    return job_out(job)

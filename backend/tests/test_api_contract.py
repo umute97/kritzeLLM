@@ -11,8 +11,6 @@ from kritzellm.api.app import render_openapi
 SPEC_PATH = Path(__file__).resolve().parents[2] / "api" / "openapi.json"
 
 JOURNAL_ID = "jrn_01k7c8x2v4f6g8h9j0k1m2n3p4"
-PAGE_ID = "pg_01k7c9a3b5d7e9f1g3h5j7k9m1"
-BLOCK_ID = "blk_01k7c9b4c6e8f0g2h4j6k8m0n2"
 CONVERSATION_ID = "cnv_01k7cbc5d7f9g1h3j5k7m9n1p3"
 JOB_ID = "job_01k7c9a4c6e8g0h2j4k6m8n0p2"
 
@@ -45,10 +43,6 @@ def test_spec_writes_whole_numbers_like_javascript() -> None:
 # Every designed operation that still answers 501.
 STUB_CASES = [
     ("POST", f"/journals/{JOURNAL_ID}/exports", {"format": "markdown"}),
-    ("PUT", f"/pages/{PAGE_ID}/blocks", {"blocks": []}),
-    ("POST", f"/pages/{PAGE_ID}/transcribe", None),
-    ("GET", f"/blocks/{BLOCK_ID}", None),
-    ("PATCH", f"/blocks/{BLOCK_ID}", {"text": "fixed"}),
     ("GET", "/search?q=lisbon", None),
     ("GET", "/conversations", None),
     ("POST", "/conversations", None),
@@ -85,6 +79,10 @@ BUILT = {
     "updatePage",
     "deletePage",
     "getPageImage",
+    "replacePageBlocks",
+    "transcribePage",
+    "getBlock",
+    "updateBlock",
     "listJobs",
     "getJob",
 }

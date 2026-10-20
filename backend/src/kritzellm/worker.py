@@ -45,12 +45,12 @@ HEARTBEAT_MAX_AGE_SECONDS = 30.0
 
 Handler = Callable[[AsyncSession, db.Job, Settings], Awaitable[None]]
 
-INGEST_STEPS = 2
+READ_STEPS = 2
 """Transcribing, then indexing."""
 
 
-async def ingest_page(session: AsyncSession, job: db.Job, settings: Settings) -> None:
-    """Reads a new page into blocks. Indexing them for search is still a placeholder."""
+async def read_page(session: AsyncSession, job: db.Job, settings: Settings) -> None:
+    """Reads a page into blocks (afresh, if it was read before), then indexes them."""
     job_id, page_id = job.id, job.page_id
     assert page_id is not None
     page = await session.get(db.Page, page_id)
@@ -60,7 +60,7 @@ async def ingest_page(session: AsyncSession, job: db.Job, settings: Settings) ->
         settings.data_dir, page_id, ImageVariant.NORMALIZED, page.original_media_type
     )
     await core_pages.set_status(session, page_id, PageStatus.TRANSCRIBING)
-    await jobs.set_progress(session, job_id, 0, INGEST_STEPS)
+    await jobs.set_progress(session, job_id, 0, READ_STEPS)
     await session.commit()
 
     image = await asyncio.to_thread(image_path.read_bytes)
@@ -68,15 +68,33 @@ async def ingest_page(session: AsyncSession, job: db.Job, settings: Settings) ->
     transcription = await transcribe(image, settings, model=model)
     if not await core_pages.save_transcription(session, page_id, transcription, model):
         return
-    await core_pages.set_status(session, page_id, PageStatus.INDEXING)
-    await jobs.set_progress(session, job_id, 1, INGEST_STEPS)
+    await _index(session, job_id, page_id, done=1, total=READ_STEPS)
+
+
+async def reindex_page(session: AsyncSession, job: db.Job, settings: Settings) -> None:
+    """Indexes a page again after its blocks were edited."""
+    assert job.page_id is not None
+    await _index(session, job.id, job.page_id, done=0, total=1)
+
+
+async def _index(
+    session: AsyncSession, job_id: str, page_id: str, *, done: int, total: int
+) -> None:
+    """The last step of a page job: indexing its blocks for search. Still a placeholder."""
+    if not await core_pages.set_status(session, page_id, PageStatus.INDEXING):
+        return
+    await jobs.set_progress(session, job_id, done, total)
     await session.commit()
 
     await core_pages.set_status(session, page_id, PageStatus.READY)
-    await jobs.set_progress(session, job_id, INGEST_STEPS, INGEST_STEPS)
+    await jobs.set_progress(session, job_id, total, total)
 
 
-HANDLERS: dict[JobKind, Handler] = {JobKind.INGEST_PAGE: ingest_page}
+HANDLERS: dict[JobKind, Handler] = {
+    JobKind.INGEST_PAGE: read_page,
+    JobKind.TRANSCRIBE_PAGE: read_page,
+    JobKind.REINDEX_PAGE: reindex_page,
+}
 
 
 def _problem(exc: Exception) -> dict[str, object]:
