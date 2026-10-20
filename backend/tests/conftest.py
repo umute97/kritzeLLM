@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx2 import Response
 from PIL import ExifTags, Image
 from pydantic import PostgresDsn
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
@@ -23,6 +24,49 @@ from kritzellm.worker import Worker
 
 # Nothing listens on port 1, so connecting fails right away.
 UNREACHABLE_DATABASE_URL = "postgresql+asyncpg://kritzellm:kritzellm@127.0.0.1:1/kritzellm"
+
+
+# --- Shortcuts for requests many tests make. The checked ones assert the request succeeded.
+
+
+def ok(response: Response, status: int = 200) -> Any:
+    """The response's JSON body, after checking its status."""
+    assert response.status_code == status, response.text
+    return response.json()
+
+
+def new_journal(client: TestClient, name: str = "Journal") -> str:
+    """Creates a journal and returns its ID."""
+    return ok(client.post("/journals", json={"name": name}), 201)["id"]
+
+
+def post_pages(
+    client: TestClient, journal_id: str, *files: bytes | tuple[str, bytes], **form: object
+) -> Response:
+    """Uploads `files` (bytes, or `(filename, bytes)`) into a journal, as they come."""
+    named = [
+        file if isinstance(file, tuple) else (f"{n}.jpg", file) for n, file in enumerate(files)
+    ]
+    return client.post(
+        f"/journals/{journal_id}/pages",
+        files=[("files", (name, data, "application/octet-stream")) for name, data in named],
+        data={key: str(value) for key, value in form.items()},
+    )
+
+
+def upload(
+    client: TestClient, journal_id: str, *files: bytes | tuple[str, bytes], **form: object
+) -> list[dict]:
+    """Uploads `files` into a journal and returns the result's items."""
+    return ok(post_pages(client, journal_id, *files, **form), 201)["items"]
+
+
+def get_page(client: TestClient, page_id: str) -> dict:
+    return ok(client.get(f"/pages/{page_id}"))
+
+
+def get_job(client: TestClient, job_id: str) -> dict:
+    return ok(client.get(f"/jobs/{job_id}"))
 
 
 @pytest.fixture

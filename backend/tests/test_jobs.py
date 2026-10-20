@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from conftest import FakeVisionModel
+from conftest import FakeVisionModel, get_job, get_page, new_journal, upload
 from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -25,35 +25,6 @@ pytestmark = pytest.mark.db
 MakeImage = Callable[..., bytes]
 
 
-def _journal(client: TestClient) -> str:
-    response = client.post("/journals", json={"name": "Jobs"})
-    assert response.status_code == 201, response.text
-    return response.json()["id"]
-
-
-def _upload(client: TestClient, journal_id: str, *images: bytes) -> list[dict]:
-    response = client.post(
-        f"/journals/{journal_id}/pages",
-        files=[
-            ("files", (f"{index}.jpg", image, "image/jpeg")) for index, image in enumerate(images)
-        ],
-    )
-    assert response.status_code == 201, response.text
-    return response.json()["items"]
-
-
-def _job(client: TestClient, job_id: str) -> dict:
-    response = client.get(f"/jobs/{job_id}")
-    assert response.status_code == 200, response.text
-    return response.json()
-
-
-def _page(client: TestClient, page_id: str) -> dict:
-    response = client.get(f"/pages/{page_id}")
-    assert response.status_code == 200, response.text
-    return response.json()
-
-
 PAGE = {
     "page_label": "7",
     "entry_dates": ["2026-03-15", "2026-03-14", "2026-03-15"],
@@ -68,7 +39,7 @@ PAGE = {
 def test_upload_queues_an_ingest_job_per_new_page(
     db_client: TestClient, make_image: MakeImage
 ) -> None:
-    items = _upload(db_client, _journal(db_client), make_image(color="red"))
+    items = upload(db_client, new_journal(db_client), make_image(color="red"))
 
     job = items[0]["job"]
     assert job["id"].startswith("job_")
@@ -77,17 +48,17 @@ def test_upload_queues_an_ingest_job_per_new_page(
     assert job["target"] == {"type": "page", "id": items[0]["page"]["id"]}
     assert (job["progress"], job["error"]) == (None, None)
     assert (job["startedAt"], job["finishedAt"]) == (None, None)
-    assert _job(db_client, job["id"]) == job
+    assert get_job(db_client, job["id"]) == job
 
 
 def test_a_duplicate_gets_the_pages_latest_job(
     db_client: TestClient, make_image: MakeImage
 ) -> None:
-    journal_id = _journal(db_client)
+    journal_id = new_journal(db_client)
     photo = make_image(color="blue")
-    first = _upload(db_client, journal_id, photo)[0]
+    first = upload(db_client, journal_id, photo)[0]
 
-    again, twice = _upload(db_client, journal_id, photo, photo)
+    again, twice = upload(db_client, journal_id, photo, photo)
 
     assert again["duplicate"]
     assert twice["duplicate"]
@@ -101,16 +72,16 @@ def test_the_worker_transcribes_the_page(
     vision_model: FakeVisionModel,
 ) -> None:
     vision_model.outputs = [PAGE]
-    (item,) = _upload(db_client, _journal(db_client), make_image(color="green"))
+    (item,) = upload(db_client, new_journal(db_client), make_image(color="green"))
 
     work()
 
-    job = _job(db_client, item["job"]["id"])
+    job = get_job(db_client, item["job"]["id"])
     assert job["status"] == "succeeded"
     assert job["progress"] == {"done": 2, "total": 2}
     assert job["error"] is None
     assert job["createdAt"] <= job["startedAt"] <= job["finishedAt"]
-    page = _page(db_client, item["page"]["id"])
+    page = get_page(db_client, item["page"]["id"])
     assert (page["status"], page["error"]) == ("ready", None)
     assert page["transcriptionModel"] == "test"
     assert page["pageLabel"] == "7"
@@ -128,11 +99,11 @@ def test_the_worker_transcribes_the_page(
 def test_the_fake_model_needs_no_key(
     db_client: TestClient, make_image: MakeImage, work: Callable[[], None]
 ) -> None:
-    (item,) = _upload(db_client, _journal(db_client), make_image(color="lime"))
+    (item,) = upload(db_client, new_journal(db_client), make_image(color="lime"))
 
     work()
 
-    page = _page(db_client, item["page"]["id"])
+    page = get_page(db_client, item["page"]["id"])
     assert page["status"] == "ready"
     assert page["blocks"]
 
@@ -144,14 +115,14 @@ def test_label_and_dates_set_by_hand_are_kept(
     vision_model: FakeVisionModel,
 ) -> None:
     vision_model.outputs = [PAGE]
-    (item,) = _upload(db_client, _journal(db_client), make_image(color="pink"))
+    (item,) = upload(db_client, new_journal(db_client), make_image(color="pink"))
     page_id = item["page"]["id"]
     fixed = {"pageLabel": "VII", "entryDates": ["2026-01-01"]}
     assert db_client.patch(f"/pages/{page_id}", json=fixed).status_code == 200
 
     work()
 
-    page = _page(db_client, page_id)
+    page = get_page(db_client, page_id)
     assert (page["pageLabel"], page["entryDates"]) == ("VII", ["2026-01-01"])
     assert len(page["blocks"]) == 3
 
@@ -164,7 +135,7 @@ def test_transcribing_again_replaces_the_blocks(
     vision_model: FakeVisionModel,
 ) -> None:
     vision_model.outputs = [PAGE]
-    (item,) = _upload(db_client, _journal(db_client), make_image(color="cyan"))
+    (item,) = upload(db_client, new_journal(db_client), make_image(color="cyan"))
     work()
 
     async def queue_again() -> None:
@@ -181,7 +152,7 @@ def test_transcribing_again_replaces_the_blocks(
     ]
     work()
 
-    page = _page(db_client, item["page"]["id"])
+    page = get_page(db_client, item["page"]["id"])
     assert [(b["seq"], b["text"]) for b in page["blocks"]] == [(0, "Neu")]
 
 
@@ -192,14 +163,14 @@ def test_a_model_that_keeps_answering_nonsense_fails_the_page(
     vision_model: FakeVisionModel,
 ) -> None:
     vision_model.outputs = [{**PAGE, "entry_dates": ["someday"]}]
-    (item,) = _upload(db_client, _journal(db_client), make_image(color="brown"))
+    (item,) = upload(db_client, new_journal(db_client), make_image(color="brown"))
 
     work()
 
-    job = _job(db_client, item["job"]["id"])
+    job = get_job(db_client, item["job"]["id"])
     assert job["status"] == "failed"
     assert len(vision_model.calls) == 2
-    page = _page(db_client, item["page"]["id"])
+    page = get_page(db_client, item["page"]["id"])
     assert (page["status"], page["error"]) == ("failed", job["error"])
     assert page["blocks"] == []
 
@@ -214,17 +185,17 @@ def test_a_failing_job_fails_its_page(
         raise RuntimeError("The pen ran out of ink")
 
     monkeypatch.setitem(worker_module.HANDLERS, JobKind.INGEST_PAGE, boom)
-    (item,) = _upload(db_client, _journal(db_client), make_image(color="purple"))
+    (item,) = upload(db_client, new_journal(db_client), make_image(color="purple"))
 
     work()
 
-    job = _job(db_client, item["job"]["id"])
+    job = get_job(db_client, item["job"]["id"])
     assert job["status"] == "failed"
     assert job["finishedAt"] is not None
     error = job["error"]
     assert (error["title"], error["status"]) == ("Job failed", 500)
     assert error["detail"] == "The pen ran out of ink"
-    page = _page(db_client, item["page"]["id"])
+    page = get_page(db_client, item["page"]["id"])
     assert (page["status"], page["error"]) == ("failed", job["error"])
 
 
@@ -235,7 +206,7 @@ def test_every_job_kind_has_a_handler() -> None:
 def test_interrupted_jobs_run_again(
     db_client: TestClient, make_image: MakeImage, settings: Settings, work: Callable[[], None]
 ) -> None:
-    (item,) = _upload(db_client, _journal(db_client), make_image(color="orange"))
+    (item,) = upload(db_client, new_journal(db_client), make_image(color="orange"))
     job_id = item["job"]["id"]
 
     async def interrupt() -> None:
@@ -249,17 +220,17 @@ def test_interrupted_jobs_run_again(
         await engine.dispose()
 
     asyncio.run(interrupt())
-    assert _job(db_client, job_id)["status"] == "running"
+    assert get_job(db_client, job_id)["status"] == "running"
 
     work()
 
-    assert _job(db_client, job_id)["status"] == "succeeded"
+    assert get_job(db_client, job_id)["status"] == "succeeded"
 
 
 def test_deleting_a_page_deletes_its_jobs(
     db_client: TestClient, make_image: MakeImage, work: Callable[[], None]
 ) -> None:
-    (item,) = _upload(db_client, _journal(db_client), make_image(color="yellow"))
+    (item,) = upload(db_client, new_journal(db_client), make_image(color="yellow"))
 
     assert db_client.delete(f"/pages/{item['page']['id']}").status_code == 204
     assert db_client.get(f"/jobs/{item['job']['id']}").status_code == 404
@@ -272,7 +243,7 @@ def test_a_failed_upload_leaves_no_pages_files_or_jobs(
     data_dir: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    journal_id = _journal(db_client)
+    journal_id = new_journal(db_client)
     publish = Staging.publish
     calls = []
 
@@ -284,7 +255,7 @@ def test_a_failed_upload_leaves_no_pages_files_or_jobs(
 
     monkeypatch.setattr(Staging, "publish", flaky_publish)
     with pytest.raises(OSError, match="Disk full"):
-        _upload(db_client, journal_id, make_image(color="red"), make_image(color="blue"))
+        upload(db_client, journal_id, make_image(color="red"), make_image(color="blue"))
 
     assert db_client.get(f"/pages?journalId={journal_id}").json()["items"] == []
     assert not (data_dir / "pages").exists() or not any((data_dir / "pages").iterdir())
@@ -293,9 +264,9 @@ def test_a_failed_upload_leaves_no_pages_files_or_jobs(
 
 
 def test_list_is_newest_first_and_pages(db_client: TestClient, make_image: MakeImage) -> None:
-    items = _upload(
+    items = upload(
         db_client,
-        _journal(db_client),
+        new_journal(db_client),
         *(make_image(color=color) for color in ("navy", "teal", "olive")),
     )
     ours = [item["job"]["id"] for item in reversed(items)]
@@ -315,9 +286,9 @@ def test_list_is_newest_first_and_pages(db_client: TestClient, make_image: MakeI
 def test_list_filters(
     db_client: TestClient, make_image: MakeImage, work: Callable[[], None]
 ) -> None:
-    (done,) = _upload(db_client, _journal(db_client), make_image(color=(1, 2, 3)))
+    (done,) = upload(db_client, new_journal(db_client), make_image(color=(1, 2, 3)))
     work()
-    (queued,) = _upload(db_client, _journal(db_client), make_image(color=(3, 2, 1)))
+    (queued,) = upload(db_client, new_journal(db_client), make_image(color=(3, 2, 1)))
 
     def ids(**params: str) -> set[str]:
         response = db_client.get("/jobs", params={"limit": "100", **params})
