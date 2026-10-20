@@ -141,10 +141,3 @@ class UploadResult(ApiModel):
     """One entry per uploaded file, in upload order."""
 
     items: list[UploadItem]
-
-
-class TranscribeRequest(InputModel):
-    """Options for re-transcribing a page."""
-
-    model: str | None = Field(default=None, min_length=1, pattern=NO_NUL)
-    """Vision model to use instead of the configured one."""
