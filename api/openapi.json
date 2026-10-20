@@ -1213,7 +1213,7 @@
           "blocks"
         ],
         "summary": "Replace a page's blocks",
-        "description": "Replaces the whole transcription of a page, in reading order.\n\nBlocks sent with an `id` are updated in place (so existing chat sources keep working); blocks\nwithout one are created; existing blocks that aren't sent are deleted. The page is re-indexed in\nthe background.",
+        "description": "Replaces the whole transcription of a page, in reading order.\n\nBlocks sent with an `id` are updated in place (so existing chat sources keep working); blocks\nwithout one are created; existing blocks that aren't sent are deleted. The page is re-indexed in\nthe background. Returns `409` while the page is waiting to be read or being read.",
         "operationId": "replacePageBlocks",
         "security": [
           {
@@ -1314,7 +1314,7 @@
           "pages"
         ],
         "summary": "Re-transcribe a page",
-        "description": "Throws away the current blocks and reads the page again, optionally with another model.\n\nManual edits are lost.",
+        "description": "Throws away the current blocks and reads the page again.\n\nManual edits are lost. Returns `409` while the page is already waiting to be read or being read.",
         "operationId": "transcribePage",
         "security": [
           {
@@ -1335,23 +1335,6 @@
             "description": "The page's ID."
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/TranscribeRequest"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Body"
-              }
-            }
-          }
-        },
         "responses": {
           "202": {
             "description": "Successful Response",
@@ -1510,7 +1493,7 @@
           "blocks"
         ],
         "summary": "Fix a block",
-        "description": "Corrects a block's text, kind or `uncertain` flag. Its page is re-indexed in the background.",
+        "description": "Corrects a block's text, kind or `uncertain` flag. Its page is re-indexed in the background.\n\nEdits made in a row share one re-index job while it's still queued. Returns `409` while the page\nis waiting to be read or being read.",
         "operationId": "updateBlock",
         "security": [
           {
@@ -1574,6 +1557,16 @@
           },
           "404": {
             "description": "The resource doesn't exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state (e.g. a job is still running).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2765,39 +2758,18 @@
       "BlockUpdate": {
         "properties": {
           "kind": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BlockKind"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/BlockKind"
           },
           "text": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 20000,
-                "minLength": 1,
-                "pattern": "^[^\\x00]*$"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Text",
             "description": "Corrected text."
           },
           "uncertain": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "boolean",
             "title": "Uncertain",
             "description": "Whether parts of the text are still unsure."
           }
@@ -4508,28 +4480,6 @@
         ],
         "title": "ToolResultEvent",
         "type": "object"
-      },
-      "TranscribeRequest": {
-        "properties": {
-          "model": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "^[^\\x00]*$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model",
-            "description": "Vision model to use instead of the configured one."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "TranscribeRequest",
-        "description": "Options for re-transcribing a page."
       },
       "UploadItem": {
         "properties": {
