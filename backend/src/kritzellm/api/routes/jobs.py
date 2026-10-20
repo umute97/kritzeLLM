@@ -4,11 +4,11 @@ from fastapi import APIRouter, Query
 from sqlalchemy import select
 
 from kritzellm.core.errors import get_existing
+from kritzellm.core.pagination import paginate
 from kritzellm.db import models as db
 
 from ..deps import Session
 from ..errors import problem_responses
-from ..pagination import paginate
 from ..schemas.common import Problem
 from ..schemas.jobs import (
     Job,

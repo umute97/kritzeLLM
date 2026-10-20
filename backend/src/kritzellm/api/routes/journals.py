@@ -1,25 +1,17 @@
-import asyncio
-import hashlib
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Request, Response, UploadFile, status
 from pydantic import WithJsonSchema
-from sqlalchemy import delete, func, select
 
-from kritzellm.core.errors import NotFoundError, get_existing
-from kritzellm.core.images import (
-    ImageTooLargeError,
-    NormalizedImage,
-    UnsupportedImageError,
-    normalize,
-)
-from kritzellm.core.pages import StagedUpload, add_pages
-from kritzellm.core.storage import Staging, delete_page_files
+from kritzellm.core import journals as core
+from kritzellm.core.errors import get_existing
+from kritzellm.core.images import ImageTooLargeError, UnsupportedImageError
+from kritzellm.core.pages import StagedUpload, add_pages, stage_upload
+from kritzellm.core.storage import Staging
 from kritzellm.db import models as db
 
 from ..deps import AppSettings, Session
 from ..errors import http_error, problem_responses
-from ..pagination import paginate
 from ..schemas.journals import Journal, JournalCreate, JournalList, JournalUpdate
 from ..schemas.pages import MAX_PAGE_NUMBER, UploadItem, UploadResult
 from .jobs import job_out
@@ -31,32 +23,16 @@ router = APIRouter(tags=["journals"])
 MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_FILES = 100
 
-PAGE_COUNT = (
-    select(func.count(db.Page.id))
-    .where(db.Page.journal_id == db.Journal.id)
-    .correlate(db.Journal)
-    .scalar_subquery()
-)
 
-
-def _journal_out(journal: db.Journal, page_count: int) -> Journal:
+def _journal_out(journal: db.Journal) -> Journal:
     return Journal(
         id=journal.id,
         name=journal.name,
         description=journal.description,
-        page_count=page_count,
+        page_count=journal.page_count,
         created_at=journal.created_at,
         updated_at=journal.updated_at,
     )
-
-
-async def _get(session: Session, journal_id: str) -> Journal:
-    row = (
-        await session.execute(select(db.Journal, PAGE_COUNT).where(db.Journal.id == journal_id))
-    ).one_or_none()
-    if row is None:
-        raise NotFoundError("Journal")
-    return _journal_out(*row)
 
 
 @router.get(
@@ -68,14 +44,10 @@ async def list_journals(
     session: Session, limit: Limit = 25, cursor: JournalCursor = None
 ) -> JournalList:
     """Lists all journals, newest first."""
-    rows, next_cursor = await paginate(
-        session,
-        select(db.Journal, PAGE_COUNT),
-        id_column=db.Journal.id,
-        limit=limit,
-        cursor=cursor,
+    journals, next_cursor = await core.list_journals(session, limit=limit, cursor=cursor)
+    return JournalList(
+        items=[_journal_out(journal) for journal in journals], next_cursor=next_cursor
     )
-    return JournalList(items=[_journal_out(*row) for row in rows], next_cursor=next_cursor)
 
 
 @router.post(
@@ -91,12 +63,10 @@ async def create_journal(
     body: JournalCreate, session: Session, request: Request, response: Response
 ) -> Journal:
     """Creates an empty journal to upload pages into."""
-    journal = db.Journal(**body.model_dump(by_alias=False))
-    session.add(journal)
+    journal = await core.create_journal(session, **body.model_dump(by_alias=False))
     await session.commit()
-    await session.refresh(journal)
     response.headers["Location"] = request.url_for("get_journal", journalId=journal.id).path
-    return _journal_out(journal, page_count=0)
+    return _journal_out(journal)
 
 
 @router.get(
@@ -106,7 +76,7 @@ async def create_journal(
 )
 async def get_journal(journal_id: JournalIdPath, session: Session) -> Journal:
     """Returns a single journal."""
-    return await _get(session, journal_id)
+    return _journal_out(await get_existing(session, db.Journal, journal_id))
 
 
 @router.patch(
@@ -118,11 +88,10 @@ async def update_journal(
     journal_id: JournalIdPath, body: JournalUpdate, session: Session
 ) -> Journal:
     """Renames a journal or changes its description. Only the given fields change."""
-    journal = await get_existing(session, db.Journal, journal_id)
-    for field, value in body.model_dump(exclude_unset=True, by_alias=False).items():
-        setattr(journal, field, value)
+    changes = body.model_dump(exclude_unset=True, by_alias=False)
+    journal = await core.update_journal(session, journal_id, changes)
     await session.commit()
-    return await _get(session, journal_id)
+    return _journal_out(journal)
 
 
 @router.delete(
@@ -139,22 +108,7 @@ async def delete_journal(
 
     This can't be undone.
     """
-    # Locks the journal, so no pages can be added to it before it's gone.
-    deleted = await session.scalar(
-        select(db.Journal.id).where(db.Journal.id == journal_id).with_for_update()
-    )
-    if deleted is None:
-        raise NotFoundError("Journal")
-    page_ids = (
-        await session.scalars(select(db.Page.id).where(db.Page.journal_id == journal_id))
-    ).all()
-    await session.execute(delete(db.Journal).where(db.Journal.id == journal_id))
-    await session.commit()
-    await asyncio.to_thread(delete_page_files, settings.data_dir, page_ids)
-
-
-def _hash_and_normalize(data: bytes) -> tuple[bytes, NormalizedImage]:
-    return hashlib.sha256(data).digest(), normalize(data)
+    await core.delete_journal(session, settings.data_dir, journal_id)
 
 
 async def _stage(file: UploadFile, staging: Staging) -> StagedUpload:
@@ -167,20 +121,11 @@ async def _stage(file: UploadFile, staging: Staging) -> StagedUpload:
     if len(data) > MAX_FILE_BYTES:
         http_error(413, too_big)
     try:
-        sha256, image = await asyncio.to_thread(_hash_and_normalize, data)
+        return await stage_upload(staging, filename, data)
     except UnsupportedImageError as exc:
         http_error(415, f"{filename or 'A file'}: {exc} Use JPEG, PNG, HEIC/HEIF or WebP.")
     except ImageTooLargeError as exc:
         http_error(413, f"{filename or 'A file'}: {exc}")
-    folder = await asyncio.to_thread(staging.stage, data, image)
-    return StagedUpload(
-        filename=filename,
-        sha256=sha256,
-        media_type=image.media_type,
-        width=image.width,
-        height=image.height,
-        folder=folder,
-    )
 
 
 @router.post(

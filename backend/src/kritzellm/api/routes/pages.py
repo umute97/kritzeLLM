@@ -4,14 +4,12 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
-from sqlalchemy import delete, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from kritzellm.core import blocks as core_blocks
 from kritzellm.core import pages as core
-from kritzellm.core.errors import ConflictError, NotFoundError, PageNumberTakenError, get_existing
-from kritzellm.core.storage import delete_page_files, variant_path
+from kritzellm.core.errors import NotFoundError, get_existing
+from kritzellm.core.storage import variant_path
 from kritzellm.db import models as db
 
 from .. import API_PREFIX
@@ -123,36 +121,8 @@ async def update_page(page_id: PageIdPath, body: PageUpdate, session: Session) -
 
     Changing dates or the journal re-indexes the page.
     """
-    page = await get_existing(session, db.Page, page_id)
     changes = body.model_dump(exclude_unset=True, by_alias=False)
-
-    journal_id = changes.get("journal_id", page.journal_id)
-    if journal_id != page.journal_id:
-        await get_existing(session, db.Journal, journal_id)
-        twin = select(db.Page.id).where(
-            db.Page.journal_id == journal_id, db.Page.sha256 == page.sha256
-        )
-        if await session.scalar(twin) is not None:
-            raise ConflictError("That journal already has a page with this image.")
-        changes.setdefault("page_number", await core.next_page_number(session, journal_id))
-    if (number := changes.get("page_number")) is not None and await core.page_number_taken(
-        session, journal_id, number, number, besides=page.id
-    ):
-        raise PageNumberTakenError(f"Page number {number} is taken in that journal.")
-    if "entry_dates" in changes:
-        changes["entry_dates"] = sorted(set(changes["entry_dates"]))
-
-    for field, value in changes.items():
-        setattr(page, field, value)
-    try:
-        await session.commit()
-    except IntegrityError:
-        await session.rollback()
-        raise ConflictError(
-            "Another change to that journal got in first. Please try again."
-        ) from None
-    await session.refresh(page)
-    return page_out(page)
+    return page_out(await core.update_page(session, page_id, changes))
 
 
 @router.delete(
@@ -164,13 +134,7 @@ async def update_page(page_id: PageIdPath, body: PageUpdate, session: Session) -
 )
 async def delete_page(page_id: PageIdPath, session: Session, settings: AppSettings) -> None:
     """Deletes a page, its images, blocks and search index entries. This can't be undone."""
-    deleted = await session.scalar(
-        delete(db.Page).where(db.Page.id == page_id).returning(db.Page.id)
-    )
-    if deleted is None:
-        raise NotFoundError("Page")
-    await session.commit()
-    await asyncio.to_thread(delete_page_files, settings.data_dir, [page_id])
+    await core.delete_page(session, settings.data_dir, page_id)
 
 
 @router.get(
