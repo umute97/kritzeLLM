@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.4.0](https://github.com/umute97/kritzeLLM/compare/v0.3.0...v0.4.0) (2026-10-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** drop what we haven't built yet ✂️ ([#56](https://github.com/umute97/kritzeLLM/issues/56))
+* **api:** fix up what the model read ✏️ ([#54](https://github.com/umute97/kritzeLLM/issues/54))
+* **api:** cite pages, not spots on them 📍 ([#47](https://github.com/umute97/kritzeLLM/issues/47))
+
+### Features
+
+* **api:** fix up what the model read ✏️ ([#54](https://github.com/umute97/kritzeLLM/issues/54)) ([a969a12](https://github.com/umute97/kritzeLLM/commit/a969a12a3b8c6b2b21d16e58fbfe39dedca80015))
+* **api:** run background jobs from the jobs table ⏳ ([#45](https://github.com/umute97/kritzeLLM/issues/45)) ([989273b](https://github.com/umute97/kritzeLLM/commit/989273bfc4a35223e47eb22e8b22cae16dbd93ac))
+* **backend:** turn handwriting into text ✍🏽 ([#48](https://github.com/umute97/kritzeLLM/issues/48)) ([0650062](https://github.com/umute97/kritzeLLM/commit/0650062afddf713bca4abf0a7adc3a59f912b89a))
+
+
+### Refactoring
+
+* **api:** cite pages, not spots on them 📍 ([#47](https://github.com/umute97/kritzeLLM/issues/47)) ([b19f553](https://github.com/umute97/kritzeLLM/commit/b19f5537533c75323522debe2d9643fc20085b3e))
+* **api:** drop what we haven't built yet ✂️ ([#56](https://github.com/umute97/kritzeLLM/issues/56)) ([f96c538](https://github.com/umute97/kritzeLLM/commit/f96c53841d5243a47e504db77c8cea471d3bd7d3))
+* **backend:** keep the routes thin 🌷 ([#58](https://github.com/umute97/kritzeLLM/issues/58)) ([58de9b3](https://github.com/umute97/kritzeLLM/commit/58de9b317360d4fafd517afb5c940f76fde26310))
+* **backend:** let the core say what went wrong 🎀 ([#57](https://github.com/umute97/kritzeLLM/issues/57)) ([e03324b](https://github.com/umute97/kritzeLLM/commit/e03324b4b81c0487cad4fce7c445eca9b240e7c5))
+* **backend:** tidy up the little repeats 🧹 ([#59](https://github.com/umute97/kritzeLLM/issues/59)) ([f424057](https://github.com/umute97/kritzeLLM/commit/f424057438a421da41b59f771b6eb6c213313a7f))
+
 ## [0.3.0](https://github.com/umute97/kritzeLLM/compare/v0.2.0...v0.3.0) (2026-10-16)
 
 
