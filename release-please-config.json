@@ -22,7 +22,10 @@
       "extra-files": [
         { "type": "generic", "path": "backend/pyproject.toml" },
         { "type": "toml", "path": "backend/uv.lock", "jsonpath": "$.package[?(@.name.value=='kritzellm')].version" },
-        { "type": "json", "path": "api/openapi.json", "jsonpath": "$.info.version" }
+        { "type": "json", "path": "api/openapi.json", "jsonpath": "$.info.version" },
+        { "type": "json", "path": "web/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "web/package-lock.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "web/package-lock.json", "jsonpath": "$.packages[''].version" }
       ]
     }
   }

@@ -46,6 +46,13 @@ repos:
 
   - repo: local
     hooks:
+      # ESLint and the typecheck need the web app's node_modules, so they run in CI and `just web-lint`.
+      - id: prettier-web
+        name: Prettier (web)
+        language: node
+        entry: prettier --write --ignore-unknown --ignore-path web/.prettierignore
+        files: ^web/
+        additional_dependencies: [prettier@3.9.10]
       - id: forbid-journal-media
         name: Forbid journal images, scans and exports
         description: Real journal pages must never be committed. Synthetic fixtures go in tests/fixtures/.
