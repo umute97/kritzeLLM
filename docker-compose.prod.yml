@@ -66,6 +66,16 @@ services:
     healthcheck:
       test: ["CMD", "python", "-m", "kritzellm.worker", "healthcheck"]
 
+  # The web app: nginx serves it and passes /api on to the api service.
+  web:
+    image: ghcr.io/umute97/kritzellm-web:${KRITZELLM_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
 volumes:
   db-data:
   api-data:
