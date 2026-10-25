@@ -104,6 +104,8 @@ jobs:
         run: uvx --from rust-just just db-check
       - name: Check the API
         run: uvx --from rust-just just api-check
+      - name: Check the web app
+        run: uvx --from rust-just just web-check
       - name: Upload a page and wait for its job
         run: uvx --from rust-just just smoke
       - name: Logs on failure
@@ -234,6 +236,11 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Install
         run: npm ci
+      - name: Are the API types up to date?
+        run: |
+          npm run api-types
+          git diff --exit-code -- src/api/schema.d.ts \
+            || { echo "::error::Run \`just web-api-types\` and commit src/api/schema.d.ts"; exit 1; }
       - name: Lint and format
         run: npm run lint
       - name: Typecheck

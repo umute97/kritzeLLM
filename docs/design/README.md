@@ -104,8 +104,10 @@ the nav when its backend exists.
     why.
 - **Page grid:**
   - Pinned `KPageCard`s with the thumbnail, number, date and status.
-  - Filter chips: All, Ready, Still reading, Needs a hand (the `status` filter on `GET /pages`).
-  - `KLoadMore` shows "Showing 8 of 48 pages", using the journal's `pageCount`.
+  - Filter chips: All, Ready, Needs a hand (the `status` filter on `GET /pages`, which takes one
+    status at a time). Pages still being read show their spinner under All.
+  - `KLoadMore` shows "Showing 24 of 48 pages", using the journal's `pageCount`. Pages come 24
+    at a time.
   - Failed cards get a *Try again*.
 - **Empty states:** no journals yet, no pages yet, nothing matches the filter.
 

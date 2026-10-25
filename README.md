@@ -19,7 +19,8 @@ just up                # start the local stack
 just api-check         # → {"status":"ok", …}
 ```
 
-The API and its docs are then at <http://localhost:8000/api/v1/docs> 💖
+The web app is then at <http://localhost:8080>, and the API and its docs at
+<http://localhost:8000/api/v1/docs> 💖
 
 To run the released images instead, grab [`docker-compose.prod.yml`](docker-compose.prod.yml), set
 `POSTGRES_PASSWORD` and `API_TOKEN`, and run `docker compose -f docker-compose.prod.yml up -d`.

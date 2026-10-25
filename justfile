@@ -43,6 +43,11 @@ api-check:
     @curl -fsS "http://localhost:${API_PORT:-8000}/api/v1/health" && echo
     @curl -fsS -o /dev/null "http://localhost:${API_PORT:-8000}/api/v1/docs" && echo "docs ok"
 
+# Check the web app answers and passes /api through
+web-check:
+    @curl -fsS -o /dev/null "http://localhost:${WEB_PORT:-8080}/" && echo "web ok"
+    @curl -fsS "http://localhost:${WEB_PORT:-8080}/api/v1/health" && echo
+
 # Upload a page to the running stack and wait for its job to finish
 smoke:
     python3 backend/scripts/smoke.py
@@ -123,3 +128,7 @@ web-test:
 # Build the web app into web/dist
 web-build:
     npm --prefix web run build
+
+# Regenerate the web app's API types from api/openapi.json
+web-api-types:
+    npm --prefix web run api-types
