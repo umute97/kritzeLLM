@@ -1,0 +1,129 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/fraunces/soft.css';
+@import '@fontsource-variable/nunito';
+@import '@fontsource/indie-flower';
+
+/*
+ * The cottage palette. Pogo Sands is the paper, Deathclaw Brown ("clay") the doodles,
+ * Herb, Orchid and Lemon the accents. Text is always walnut "ink"; clay is too light for
+ * body text (3.3:1 on sand), so links and small text use the deeper "bark".
+ */
+@theme {
+  --color-*: initial;
+  --color-sand: #ede5d2;
+  --color-herb: #a7c186;
+  --color-orchid: #d6938a;
+  --color-lemon: #efc06e;
+  --color-clay: #b46a55;
+
+  --color-ink: #3d2b22;
+  --color-bark: #8a4a3a;
+  --color-muted: #6e5a4c;
+  --color-hint: #7a6656;
+  --color-cream: #fbf7ee;
+  --color-paper: #fffdf8;
+  --color-line: #d9ccb0;
+  --color-edge: #9a8467;
+  --color-mute: #e4daca;
+
+  --color-herb-soft: #e3edd6;
+  --color-lemon-soft: #fbebc8;
+  --color-orchid-soft: #f4deda;
+  --color-bark-soft: #f6e3dc;
+  --color-clay-soft: #f6e6dd;
+
+  /* The one accent: buttons, the current tab, picked things. */
+  --color-accent: var(--color-herb);
+  --color-accent-strong: #96ae79;
+
+  --font-display: 'Fraunces Variable', Georgia, serif;
+  --font-sans: 'Nunito Variable', system-ui, sans-serif;
+  --font-hand: 'Indie Flower', cursive;
+
+  --radius-card: 18px;
+  --radius-field: 9px;
+
+  --shadow-press: 0 3px 0 var(--color-ink);
+  --shadow-press-sm: 0 2px 0 var(--color-ink);
+  --shadow-lift: 0 5px 0 var(--color-ink);
+  --shadow-soft: 0 5px 0 rgb(61 43 34 / 0.18);
+  --shadow-pin: 0 6px 0 rgb(180 106 85 / 0.18);
+  --shadow-pop: 0 8px 0 rgb(61 43 34 / 0.35);
+
+  --animate-daisy: spin 2.4s linear infinite;
+  --animate-pulse-soft: pulse-soft 1.6s ease-in-out infinite;
+  --animate-bob: bob 1.2s ease-in-out infinite;
+  --animate-blink: blink 1s steps(1) infinite;
+
+  @keyframes pulse-soft {
+    50% {
+      opacity: 0.45;
+    }
+  }
+  @keyframes bob {
+    0%,
+    80%,
+    100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-6px);
+    }
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+}
+
+/* Lined notebook paper; set --line to change the spacing. */
+@utility paper-lines {
+  background-color: var(--color-paper);
+  background-image: repeating-linear-gradient(
+    transparent 0 calc(var(--line, 24px) - 1px),
+    rgb(110 90 76 / 0.22) calc(var(--line, 24px) - 1px) var(--line, 24px)
+  );
+}
+
+@layer base {
+  html {
+    background-color: var(--color-sand);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.55;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-variation-settings: 'SOFT' 100;
+  }
+
+  a {
+    color: var(--color-bark);
+  }
+  a:hover {
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-bark);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background-color: var(--color-lemon-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

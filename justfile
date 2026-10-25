@@ -55,7 +55,7 @@ db-reset:
 # --- Quality ---------------------------------------------------------------------
 
 # Run every check (grows as components land)
-check: backend-lint backend-typecheck backend-test api-lint
+check: backend-lint backend-typecheck backend-test api-lint web-lint web-typecheck web-test
     pre-commit run --all-files
 
 # --- Backend ---------------------------------------------------------------------
@@ -97,3 +97,29 @@ api-lint:
 # Serve a mock API (random but valid data) on http://localhost:4010
 api-mock:
     npm --prefix api run mock
+
+# --- Web -------------------------------------------------------------------------
+
+# Install the web app's dependencies
+web-install:
+    npm --prefix web ci
+
+# Run the web app with hot reload on http://localhost:5173
+web-dev:
+    npm --prefix web run dev
+
+# Lint and format-check the web app
+web-lint:
+    npm --prefix web run lint
+
+# Typecheck the web app
+web-typecheck:
+    npm --prefix web run typecheck
+
+# Run the web app's tests
+web-test:
+    npm --prefix web test
+
+# Build the web app into web/dist
+web-build:
+    npm --prefix web run build
