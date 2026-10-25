@@ -8,7 +8,7 @@
     "mock": "prism mock --dynamic --json-schema-faker-fillProperties false openapi.json --port 4010"
   },
   "devDependencies": {
-    "@redocly/cli": "2.62.1",
+    "@redocly/cli": "2.64.1",
     "@stoplight/prism-cli": "5.16.0"
   },
   "engines": {
