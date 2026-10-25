@@ -3,7 +3,7 @@ import { ref, watch } from 'vue'
 
 import { ApiError } from '@/api/errors'
 import type { Journal } from '@/api/types'
-import { toastError } from '@/lib/notify'
+import { toastError } from '@/utils/notify'
 import { useJournals } from '@/stores/journals'
 import { KButton, KDialog, KDoodle, KTextArea, KTextField } from '@/ui'
 

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
-import { plural } from '@/lib/format'
+import { plural } from '@/utils/format'
 import { useUploads } from '@/stores/uploads'
 import { KButton, KProgressBar, KUploadRow } from '@/ui'
 

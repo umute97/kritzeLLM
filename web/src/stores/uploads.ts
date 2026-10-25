@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 
 import { ApiError } from '@/api/errors'
 import { uploadPage } from '@/api/upload'
-import { fileSize } from '@/lib/format'
+import { fileSize } from '@/utils/format'
 import { useToasts, type UploadStatus } from '@/ui'
 
 import { useJournals } from './journals'

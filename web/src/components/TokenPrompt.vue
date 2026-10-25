@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 
 import { ApiError } from '@/api/errors'
-import { verifySession } from '@/lib/session'
+import { verifySession } from '@/utils/session'
 import { useAuth } from '@/stores/auth'
 import { KButton, KCheckbox, KTextField } from '@/ui'
 

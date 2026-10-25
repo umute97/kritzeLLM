@@ -4,7 +4,7 @@ import { RouterLink } from 'vue-router'
 
 import { useAuthedImage } from '@/api/images'
 import type { Page } from '@/api/types'
-import { formatEntryDates } from '@/lib/format'
+import { formatEntryDates } from '@/utils/format'
 import { KPageCard } from '@/ui'
 
 // A page card with its real thumbnail, linking to Page detail.

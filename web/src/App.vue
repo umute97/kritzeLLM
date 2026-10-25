@@ -3,7 +3,7 @@ import { onMounted, watch } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 
 import TokenPrompt from '@/components/TokenPrompt.vue'
-import { verifySession } from '@/lib/session'
+import { verifySession } from '@/utils/session'
 import { useAuth } from '@/stores/auth'
 import { useHealth } from '@/stores/health'
 import { KBanner, KButton, KLogo, KNavLink, KSpinner, KToastStack, KTopNav } from '@/ui'
