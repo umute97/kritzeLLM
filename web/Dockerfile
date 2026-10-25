@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # --- Build: the static app into /app/dist ------------------------------------------------
-FROM node:24.22.1-alpine3.24 AS build
+FROM node:26.12.0-alpine3.24 AS build
 
 WORKDIR /app
 
