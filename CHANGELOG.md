@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/umute97/kritzeLLM/compare/v0.4.0...v0.5.0) (2026-10-25)
+
+
+### Features
+
+* **web:** add the cottage component library 🌸 ([#64](https://github.com/umute97/kritzeLLM/issues/64)) ([d3b4579](https://github.com/umute97/kritzeLLM/commit/d3b45799662fb515b774a83d0be839d0e30ce08f))
+* **web:** add the library, upload and page detail screens 💖 ([#65](https://github.com/umute97/kritzeLLM/issues/65)) ([4eaeddb](https://github.com/umute97/kritzeLLM/commit/4eaeddb808803b0520890fb46261fc923ed8bbd7))
+
 ## [0.4.0](https://github.com/umute97/kritzeLLM/compare/v0.3.0...v0.4.0) (2026-10-20)
 
 
