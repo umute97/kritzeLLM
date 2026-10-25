@@ -1,9 +1,9 @@
 # kritzeLLM design: cottage edition 🌸
 
-A cosy, cottagecore look for the web app: lined paper, a pencil, a few doodles, and calm colours
+A cozy, cottagecore look for the web app: lined paper, a pencil, a few doodles, and calm colours
 from the *Cottagecore Meadow Warmth* palette. Every screen is built from the component library in
 [`web/src/ui/`](../../web/src/ui/). This page is the reference for what those pieces are, how
-they're used, and how the screens fit together, including the ones whose backend isn't built yet.
+they're used, and how the screens fit together.
 
 ## Colours
 
@@ -27,9 +27,6 @@ Rules:
 - Filled controls use a soft ground with `ink` text. The one exception is `bark`, which takes
   `cream` text (errors, danger buttons, the "Failed" chip).
 - Colour only hints. Every status also says it in words, and picked chips get a tick.
-- The palette lives in `@theme` in [`web/src/styles/main.css`](../../web/src/styles/main.css),
-  so it's available as Tailwind classes (`bg-herb`, `text-bark`, `border-edge` …). The accent is
-  `--color-accent`, so swapping Herb for Orchid or Lemon is a one-line change.
 
 ## Type
 
@@ -39,24 +36,20 @@ Rules:
   greeting, page thumbnails and the "letter" chat style. Never use it for anything you must read
   to get something done.
 
-All three are installed from npm (`@fontsource`), so the app never calls Google Fonts.
-
 ## Shape and feel
 
 - Radii: `rounded-card` (18px) for cards and banners, `rounded-field` (9px) for fields and small
   cards. Buttons, chips and the search bar are fully round.
-- Shadows are flat offsets, never blurs. Main buttons sit on a 3px ink shadow, lift on hover and
+- Shadows are flat offsets. Main buttons sit on a 3px ink shadow, lift on hover and
   sink when pressed. Page cards cast a soft clay shadow and tilt a little (`tiltFor(index)`).
 - Lined paper (`paper-lines`, with `--line` setting the spacing) stands in for a page.
-- Doodles (`KDoodle`: daisy, sprig, heart, sparkle, squiggle) are sprinkled lightly: one per empty
-  state or dialog, never everywhere.
-- The logo is a pencil drawing a squiggle (`KLogo`), because *kritzeln* means "to scribble".
-- Focus is a 3px `bark` outline. Every target is at least 44px. Motion stops when the system asks
-  for less motion.
+- Doodles (`KDoodle`: daisy, sprig, heart, sparkle, squiggle) are sprinkled in lightly.
+- The logo is a pencil drawing a squiggle (`KLogo`), because *kritzeln* means "to scribble" 😉.
+- Focus is a 3px `bark` outline. Every target is at least 44px.
 
 ## Components
 
-Everything is exported from [`web/src/ui/index.ts`](../../web/src/ui/index.ts) with a `K` prefix.
+Everything is exported from [`web/src/ui/index.ts`](../../web/src/ui/index.ts).
 
 | Group | Components | Notes |
 |---|---|---|
@@ -73,7 +66,7 @@ Everything is exported from [`web/src/ui/index.ts`](../../web/src/ui/index.ts) w
 
 ### Toasts and banners
 
-- **Toasts** are for things that just happened. Success and info leave after 5 seconds (hover or
+- **Toasts**: Success and info leave after 5 seconds (hover or
   focus holds them). Warnings, errors and progress stay until dismissed. At most three show; older
   ones fold away. They sit bottom right on wide screens and top, full width, on phones.
 - An API problem (`application/problem+json`) becomes an error toast with its `title` and
@@ -157,6 +150,4 @@ the nav when its backend exists.
 
 ## Where the design came from
 
-The screens and components were laid out on a design canvas and exported as a PDF. The export
-isn't in the repo (it's large and only images); keep a local copy at `docs/design/*.pdf`, which
-git ignores.
+I laid the screens and components out on a design canvas and exported them as a PDF, storing it locally bc it's so large.
