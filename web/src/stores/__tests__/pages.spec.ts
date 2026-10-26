@@ -96,4 +96,20 @@ describe('the page list', () => {
     await vi.advanceTimersByTimeAsync(2000)
     expect(pages.byId.has(page.id)).toBe(false)
   })
+
+  it('forgets a deleted journal’s pages and stops following them', async () => {
+    vi.useFakeTimers()
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const pages = usePages()
+    const gone = makePage({ journalId: 'jrn_1', status: 'uploaded' })
+    const kept = makePage({ journalId: 'jrn_2' })
+    pages.put(gone)
+    pages.put(kept)
+
+    pages.forgetJournal('jrn_1')
+    expect([...pages.byId.keys()]).toEqual([kept.id])
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(fetch).not.toHaveBeenCalled()
+  })
 })

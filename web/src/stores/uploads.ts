@@ -55,7 +55,8 @@ export const useUploads = defineStore('uploads', () => {
   } {
     if (row.own) return row.own
     const page = row.pageId ? pages.byId.get(row.pageId) : undefined
-    if (!page) return { status: 'queued' }
+    // Uploads put their page in the store, so it's only missing once it was deleted.
+    if (!page) return { status: 'deleted', note: 'Its page was deleted' }
     const where = `Page ${page.pageNumber}`
     if (row.duplicate) return { status: 'duplicate', note: `Same photo as page ${page.pageNumber}` }
     switch (page.status) {
@@ -73,17 +74,20 @@ export const useUploads = defineStore('uploads', () => {
   }
 
   const shown = computed(() => rows.value.map((row) => ({ ...row, ...statusOf(row) })))
-  const counts = computed(() => {
-    const c = { done: 0, skipped: 0, failed: 0, busy: 0 }
-    for (const row of shown.value) {
-      if (row.status === 'ready') c.done++
-      else if (row.status === 'duplicate') c.skipped++
-      else if (row.status === 'failed') c.failed++
-      else c.busy++
+
+  /** One journal's rows, how they're doing, and whether any are still on their way. */
+  function batch(journalId: string) {
+    const mine = shown.value.filter((row) => row.journalId === journalId)
+    const counts = { done: 0, skipped: 0, failed: 0, deleted: 0, busy: 0 }
+    for (const row of mine) {
+      if (row.status === 'ready') counts.done++
+      else if (row.status === 'duplicate') counts.skipped++
+      else if (row.status === 'failed') counts.failed++
+      else if (row.status === 'deleted') counts.deleted++
+      else counts.busy++
     }
-    return c
-  })
-  const active = computed(() => counts.value.busy > 0)
+    return { rows: mine, counts, active: counts.busy > 0 }
+  }
 
   /** Adds photos to a journal. Returns a rejection message when none of them can go up. */
   function add(journalId: string, files: File[]): string | null {
@@ -160,11 +164,19 @@ export const useUploads = defineStore('uploads', () => {
     }
   }
 
-  /** Clears the batch card once everything has settled. */
-  function clear() {
-    if (active.value) return
-    rows.value = []
+  /** Clears a journal's batch card once everything in it has settled. */
+  function clear(journalId: string) {
+    if (batch(journalId).active) return
+    rows.value = rows.value.filter((row) => row.journalId !== journalId)
   }
 
-  return { rows: shown, counts, active, add, clear }
+  /** Drops a deleted journal's rows, and its photos that haven't gone up yet. */
+  function forget(journalId: string) {
+    for (const waiting of queue.filter(({ row }) => row.journalId === journalId)) {
+      queue.splice(queue.indexOf(waiting), 1)
+    }
+    rows.value = rows.value.filter((row) => row.journalId !== journalId)
+  }
+
+  return { rows: shown, batch, add, clear, forget }
 })

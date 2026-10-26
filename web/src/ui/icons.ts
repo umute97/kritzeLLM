@@ -13,6 +13,7 @@ export const icons = {
   'arrow-up': { d: 'M12 19V5M5 12l7-7 7 7' },
   'arrow-right': { d: 'M5 12h14M13 6l6 6-6 6' },
   download: { d: 'M12 4v12M6 10l6 6 6-6M4 20h16' },
+  pencil: { d: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4' },
   trash: { d: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13' },
   refresh: { d: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7' },
   reconnect: { d: 'M4 14a8 8 0 0 1 14-6M20 10a8 8 0 0 1-14 6M18 4v4h-4M6 20v-4h4' },

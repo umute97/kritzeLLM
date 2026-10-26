@@ -101,7 +101,14 @@ the nav when its backend exists.
   - Next to it, a batch card lists one `KUploadRow` per file. Each row follows its page's job
     (`GET /jobs/{id}`): sending, waiting, transcribing, indexing, ready.
   - Duplicates (`duplicate: true`) show "Already here", linked to the existing page. Failures say
-    why.
+    why. A row whose page was deleted says "Deleted" and counts as settled.
+  - The card only lists the open journal's photos. *Clear the list* shows once they've all
+    settled.
+- **Journal header:** the journal's name, with its description (if it has one) underneath.
+- **Journal actions:** a ⋯ menu next to the journal's name, with *Rename journal* (the new-journal
+  dialog, filled in; `PATCH /journals/{id}`) and *Delete journal*. Deleting asks first, naming the
+  page count, and waits until no photos are still going up into it (`DELETE /journals/{id}`).
+  Afterwards the first journal on the shelf opens.
 - **Page grid:**
   - Pinned `KPageCard`s with the thumbnail, number, date and status.
   - Filter chips: All, Ready, Needs a hand (the `status` filter on `GET /pages`, which takes one

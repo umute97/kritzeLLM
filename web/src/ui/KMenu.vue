@@ -108,7 +108,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside))
           type="button"
           role="menuitem"
           :disabled="item.disabled"
-          class="flex min-h-[42px] cursor-pointer items-center gap-2.5 rounded-lg px-3 text-left font-bold text-bark hover:bg-bark-soft focus:bg-bark-soft focus:outline-none"
+          class="flex min-h-[42px] cursor-pointer items-center gap-2.5 rounded-lg px-3 text-left font-bold text-bark hover:bg-bark-soft focus:bg-bark-soft focus:outline-none disabled:cursor-not-allowed disabled:text-muted disabled:hover:bg-transparent"
           @click="choose(item)"
         >
           <KIcon v-if="item.icon" :name="item.icon" />

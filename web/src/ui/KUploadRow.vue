@@ -24,6 +24,7 @@ const chips: Record<UploadStatus, { label: string; tone: Tone }> = {
   ready: { label: 'Ready', tone: 'herb' },
   duplicate: { label: 'Already here', tone: 'orchid' },
   failed: { label: 'Failed', tone: 'bark' },
+  deleted: { label: 'Deleted', tone: 'plain' },
 }
 
 const chip = computed(() => chips[props.status])

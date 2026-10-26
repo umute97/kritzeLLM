@@ -57,6 +57,13 @@ export const usePages = defineStore('pages', () => {
     ids.value = ids.value.filter((other) => other !== id)
   }
 
+  /** Forgets every page of a deleted journal. */
+  function forgetJournal(journalId: string) {
+    for (const page of [...byId.values()]) {
+      if (page.journalId === journalId) remove(page.id)
+    }
+  }
+
   async function fetchBatch(cursor?: string) {
     const current = view.value!
     const list = await call(
@@ -137,5 +144,18 @@ export const usePages = defineStore('pages', () => {
     return all
   }
 
-  return { byId, view, items, nextCursor, loading, put, remove, load, more, track, journalIndex }
+  return {
+    byId,
+    view,
+    items,
+    nextCursor,
+    loading,
+    put,
+    remove,
+    forgetJournal,
+    load,
+    more,
+    track,
+    journalIndex,
+  }
 })
