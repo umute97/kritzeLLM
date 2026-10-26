@@ -112,6 +112,9 @@ describe('KUploadRow', () => {
     })
     expect(failed.text()).toContain('Too big')
     expect(failed.classes()).toContain('bg-bark-soft')
+    expect(mount(KUploadRow, { props: { fileName: 'c.jpg', status: 'deleted' } }).text()).toContain(
+      'Deleted',
+    )
   })
 })
 

@@ -13,7 +13,7 @@ export type Tone = 'plain' | 'lemon' | 'orchid' | 'herb' | 'bark'
 export type CoverColor = 'herb' | 'clay' | 'orchid' | 'lemon'
 
 export type UploadStatus =
-  'sending' | 'queued' | 'transcribing' | 'indexing' | 'ready' | 'duplicate' | 'failed'
+  'sending' | 'queued' | 'transcribing' | 'indexing' | 'ready' | 'duplicate' | 'failed' | 'deleted'
 
 export interface Option<T extends string = string> {
   value: T

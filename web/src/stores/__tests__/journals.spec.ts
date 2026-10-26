@@ -75,4 +75,40 @@ describe('the shelf', () => {
     await journals.refresh(journal.id)
     expect(journals.shelf[0]?.pageCount).toBe(2)
   })
+
+  it('shows a renamed journal on the shelf', async () => {
+    const journal = makeJournal({ name: 'Green notebook' })
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(json({ items: [journal], nextCursor: null }))
+      .mockResolvedValueOnce(json({ ...journal, name: 'Blue notebook' }))
+    vi.stubGlobal('fetch', fetch)
+    const journals = useJournals()
+    await journals.show(0)
+    await journals.update(journal.id, { name: 'Blue notebook', description: null })
+
+    const request = fetch.mock.calls[1]![0] as Request
+    expect(request.method).toBe('PATCH')
+    expect(await request.json()).toEqual({ name: 'Blue notebook', description: null })
+    expect(journals.shelf[0]?.name).toBe('Blue notebook')
+  })
+
+  it('deletes a journal and starts the shelf over without it', async () => {
+    const [gone, kept] = [makeJournal(), makeJournal()]
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(json({ items: [gone, kept], nextCursor: null }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(json({ items: [kept], nextCursor: null }))
+    vi.stubGlobal('fetch', fetch)
+    const journals = useJournals()
+    await journals.show(0)
+    await journals.remove(gone!.id)
+
+    const request = fetch.mock.calls[1]![0] as Request
+    expect(request.method).toBe('DELETE')
+    expect(calledUrl(fetch, 1)).toBe(`/api/v1/journals/${gone!.id}`)
+    expect(journals.shelf.map((j) => j.id)).toEqual([kept!.id])
+    expect(journals.byId.has(gone!.id)).toBe(false)
+  })
 })

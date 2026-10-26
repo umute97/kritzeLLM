@@ -87,6 +87,22 @@ export const useJournals = defineStore('journals', () => {
     return journal
   }
 
+  /** Renames a journal or changes its description. */
+  async function update(id: string, changes: { name?: string; description?: string | null }) {
+    const journal = await call(
+      api.PATCH('/journals/{journalId}', { params: { path: { journalId: id } }, body: changes }),
+    )
+    remember(journal)
+    return journal
+  }
+
+  /** Deletes a journal with all of its pages, then starts the shelf over. */
+  async function remove(id: string) {
+    await call(api.DELETE('/journals/{journalId}', { params: { path: { journalId: id } } }))
+    byId.delete(id)
+    await reload()
+  }
+
   return {
     shelf,
     index,
@@ -104,5 +120,7 @@ export const useJournals = defineStore('journals', () => {
     get,
     refresh,
     create,
+    update,
+    remove,
   }
 })

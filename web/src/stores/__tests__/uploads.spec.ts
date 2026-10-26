@@ -76,7 +76,7 @@ describe('useUploads', () => {
 
     usePages().put({ ...page, status: 'ready' })
     expect(uploads.rows[0]!.status).toBe('ready')
-    expect(uploads.active).toBe(false)
+    expect(uploads.batch('jrn_1').active).toBe(false)
     expect(useToasts().items.value[0]?.title).toBe('Pages tucked in')
   })
 
@@ -107,5 +107,56 @@ describe('useUploads', () => {
     expect(uploads.rows[0]).toMatchObject({ statusLabel: 'Too big', note: 'Over 25 MB.' })
     expect(uploads.rows[2]!.note).toBe('Didn’t go up, try again')
     expect(upload).toHaveBeenCalledTimes(2)
+  })
+
+  it('marks a row deleted once its page is, so the list can be cleared', async () => {
+    const page = makePage({ status: 'uploaded' })
+    upload.mockResolvedValue(result({ page }))
+    const uploads = useUploads()
+    uploads.add('jrn_1', [photo()])
+    await vi.waitFor(() => expect(uploads.rows[0]!.status).toBe('queued'))
+    expect(uploads.batch('jrn_1').active).toBe(true)
+
+    usePages().remove(page.id)
+    expect(uploads.rows[0]).toMatchObject({ status: 'deleted', note: 'Its page was deleted' })
+    expect(uploads.batch('jrn_1').counts.deleted).toBe(1)
+    expect(uploads.batch('jrn_1').active).toBe(false)
+    uploads.clear('jrn_1')
+    expect(uploads.rows).toEqual([])
+  })
+
+  it('keeps each journal’s rows to itself', async () => {
+    upload.mockImplementation(async (journalId) =>
+      result({
+        page: makePage({ journalId, status: journalId === 'jrn_1' ? 'ready' : 'uploaded' }),
+      }),
+    )
+    const uploads = useUploads()
+    uploads.add('jrn_1', [photo('a.jpg')])
+    uploads.add('jrn_2', [photo('b.jpg')])
+    await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(uploads.batch('jrn_2').rows[0]?.status).toBe('queued'))
+
+    expect(uploads.batch('jrn_1').rows.map((r) => r.fileName)).toEqual(['a.jpg'])
+    expect(uploads.batch('jrn_1').active).toBe(false)
+    expect(uploads.batch('jrn_2').active).toBe(true)
+    // A busy journal doesn't stop another one's list from clearing.
+    uploads.clear('jrn_1')
+    uploads.clear('jrn_2')
+    expect(uploads.rows.map((r) => r.fileName)).toEqual(['b.jpg'])
+  })
+
+  it('forgets a deleted journal’s rows and photos still waiting to go up', async () => {
+    let finish!: (value: UploadResult) => void
+    upload.mockImplementation(() => new Promise((resolve) => (finish = resolve)))
+    const uploads = useUploads()
+    uploads.add('jrn_1', [photo('a.jpg')])
+    uploads.add('jrn_2', [photo('b.jpg'), photo('c.jpg')])
+
+    uploads.forget('jrn_2')
+    expect(uploads.rows.map((r) => r.fileName)).toEqual(['a.jpg'])
+    finish(result())
+    await vi.waitFor(() => expect(uploads.rows[0]!.status).toBe('ready'))
+    expect(upload).toHaveBeenCalledTimes(1)
   })
 })

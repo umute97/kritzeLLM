@@ -6,19 +6,22 @@ import { plural } from '@/utils/format'
 import { useUploads } from '@/stores/uploads'
 import { KButton, KProgressBar, KUploadRow } from '@/ui'
 
-// The batch card next to the dropzone: one row per photo, following it to "Ready".
-defineProps<{ journalName: string }>()
+// The batch card next to the dropzone: one row per photo into this journal, following it to
+// "Ready".
+const props = defineProps<{ journalId: string; journalName: string }>()
 
 const uploads = useUploads()
 
-const total = computed(() => uploads.rows.length)
-const settled = computed(() => total.value - uploads.counts.busy)
+const batch = computed(() => uploads.batch(props.journalId))
+const total = computed(() => batch.value.rows.length)
+const settled = computed(() => total.value - batch.value.counts.busy)
 const summary = computed(() => {
-  const { done, skipped, failed } = uploads.counts
+  const { done, skipped, failed, deleted } = batch.value.counts
   return [
     `${done} done`,
     skipped && `${skipped} skipped`,
     failed && `${failed} ${failed === 1 ? 'needs' : 'need'} a hand`,
+    deleted && `${deleted} deleted`,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -39,7 +42,7 @@ const summary = computed(() => {
     <KProgressBar :value="settled" :max="total" label="Upload progress" />
     <ul class="m-0 flex list-none flex-col gap-2 p-0">
       <KUploadRow
-        v-for="row in uploads.rows"
+        v-for="row in batch.rows"
         :key="row.key"
         :file-name="row.fileName"
         :status="row.status"
@@ -56,11 +59,11 @@ const summary = computed(() => {
       </KUploadRow>
     </ul>
     <KButton
-      v-if="!uploads.active"
+      v-if="!batch.active"
       variant="quiet"
       size="sm"
       class="self-end"
-      @click="uploads.clear()"
+      @click="uploads.clear(journalId)"
     >
       Clear the list
     </KButton>
