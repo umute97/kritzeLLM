@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
 
+import { joinIds } from './attrs'
 import { fieldClass } from './field'
 import KFieldShell from './KFieldShell.vue'
 import KIcon from './KIcon.vue'
@@ -43,7 +44,7 @@ const items = computed(() =>
         v-bind="$attrs"
         :disabled="disabled"
         :aria-invalid="invalid ? 'true' : undefined"
-        :aria-describedby="describedby"
+        :aria-describedby="joinIds(describedby, $attrs['aria-describedby'])"
         :class="[fieldClass({ invalid, disabled }), 'min-h-[46px] appearance-none pr-11 pl-4']"
       >
         <option v-for="item in items" :key="item.value" :value="item.value">

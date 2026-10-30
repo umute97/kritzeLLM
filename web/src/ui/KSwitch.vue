@@ -1,16 +1,22 @@
 <script setup lang="ts">
 import { useId } from 'vue'
 
+import { useSplitAttrs } from './attrs'
+
+defineOptions({ inheritAttrs: false })
+
 const model = defineModel<boolean>({ default: false })
 
 defineProps<{ label: string; disabled?: boolean }>()
 
 const labelId = useId()
+const { rootAttrs, controlAttrs } = useSplitAttrs()
 </script>
 
 <template>
-  <div class="inline-flex min-h-11 items-center gap-2.5">
+  <div v-bind="rootAttrs()" class="inline-flex min-h-11 items-center gap-2.5">
     <button
+      v-bind="controlAttrs()"
       type="button"
       role="switch"
       :aria-checked="model"

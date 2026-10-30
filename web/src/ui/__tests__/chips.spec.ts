@@ -27,6 +27,13 @@ describe('KStatusChip', () => {
       'Too big',
     )
   })
+
+  it('falls back to plain words when a status of the other kind slips through', () => {
+    // Templates refuse this at type level; the cast plays a caller that got around it.
+    const wrapper = mount(KStatusChip, { props: { status: 'queued' as never } })
+    expect(wrapper.text()).toBe('queued')
+    expect(wrapper.classes()).toContain('bg-paper')
+  })
 })
 
 describe('KBlockKindTag and KFlag', () => {

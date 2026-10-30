@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useId, useTemplateRef } from 'vue'
 
 import KIcon from './KIcon.vue'
 import KIconButton from './KIconButton.vue'
@@ -14,7 +14,14 @@ const emit = defineEmits<{ select: [id: string] }>()
 
 const open = ref(false)
 const root = useTemplateRef('root')
-const trigger = useTemplateRef<InstanceType<typeof KIconButton>>('trigger')
+const menuId = useId()
+
+// Spread on a custom `#trigger` too, so it's announced as a menu button and gets focus back.
+const triggerProps = computed(() => ({
+  'aria-haspopup': 'menu' as const,
+  'aria-expanded': open.value,
+  'aria-controls': open.value ? menuId : undefined,
+}))
 
 const safe = computed(() => props.items.filter((item) => !item.danger))
 const danger = computed(() => props.items.filter((item) => item.danger))
@@ -35,7 +42,7 @@ async function show() {
 function hide(refocus = true) {
   open.value = false
   document.removeEventListener('pointerdown', onOutside)
-  if (refocus) (trigger.value?.$el as HTMLElement | undefined)?.focus()
+  if (refocus) root.value?.querySelector<HTMLElement>('[aria-haspopup="menu"]')?.focus()
 }
 
 function onOutside(event: PointerEvent) {
@@ -67,19 +74,23 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside))
 
 <template>
   <div ref="root" class="relative inline-block">
-    <slot name="trigger" :toggle="() => (open ? hide() : show())" :open="open">
+    <slot
+      name="trigger"
+      :toggle="() => (open ? hide() : show())"
+      :open="open"
+      :trigger-props="triggerProps"
+    >
       <KIconButton
-        ref="trigger"
+        v-bind="triggerProps"
         icon="dots"
         :label="label"
-        aria-haspopup="menu"
-        :aria-expanded="open"
         :class="open ? 'bg-accent!' : ''"
         @click="open ? hide() : show()"
       />
     </slot>
     <div
       v-if="open"
+      :id="menuId"
       role="menu"
       :aria-label="label"
       :class="[

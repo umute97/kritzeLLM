@@ -2,6 +2,7 @@
 import { computed, type Component } from 'vue'
 
 import KSpinner from './KSpinner.vue'
+import { usePolymorphic } from './polymorphic'
 
 // One `main` button per view; everything beside it is `second` or `quiet`.
 // `danger` belongs in confirm dialogs only.
@@ -18,8 +19,12 @@ const props = withDefaults(
   { variant: 'main', size: 'md', as: 'button', type: 'button' },
 )
 
-const isButton = computed(() => props.as === 'button')
 const inactive = computed(() => props.disabled || props.loading)
+const element = usePolymorphic(
+  () => props.as,
+  inactive,
+  () => props.type,
+)
 
 const variants = {
   main: 'border-[1.5px] border-ink bg-accent text-ink hover:-translate-y-0.5 hover:bg-accent-strong active:translate-y-[3px] active:shadow-none',
@@ -49,14 +54,7 @@ const classes = computed(() => {
 </script>
 
 <template>
-  <component
-    :is="as"
-    :type="isButton ? type : undefined"
-    :disabled="isButton ? inactive : undefined"
-    :aria-disabled="!isButton && inactive ? 'true' : undefined"
-    :aria-busy="loading ? 'true' : undefined"
-    :class="classes"
-  >
+  <component :is="as" v-bind="element" :aria-busy="loading ? 'true' : undefined" :class="classes">
     <KSpinner v-if="loading" :size="size === 'md' ? 18 : 14" />
     <slot v-else name="icon" />
     <slot />

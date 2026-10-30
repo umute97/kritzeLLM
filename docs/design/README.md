@@ -58,11 +58,27 @@ Everything is exported from [`web/src/ui/index.ts`](../../web/src/ui/index.ts).
 | Chips | `KChip`, `KStatusChip`, `KBlockKindTag`, `KFlag`, `KBadge` | Page status: Uploaded, Transcribing, Indexing, Ready, Failed. Job status: Waiting, Working, Done, Failed. Flags: not quite sure, already here, edited by you, saved |
 | Pickers | `KFilterChips`, `KSegmented` | Single choice, `aria-pressed` |
 | Feedback | `KToast` + `KToastStack` + `useToasts()`, `KBanner` | See below |
-| Overlays | `KDialog`, `KMenu`, `KTooltip` | Native `<dialog>`; the menu has arrow keys and Escape, with danger items alone at the bottom |
+| Overlays | `KDialog`, `KMenu`, `KTooltip` | Native `<dialog>`; a `form` dialog wraps body and footer in one form and emits `submit`; `:dismissible="false"` holds it open while saving. The menu has arrow keys and Escape, with danger items alone at the bottom; a custom `#trigger` spreads `triggerProps` |
 | Navigation | `KTopNav`, `KNavLink`, `KBreadcrumb`, `KPageStepper`, `KShelfPager`, `KLoadMore` | On phones the nav links fold behind a menu button |
 | Progress | `KProgressBar`, `KSpinner` (ring, daisy), `KTypingDots`, `KSkeleton`, `KEmptyState` | A bar when we know how long, a daisy when we don't |
 | Journals and pages | `KJournalCover`, `KAddTile`, `KPageCard`, `KDropzone`, `KUploadRow`, `KBlockCard` | See the screens below |
 | Search and chat | `KSearchResult`, `KScoreBars`, `KHighlight`, `KMessage`, `KToolActivity`, `KCitationChip`, `KSourceCard`, `KComposer` | Built ahead of their screens |
+
+### Writing a component
+
+Every component has to work twice on one page, anywhere on it.
+
+- **No fixed ids.** Make them with `useId()`, and take an optional `id` prop when a caller may
+  need to point at the control. A closed `KDialog` stays in the DOM, so its ids count too.
+- **Attributes go where they mean something.** When the root isn't the real control, use
+  `inheritAttrs: false` and `useSplitAttrs()` (`ui/attrs.ts`): `class` and `style` on the root,
+  the rest (`name`, `id`, `aria-*`, listeners) on the input or button. Merge a caller's
+  `aria-describedby` with your own through `joinIds()` instead of overwriting it.
+- **Buttons that can be links** (`as`) get their `type`, `disabled` and the disabled-link
+  handling from `usePolymorphic()` (`ui/polymorphic.ts`).
+- **A form in a dialog** is `<KDialog form @submit>`, with the submit button in the footer. Never
+  link a button to a form by id.
+- **Custom triggers** get the same aria wiring as the built-in one, as slot props.
 
 ### Toasts and banners
 

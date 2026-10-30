@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="K extends 'page' | 'job' = 'page'">
 import { computed } from 'vue'
 
 import KChip from './KChip.vue'
@@ -9,30 +9,31 @@ import {
   pageStatusTones,
   type JobStatus,
   type PageStatus,
+  type Tone,
 } from './types'
 
-// A page's or a job's status, in words and a hint of colour.
+// A page's or a job's status, in words and a hint of colour. `kind` (page unless it says job)
+// decides which statuses `status` may be.
 const props = withDefaults(
   defineProps<{
-    status: PageStatus | JobStatus
-    kind?: 'page' | 'job'
+    status: K extends 'job' ? JobStatus : PageStatus
+    kind?: K
     size?: 'md' | 'sm'
     label?: string
   }>(),
-  { kind: 'page', size: 'md', label: undefined },
+  { kind: undefined, size: 'md', label: undefined },
 )
 
-const tone = computed(() =>
+const looks = computed(() =>
   props.kind === 'job'
-    ? jobStatusTones[props.status as JobStatus]
-    : pageStatusTones[props.status as PageStatus],
+    ? { tones: jobStatusTones, labels: jobStatusLabels }
+    : { tones: pageStatusTones, labels: pageStatusLabels },
+)
+const tone = computed<Tone>(
+  () => (looks.value.tones as Record<string, Tone>)[props.status] ?? 'plain',
 )
 const text = computed(
-  () =>
-    props.label ??
-    (props.kind === 'job'
-      ? jobStatusLabels[props.status as JobStatus]
-      : pageStatusLabels[props.status as PageStatus]),
+  () => props.label ?? (looks.value.labels as Record<string, string>)[props.status] ?? props.status,
 )
 </script>
 

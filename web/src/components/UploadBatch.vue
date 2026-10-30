@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { plural } from '@/utils/format'
@@ -11,6 +11,7 @@ import { KButton, KProgressBar, KUploadRow } from '@/ui'
 const props = defineProps<{ journalId: string; journalName: string }>()
 
 const uploads = useUploads()
+const titleId = useId()
 
 const batch = computed(() => uploads.batch(props.journalId))
 const total = computed(() => batch.value.rows.length)
@@ -30,11 +31,11 @@ const summary = computed(() => {
 
 <template>
   <section
-    aria-labelledby="batch-title"
+    :aria-labelledby="titleId"
     class="flex min-w-0 flex-[1_1_420px] flex-col gap-4 rounded-card border-[1.5px] border-ink bg-cream px-5 py-5.5 sm:px-7"
   >
     <div class="flex flex-wrap items-baseline justify-between gap-2.5">
-      <h2 id="batch-title" class="m-0 text-[22px]">
+      <h2 :id="titleId" class="m-0 text-[22px]">
         {{ plural(total, 'photo') }} into {{ journalName }}
       </h2>
       <span class="text-sm text-muted">{{ summary }}</span>
