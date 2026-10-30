@@ -38,6 +38,17 @@ describe('KTextField', () => {
     expect(wrapper.text()).not.toContain('Short is fine')
   })
 
+  it('keeps a description passed in alongside its own', () => {
+    const wrapper = mount(KTextField, {
+      props: { label: 'Token', help: 'From your admin' },
+      attrs: { 'aria-describedby': 'token-tip' },
+    })
+    const ids = wrapper.get('input').attributes('aria-describedby')!.split(' ')
+    expect(ids).toHaveLength(2)
+    expect(ids[0]).toMatch(/-help$/)
+    expect(ids[1]).toBe('token-tip')
+  })
+
   it('passes attributes to the input, not the wrapper', () => {
     const wrapper = mount(KTextField, { props: { label: 'Token' }, attrs: { autocomplete: 'off' } })
     expect(wrapper.get('input').attributes('autocomplete')).toBe('off')
@@ -93,7 +104,7 @@ describe('KSelect', () => {
 })
 
 describe('KSearchField', () => {
-  it('searches on enter and clears with the little cross', async () => {
+  it('searches on submit and clears with the little cross', async () => {
     const wrapper = mount(KSearchField, {
       props: {
         label: 'Search your pages',
@@ -101,12 +112,20 @@ describe('KSearchField', () => {
         'onUpdate:modelValue': (v: string) => wrapper.setProps({ modelValue: v }),
       },
     })
-    await wrapper.get('input').trigger('keydown', { key: 'Enter' })
+    // Enter in the input submits the search form (jsdom doesn't do that part).
+    expect(wrapper.get('form').attributes('role')).toBe('search')
+    await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('search')).toEqual([['sweet peas']])
 
     await wrapper.get('button[aria-label="Clear search"]').trigger('click')
     expect(wrapper.props('modelValue')).toBe('')
     expect(wrapper.find('button[aria-label="Clear search"]').exists()).toBe(false)
+  })
+
+  it('keeps its label tied to the input when given an id', () => {
+    const wrapper = mount(KSearchField, { props: { label: 'Search', id: 'find' } })
+    expect(wrapper.get('input').attributes('id')).toBe('find')
+    expect(wrapper.get('label').attributes('for')).toBe('find')
   })
 })
 
@@ -122,6 +141,19 @@ describe('KCheckbox', () => {
     await wrapper.get('input[type="checkbox"]').setValue(true)
     expect(wrapper.props('modelValue')).toBe(true)
     expect(wrapper.get('label').text()).toContain('Remember this token')
+  })
+
+  it('gives form attributes to the checkbox and layout to the label', () => {
+    const wrapper = mount(KCheckbox, {
+      props: { label: 'Remember me' },
+      attrs: { name: 'remember', 'aria-describedby': 'why', class: 'mt-4' },
+    })
+    const input = wrapper.get('input')
+    expect(input.attributes('name')).toBe('remember')
+    expect(input.attributes('aria-describedby')).toBe('why')
+    expect(input.classes()).not.toContain('mt-4')
+    expect(wrapper.get('label').classes()).toContain('mt-4')
+    expect(wrapper.get('label').attributes('name')).toBeUndefined()
   })
 })
 
@@ -141,5 +173,15 @@ describe('KSwitch', () => {
     expect(toggle.attributes('aria-checked')).toBe('true')
     const labelId = toggle.attributes('aria-labelledby')
     expect(wrapper.get(`#${labelId}`).text()).toBe('Show scores')
+  })
+
+  it('gives attributes to the switch, not its wrapper', () => {
+    const wrapper = mount(KSwitch, {
+      props: { label: 'Show scores' },
+      attrs: { id: 'scores', class: 'ml-2' },
+    })
+    expect(wrapper.get('[role="switch"]').attributes('id')).toBe('scores')
+    expect(wrapper.classes()).toContain('ml-2')
+    expect(wrapper.attributes('id')).toBeUndefined()
   })
 })

@@ -1,21 +1,23 @@
 <script setup lang="ts">
-import { useId, useTemplateRef } from 'vue'
+import { computed, useId, useTemplateRef } from 'vue'
 
 import KIcon from './KIcon.vue'
 
-// Round like the buttons. Enter searches; the trailing slot takes a submit button.
+// Round like the buttons, and a search form of its own: Enter or a submit button in the
+// trailing slot searches. So don't put it inside another form.
 defineOptions({ inheritAttrs: false })
 
 const model = defineModel<string>({ default: '' })
 
-withDefaults(defineProps<{ label: string; placeholder?: string; size?: 'md' | 'lg' }>(), {
-  placeholder: undefined,
-  size: 'md',
-})
+const props = withDefaults(
+  defineProps<{ label: string; placeholder?: string; size?: 'md' | 'lg'; id?: string }>(),
+  { placeholder: undefined, size: 'md', id: undefined },
+)
 
 const emit = defineEmits<{ search: [query: string] }>()
 
-const id = useId()
+const autoId = useId()
+const fieldId = computed(() => props.id ?? autoId)
 const input = useTemplateRef('input')
 
 function clear() {
@@ -25,18 +27,20 @@ function clear() {
 </script>
 
 <template>
-  <div
+  <form
+    role="search"
     :class="[
       'flex items-center gap-1 rounded-full border-ink bg-paper pl-4 focus-within:ring-4 focus-within:ring-accent/55',
       size === 'lg'
         ? 'min-h-14 border-2 pl-5 shadow-[0_4px_0_rgb(61_43_34/0.15)]'
         : 'min-h-[46px] border-[1.5px]',
     ]"
+    @submit.prevent="emit('search', model)"
   >
     <KIcon name="search" :size="size === 'lg' ? 22 : 18" class="text-ink" />
-    <label :for="id" class="sr-only">{{ label }}</label>
+    <label :for="fieldId" class="sr-only">{{ label }}</label>
     <input
-      :id="id"
+      :id="fieldId"
       ref="input"
       v-model="model"
       v-bind="$attrs"
@@ -46,7 +50,6 @@ function clear() {
         'min-w-0 flex-1 bg-transparent px-2 text-ink placeholder:text-hint focus:outline-none [&::-webkit-search-cancel-button]:hidden',
         size === 'lg' ? 'h-13 text-lg' : 'h-11 text-base',
       ]"
-      @keydown.enter.prevent="emit('search', model)"
     />
     <button
       v-if="model"
@@ -60,5 +63,5 @@ function clear() {
     <div v-if="$slots.default" class="pr-1.5">
       <slot />
     </div>
-  </div>
+  </form>
 </template>

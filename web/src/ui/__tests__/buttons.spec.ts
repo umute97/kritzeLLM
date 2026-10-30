@@ -35,6 +35,25 @@ describe('KButton', () => {
     expect(link.attributes('aria-disabled')).toBe('true')
   })
 
+  it('keeps a disabled link from going anywhere', async () => {
+    const wrapper = mount(KButton, { props: { as: 'a', disabled: true }, attrs: { href: '/x' } })
+    const link = wrapper.get('a')
+    expect(link.attributes('tabindex')).toBe('-1')
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+    link.element.dispatchEvent(click)
+    expect(click.defaultPrevented).toBe(true)
+  })
+
+  it('lets an enabled link go', () => {
+    const wrapper = mount(KButton, { props: { as: 'a' }, attrs: { href: '/x' } })
+    const link = wrapper.get('a')
+    expect(link.attributes('tabindex')).toBeUndefined()
+    expect(link.attributes('aria-disabled')).toBeUndefined()
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+    link.element.dispatchEvent(click)
+    expect(click.defaultPrevented).toBe(false)
+  })
+
   it('looks dashed when disabled, whatever the variant', () => {
     const wrapper = mount(KButton, { props: { variant: 'danger', disabled: true } })
     expect(wrapper.classes()).toContain('border-dashed')
@@ -54,5 +73,19 @@ describe('KIconButton', () => {
     expect(plain.attributes('aria-pressed')).toBeUndefined()
     const toggle = mount(KIconButton, { props: { icon: 'eye', label: 'Show', pressed: false } })
     expect(toggle.attributes('aria-pressed')).toBe('false')
+  })
+
+  it('can submit a form', () => {
+    const wrapper = mount(KIconButton, {
+      props: { icon: 'arrow-up', label: 'Send', type: 'submit' },
+    })
+    expect(wrapper.get('button').attributes('type')).toBe('submit')
+  })
+
+  it('says it is disabled when it is a link', () => {
+    const wrapper = mount(KIconButton, {
+      props: { icon: 'close', label: 'Close', as: 'a', disabled: true },
+    })
+    expect(wrapper.get('a').attributes('aria-disabled')).toBe('true')
   })
 })

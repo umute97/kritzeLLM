@@ -3,6 +3,7 @@ import { computed, type Component } from 'vue'
 
 import type { IconName } from './icons'
 import KIcon from './KIcon.vue'
+import { usePolymorphic } from './polymorphic'
 
 // Icon-only buttons always carry a label for screen readers.
 const props = withDefaults(
@@ -14,8 +15,15 @@ const props = withDefaults(
     pressed?: boolean
     disabled?: boolean
     as?: string | Component
+    type?: 'button' | 'submit' | 'reset'
   }>(),
-  { variant: 'second', size: 'md', pressed: undefined, as: 'button' },
+  { variant: 'second', size: 'md', pressed: undefined, as: 'button', type: 'button' },
+)
+
+const element = usePolymorphic(
+  () => props.as,
+  () => props.disabled,
+  () => props.type,
 )
 
 const classes = computed(() => [
@@ -37,14 +45,7 @@ const classes = computed(() => [
 </script>
 
 <template>
-  <component
-    :is="as"
-    :type="as === 'button' ? 'button' : undefined"
-    :disabled="as === 'button' ? disabled : undefined"
-    :aria-label="label"
-    :aria-pressed="pressed"
-    :class="classes"
-  >
+  <component :is="as" v-bind="element" :aria-label="label" :aria-pressed="pressed" :class="classes">
     <KIcon :name="icon" :size="size === 'md' ? 18 : 16" />
   </component>
 </template>

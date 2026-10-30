@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useId } from 'vue'
 
+import { joinIds } from './attrs'
 import { fieldClass } from './field'
 import KFieldShell from './KFieldShell.vue'
 import KIcon from './KIcon.vue'
@@ -53,7 +54,7 @@ const inputType = computed(() =>
         :disabled="disabled"
         :placeholder="placeholder"
         :aria-invalid="invalid ? 'true' : undefined"
-        :aria-describedby="describedby"
+        :aria-describedby="joinIds(describedby, $attrs['aria-describedby'])"
         :class="[fieldClass({ invalid, disabled }), 'min-h-[46px] px-4', revealable && 'pr-12']"
       />
       <button

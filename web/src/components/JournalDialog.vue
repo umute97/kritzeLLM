@@ -58,11 +58,18 @@ async function save() {
 </script>
 
 <template>
-  <KDialog v-model:open="open" :title="editing ? 'Rename journal' : 'A new journal'" width="md">
+  <KDialog
+    v-model:open="open"
+    :title="editing ? 'Rename journal' : 'A new journal'"
+    width="md"
+    form
+    :dismissible="!busy"
+    @submit="save"
+  >
     <template #decoration>
-      <KDoodle name="sprig" :size="46" class="absolute -top-12 right-0" />
+      <KDoodle name="sprig" :size="46" class="absolute -top-5 right-7" />
     </template>
-    <form id="journal-form" class="flex flex-col gap-3.5" novalidate @submit.prevent="save">
+    <div class="flex flex-col gap-3.5">
       <KTextField
         v-model="name"
         label="Name"
@@ -77,10 +84,10 @@ async function save() {
         :rows="2"
         placeholder="What lives in this notebook?"
       />
-    </form>
+    </div>
     <template #footer>
-      <KButton variant="quiet" @click="open = false">Cancel</KButton>
-      <KButton type="submit" form="journal-form" :loading="busy">
+      <KButton variant="quiet" :disabled="busy" @click="open = false">Cancel</KButton>
+      <KButton type="submit" :loading="busy">
         {{ editing ? 'Save' : 'Create journal' }}
       </KButton>
     </template>

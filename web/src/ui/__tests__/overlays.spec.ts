@@ -42,6 +42,65 @@ describe('KDialog', () => {
     expect(wrapper.emitted('update:open')).toEqual([[false]])
     wrapper.unmount()
   })
+
+  it('stays open when the click lands inside the card, padding included', async () => {
+    const wrapper = mount(KDialog, {
+      attachTo: document.body,
+      props: { title: 'A new journal', open: true },
+    })
+    await wrapper.get('dialog > div').trigger('click')
+    expect(wrapper.emitted('update:open')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('submits from a footer button when it is a form', async () => {
+    const wrapper = mount(KDialog, {
+      attachTo: document.body,
+      props: { title: 'Rename journal', open: true, form: true },
+      slots: {
+        default: '<input name="name" />',
+        footer: '<button type="submit">Save</button>',
+      },
+    })
+    const form = wrapper.get('dialog > form')
+    expect(form.find('input').exists()).toBe(true)
+    expect(form.find('button[type="submit"]').exists()).toBe(true)
+    await form.trigger('submit')
+    expect(wrapper.emitted('submit')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('keeps two form dialogs on one page apart', async () => {
+    const make = (title: string) =>
+      mount(KDialog, {
+        attachTo: document.body,
+        props: { title, open: false, form: true },
+        slots: { footer: '<button type="submit">Save</button>' },
+      })
+    const first = make('A new journal')
+    const second = make('Rename journal')
+    await second.setProps({ open: true })
+    await second.get('form').trigger('submit')
+    expect(second.emitted('submit')).toHaveLength(1)
+    expect(first.emitted('submit')).toBeUndefined()
+    first.unmount()
+    second.unmount()
+  })
+
+  it('holds on while it is not dismissible', async () => {
+    const wrapper = mount(KDialog, {
+      attachTo: document.body,
+      props: { title: 'Saving', open: true, dismissible: false },
+    })
+    const dialog = wrapper.get('dialog')
+    const cancel = new Event('cancel', { cancelable: true })
+    dialog.element.dispatchEvent(cancel)
+    expect(cancel.defaultPrevented).toBe(true)
+    await dialog.trigger('click')
+    expect(wrapper.get('button[aria-label="Close"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.emitted('update:open')).toBeUndefined()
+    wrapper.unmount()
+  })
 })
 
 const items = [
@@ -85,6 +144,33 @@ describe('KMenu', () => {
     await menu.trigger('keydown', { key: 'Escape' })
     expect(wrapper.find('[role="menu"]').exists()).toBe(false)
     expect(document.activeElement).toBe(wrapper.get('button[aria-haspopup="menu"]').element)
+    wrapper.unmount()
+  })
+})
+
+describe('KMenu with its own trigger', () => {
+  it('hands the trigger its menu-button wiring and gives focus back', async () => {
+    const wrapper = mount(KMenu, {
+      attachTo: document.body,
+      props: { label: 'Journal actions', items },
+      slots: {
+        trigger: `<template #trigger="{ toggle, triggerProps }">
+          <button v-bind="triggerProps" @click="toggle">Journal</button>
+        </template>`,
+      },
+    })
+    const trigger = wrapper.get('button[aria-haspopup="menu"]')
+    expect(trigger.text()).toBe('Journal')
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+
+    await trigger.trigger('click')
+    await nextTick()
+    const menu = wrapper.get('[role="menu"]')
+    expect(trigger.attributes('aria-expanded')).toBe('true')
+    expect(trigger.attributes('aria-controls')).toBe(menu.attributes('id'))
+
+    await menu.trigger('keydown', { key: 'Escape' })
+    expect(document.activeElement).toBe(trigger.element)
     wrapper.unmount()
   })
 })

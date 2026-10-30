@@ -34,6 +34,17 @@ describe('KTopNav and KNavLink', () => {
   })
 })
 
+describe('KNavLink badge', () => {
+  it('reads out the badge label instead of the bare number', () => {
+    const wrapper = mount(KNavLink, {
+      props: { href: '#', badge: 3, badgeLabel: '3 pages need a hand' },
+      slots: { default: 'Pages' },
+    })
+    expect(wrapper.get('.sr-only').text()).toBe('3 pages need a hand')
+    expect(wrapper.get('[aria-hidden="true"]').text()).toBe('3')
+  })
+})
+
 describe('KBreadcrumb', () => {
   it('links the way back and marks where you are', () => {
     const wrapper = mount(KBreadcrumb, {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, useId, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 import { api, call } from '@/api/client'
@@ -53,6 +53,8 @@ const confirmDelete = ref(false)
 // The journal the delete dialog asks about, kept while it closes after the journal is gone.
 const doomed = ref<Journal>()
 const deleting = ref(false)
+const shelfTitleId = useId()
+const pagesTitleId = useId()
 
 const journal = computed(() => (props.journalId ? journals.byId.get(props.journalId) : undefined))
 const batch = computed(() => (journal.value ? uploads.batch(journal.value.id) : undefined))
@@ -210,9 +212,9 @@ const summary = computed(() => {
     </KEmptyState>
 
     <template v-else>
-      <section aria-labelledby="shelf-title" class="flex flex-col gap-4">
+      <section :aria-labelledby="shelfTitleId" class="flex flex-col gap-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="shelf-title" class="m-0 text-[22px]">On the shelf</h2>
+          <h2 :id="shelfTitleId" class="m-0 text-[22px]">On the shelf</h2>
           <KShelfPager
             v-if="journals.loaded"
             :range="journals.range"
@@ -259,11 +261,11 @@ const summary = computed(() => {
         />
       </section>
 
-      <section v-if="journal" aria-labelledby="pages-title" class="flex flex-col gap-5">
+      <section v-if="journal" :aria-labelledby="pagesTitleId" class="flex flex-col gap-5">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div class="flex min-w-0 flex-col gap-1">
             <div class="flex items-center gap-2">
-              <h2 id="pages-title" class="m-0 text-3xl">{{ journal.name }}</h2>
+              <h2 :id="pagesTitleId" class="m-0 text-3xl">{{ journal.name }}</h2>
               <KMenu label="Journal actions" :items="menu" align="start" @select="onMenu" />
             </div>
             <p

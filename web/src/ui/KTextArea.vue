@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
 
+import { joinIds } from './attrs'
 import { fieldClass } from './field'
 import KFieldShell from './KFieldShell.vue'
 
@@ -45,7 +46,7 @@ const fieldId = computed(() => props.id ?? autoId)
       :disabled="disabled"
       :placeholder="placeholder"
       :aria-invalid="invalid ? 'true' : undefined"
-      :aria-describedby="describedby"
+      :aria-describedby="joinIds(describedby, $attrs['aria-describedby'])"
       :class="[fieldClass({ invalid, disabled }), 'resize-y px-4 py-3 leading-normal']"
     />
   </KFieldShell>
