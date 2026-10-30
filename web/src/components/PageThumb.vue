@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
 
 import { useAuthedImage } from '@/api/images'
 import type { Page } from '@/api/types'
@@ -17,7 +16,6 @@ const date = computed(() => formatEntryDates(props.page.entryDates))
 
 <template>
   <KPageCard
-    :as="RouterLink"
     :to="{ name: 'page', params: { pageId: page.id } }"
     :page-number="page.pageNumber"
     :status="page.status"

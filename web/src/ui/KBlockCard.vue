@@ -3,10 +3,12 @@ import { computed } from 'vue'
 
 import KButton from './KButton.vue'
 import KFlag from './KFlag.vue'
+import KIconBadge from './KIconBadge.vue'
+import { focusRing } from './styles'
 import { blockKindLabels, type BlockKind } from './types'
 
 // One transcribed block, editable. Cmd/Ctrl+Enter saves, Escape undoes.
-// `active` mirrors hover/focus so the page can point at the same block elsewhere.
+// `selected` mirrors hover/focus so the page can point at the same block elsewhere.
 const text = defineModel<string>({ required: true })
 
 const props = defineProps<{
@@ -16,7 +18,7 @@ const props = defineProps<{
   dirty?: boolean
   saving?: boolean
   saved?: boolean
-  active?: boolean
+  selected?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -50,7 +52,7 @@ function onKeydown(event: KeyboardEvent) {
   <div
     :class="[
       'flex flex-col gap-2 rounded-card border-[1.5px] px-4 pt-3.5 pb-4 transition-colors',
-      active || dirty ? 'border-ink bg-accent/30' : 'border-line bg-cream',
+      selected || dirty ? 'border-ink bg-accent/30' : 'border-line bg-cream',
     ]"
     @mouseenter="emit('activate')"
     @mouseleave="emit('deactivate')"
@@ -58,36 +60,34 @@ function onKeydown(event: KeyboardEvent) {
     @focusout="emit('deactivate')"
   >
     <div class="flex flex-wrap items-center gap-2.5">
-      <span
-        aria-hidden="true"
-        :class="[
-          'flex size-6 items-center justify-center rounded-full border-[1.5px] border-ink text-xs font-bold',
-          active || dirty ? 'bg-accent' : 'bg-paper',
-        ]"
-        >{{ seq }}</span
-      >
+      <KIconBadge size="xs" :class="selected || dirty ? 'bg-accent' : 'bg-paper'">{{
+        seq
+      }}</KIconBadge>
       <span class="text-sm font-bold">{{ blockKindLabels[kind] }}</span>
       <KFlag v-if="uncertain && !dirty" kind="unsure" />
       <span v-if="dirty" class="text-xs font-bold text-muted">changed, not saved</span>
       <KFlag v-else-if="saved" kind="saved" />
       <span class="flex-1" />
-      <template v-if="dirty">
-        <KButton variant="quiet" size="sm" :disabled="saving" @click="emit('undo')">Undo</KButton>
-        <KButton size="sm" :loading="saving" @click="emit('save')">Save</KButton>
-      </template>
-      <KButton v-else-if="uncertain" variant="second" size="sm" @click="emit('confirm')">
-        Looks right
-      </KButton>
+      <slot name="actions" :dirty="dirty" :saving="saving">
+        <template v-if="dirty">
+          <KButton variant="quiet" size="sm" :disabled="saving" @click="emit('undo')">Undo</KButton>
+          <KButton size="sm" :loading="saving" @click="emit('save')">Save</KButton>
+        </template>
+        <KButton v-else-if="uncertain" variant="second" size="sm" @click="emit('confirm')">
+          Looks right
+        </KButton>
+      </slot>
     </div>
     <textarea
       v-model="text"
       :rows="rows"
       :aria-label="`Block ${seq}, ${blockKindLabels[kind]}`"
       :class="[
-        'w-full resize-y rounded-field bg-paper px-3 py-2.5 leading-normal text-ink focus:outline-none',
+        'w-full resize-y rounded-field bg-paper px-3 py-2.5 leading-normal text-ink',
+        focusRing,
         kind === 'drawing' && 'italic',
         dirty
-          ? 'border-2 border-ink ring-4 ring-accent/45'
+          ? 'border-2 border-ink ring-4 ring-accent/55'
           : uncertain
             ? 'border-[1.5px] border-dashed border-clay focus:border-ink'
             : 'border-[1.5px] border-edge focus:border-ink',

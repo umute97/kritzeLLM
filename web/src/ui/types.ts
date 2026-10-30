@@ -15,6 +15,8 @@ export type CoverColor = 'herb' | 'clay' | 'orchid' | 'lemon'
 export type UploadStatus =
   'sending' | 'queued' | 'transcribing' | 'indexing' | 'ready' | 'duplicate' | 'failed' | 'deleted'
 
+export type StatusKind = 'page' | 'job' | 'upload'
+
 export interface Option<T extends string = string> {
   value: T
   label: string
@@ -63,6 +65,29 @@ export const jobStatusTones: Record<JobStatus, Tone> = {
   running: 'lemon',
   succeeded: 'herb',
   failed: 'bark',
+}
+
+// An upload follows its page's job, so it borrows their words and colours, plus a few of its own.
+export const uploadStatusLabels: Record<UploadStatus, string> = {
+  sending: 'Sending',
+  queued: jobStatusLabels.queued,
+  transcribing: pageStatusLabels.transcribing,
+  indexing: pageStatusLabels.indexing,
+  ready: pageStatusLabels.ready,
+  duplicate: 'Already here',
+  failed: pageStatusLabels.failed,
+  deleted: 'Deleted',
+}
+
+export const uploadStatusTones: Record<UploadStatus, Tone> = {
+  sending: 'plain',
+  queued: jobStatusTones.queued,
+  transcribing: pageStatusTones.transcribing,
+  indexing: pageStatusTones.indexing,
+  ready: pageStatusTones.ready,
+  duplicate: 'orchid',
+  failed: pageStatusTones.failed,
+  deleted: 'plain',
 }
 
 export const blockKindLabels: Record<BlockKind, string> = {

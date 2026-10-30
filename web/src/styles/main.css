@@ -49,6 +49,9 @@
   --shadow-soft: 0 5px 0 rgb(61 43 34 / 0.18);
   --shadow-pin: 0 6px 0 rgb(180 106 85 / 0.18);
   --shadow-pop: 0 8px 0 rgb(61 43 34 / 0.35);
+  --shadow-lift-lg: 0 8px 0 var(--color-ink);
+  --shadow-cover: 0 3px 0 rgb(61 43 34 / 0.35);
+  --shadow-bark: 0 5px 0 rgb(138 74 58 / 0.3);
 
   --animate-daisy: spin 2.4s linear infinite;
   --animate-pulse-soft: pulse-soft 1.6s ease-in-out infinite;
@@ -75,6 +78,13 @@
       opacity: 0;
     }
   }
+}
+
+/* The soft, rounded display face of titles that aren't headings. */
+@utility font-display-soft {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: 'SOFT' 100;
 }
 
 /* Lined notebook paper; set --line to change the spacing. */

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, useId, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 
 import { api, call } from '@/api/client'
 import { ApiError } from '@/api/errors'
@@ -21,11 +21,10 @@ import {
   KDropzone,
   KEmptyState,
   KFilterChips,
-  KIcon,
   KJournalCover,
   KLoadMore,
   KMenu,
-  KShelfPager,
+  KPager,
   KSkeleton,
   tiltFor,
   useToasts,
@@ -196,10 +195,7 @@ const summary = computed(() => {
           >pick a notebook, or tuck in some new pages</span
         >
       </div>
-      <KButton variant="second" @click="newJournal = true">
-        <template #icon><KIcon name="plus" /></template>
-        New journal
-      </KButton>
+      <KButton variant="second" icon="plus" @click="newJournal = true"> New journal </KButton>
     </header>
 
     <KEmptyState
@@ -215,22 +211,24 @@ const summary = computed(() => {
       <section :aria-labelledby="shelfTitleId" class="flex flex-col gap-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 :id="shelfTitleId" class="m-0 text-[22px]">On the shelf</h2>
-          <KShelfPager
+          <KPager
             v-if="journals.loaded"
-            :range="journals.range"
-            noun="journals"
-            :can-back="journals.canBack && !journals.loading"
+            text-first
+            prev-label="Previous journals"
+            next-label="More journals"
+            :can-prev="journals.canBack && !journals.loading"
             :can-next="journals.canNext && !journals.loading"
-            @back="shelfStep('back')"
+            @prev="shelfStep('back')"
             @next="shelfStep('next')"
-          />
+          >
+            <span class="text-sm text-muted">{{ journals.range }}</span>
+          </KPager>
         </div>
         <div class="grid grid-cols-2 gap-6 sm:grid-cols-4">
           <template v-if="journals.loaded">
             <KJournalCover
               v-for="item in journals.shelf"
               :key="item.id"
-              :as="RouterLink"
               :to="{ name: 'journal', params: { journalId: item.id } }"
               :name="item.name"
               :meta="plural(item.pageCount, 'page')"

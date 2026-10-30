@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 
 import { api, call } from '@/api/client'
 import { ApiError } from '@/api/errors'
@@ -18,9 +18,8 @@ import {
   KDialog,
   KDoodle,
   KEmptyState,
-  KIcon,
   KMenu,
-  KPageStepper,
+  KPager,
   KSegmented,
   KSkeleton,
   KSpinner,
@@ -222,14 +221,13 @@ function step(id?: string) {
       text="It may have been deleted. The rest of the journal is still on the shelf."
     >
       <template #illustration><KDoodle name="squiggle" /></template>
-      <KButton :as="RouterLink" to="/">Back to your journals</KButton>
+      <KButton to="/">Back to your journals</KButton>
     </KEmptyState>
 
     <template v-else-if="detail">
       <header class="flex flex-wrap items-end justify-between gap-4">
         <div class="flex flex-col gap-1.5">
           <KBreadcrumb
-            :link-as="RouterLink"
             :items="[
               { label: 'Journals', to: '/' },
               {
@@ -249,18 +247,22 @@ function step(id?: string) {
           </span>
         </div>
         <div class="flex flex-wrap items-center gap-2.5">
-          <KPageStepper
-            :current="detail.pageNumber"
-            :total="journal?.pageCount"
+          <KPager
             :prev-label="neighbours.prevNumber ? `Page ${neighbours.prevNumber}` : 'Previous page'"
             :next-label="neighbours.nextNumber ? `Page ${neighbours.nextNumber}` : 'Next page'"
             :can-prev="!!neighbours.prev"
             :can-next="!!neighbours.next"
             @prev="step(neighbours.prev)"
             @next="step(neighbours.next)"
-          />
-          <KButton variant="second" :disabled="busy" @click="confirmRead = true">
-            <template #icon><KIcon name="refresh" /></template>
+          >
+            <span class="font-bold">
+              {{ detail.pageNumber
+              }}<span v-if="journal?.pageCount" class="font-normal text-muted">
+                of {{ journal.pageCount }}</span
+              >
+            </span>
+          </KPager>
+          <KButton variant="second" icon="refresh" :disabled="busy" @click="confirmRead = true">
             Re-transcribe
           </KButton>
           <KMenu label="Page actions" :items="menu" @select="onMenu" />
@@ -327,7 +329,7 @@ function step(id?: string) {
               :dirty="drafts.has(block.id)"
               :saving="saving.has(block.id)"
               :saved="saved.has(block.id)"
-              :active="active === block.id"
+              :selected="active === block.id"
               @update:model-value="setText(block, $event)"
               @save="save(block)"
               @undo="drafts.delete(block.id)"

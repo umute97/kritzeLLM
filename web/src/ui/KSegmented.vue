@@ -1,12 +1,14 @@
 <script setup lang="ts" generic="T extends string">
+import { pillClass } from './styles'
 import type { Option } from './types'
 
 // A small pill switch between a few views, e.g. Photo / Text / Both.
 const model = defineModel<T>({ required: true })
 
-withDefaults(defineProps<{ label: string; options: Option<T>[]; size?: 'md' | 'sm' }>(), {
-  size: 'md',
-})
+withDefaults(
+  defineProps<{ label: string; options: Option<T>[]; size?: 'md' | 'sm'; disabled?: boolean }>(),
+  { size: 'md' },
+)
 </script>
 
 <template>
@@ -20,10 +22,10 @@ withDefaults(defineProps<{ label: string; options: Option<T>[]; size?: 'md' | 's
       :key="option.value"
       type="button"
       :aria-pressed="option.value === model"
+      :disabled="disabled"
       :class="[
-        'cursor-pointer rounded-full border-[1.5px] font-bold text-ink',
+        pillClass({ on: option.value === model, disabled }),
         size === 'md' ? 'min-h-10 px-4.5 text-sm' : 'min-h-9 px-3.5 text-[13px]',
-        option.value === model ? 'border-ink bg-accent' : 'border-transparent hover:bg-cream',
       ]"
       @click="model = option.value"
     >

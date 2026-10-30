@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // Say what's missing, then one way forward.
-withDefaults(defineProps<{ title: string; text?: string; framed?: boolean }>(), {
-  text: undefined,
-  framed: true,
-})
+withDefaults(
+  defineProps<{ title: string; text?: string; framed?: boolean; headingLevel?: 2 | 3 }>(),
+  { text: undefined, framed: true, headingLevel: 2 },
+)
 </script>
 
 <template>
@@ -14,8 +14,10 @@ withDefaults(defineProps<{ title: string; text?: string; framed?: boolean }>(), 
     ]"
   >
     <slot name="illustration" />
-    <h2 class="m-0 text-[22px]">{{ title }}</h2>
-    <p v-if="text" class="m-0 max-w-[420px] text-sm text-muted">{{ text }}</p>
+    <component :is="`h${headingLevel}`" class="m-0 text-[22px]">{{ title }}</component>
+    <p v-if="text || $slots.text" class="m-0 max-w-[420px] text-sm text-muted">
+      <slot name="text">{{ text }}</slot>
+    </p>
     <div v-if="$slots.default" class="mt-1.5 flex flex-wrap justify-center gap-2">
       <slot />
     </div>

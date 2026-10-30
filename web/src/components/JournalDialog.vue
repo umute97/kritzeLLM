@@ -61,7 +61,7 @@ async function save() {
   <KDialog
     v-model:open="open"
     :title="editing ? 'Rename journal' : 'A new journal'"
-    width="md"
+    size="md"
     form
     :dismissible="!busy"
     @submit="save"

@@ -23,6 +23,9 @@ const triggerProps = computed(() => ({
   'aria-controls': open.value ? menuId : undefined,
 }))
 
+const itemClass =
+  'flex min-h-[42px] cursor-pointer items-center gap-2.5 rounded-lg px-3 text-left focus:outline-none disabled:cursor-not-allowed disabled:text-muted disabled:hover:bg-transparent'
+
 const safe = computed(() => props.items.filter((item) => !item.danger))
 const danger = computed(() => props.items.filter((item) => item.danger))
 
@@ -94,7 +97,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside))
       role="menu"
       :aria-label="label"
       :class="[
-        'absolute z-40 mt-2 flex w-60 flex-col rounded-field border-[1.5px] border-ink bg-paper p-1.5 shadow-[0_6px_0_rgb(61_43_34/0.2)]',
+        'absolute z-40 mt-2 flex w-60 flex-col rounded-field border-[1.5px] border-ink bg-paper p-1.5 shadow-soft',
         align === 'end' ? 'right-0' : 'left-0',
       ]"
       @keydown="onKeydown"
@@ -105,7 +108,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside))
         type="button"
         role="menuitem"
         :disabled="item.disabled"
-        class="flex min-h-[42px] cursor-pointer items-center gap-2.5 rounded-lg px-3 text-left font-semibold text-ink hover:bg-accent/40 focus:bg-accent/40 focus:outline-none disabled:cursor-not-allowed disabled:text-muted"
+        :class="[itemClass, 'font-semibold text-ink hover:bg-accent/40 focus:bg-accent/40']"
         @click="choose(item)"
       >
         <KIcon v-if="item.icon" :name="item.icon" class="text-bark" />
@@ -119,7 +122,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside))
           type="button"
           role="menuitem"
           :disabled="item.disabled"
-          class="flex min-h-[42px] cursor-pointer items-center gap-2.5 rounded-lg px-3 text-left font-bold text-bark hover:bg-bark-soft focus:bg-bark-soft focus:outline-none disabled:cursor-not-allowed disabled:text-muted disabled:hover:bg-transparent"
+          :class="[itemClass, 'font-bold text-bark hover:bg-bark-soft focus:bg-bark-soft']"
           @click="choose(item)"
         >
           <KIcon v-if="item.icon" :name="item.icon" />

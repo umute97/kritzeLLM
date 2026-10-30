@@ -49,18 +49,20 @@ Rules:
 
 ## Components
 
-Everything is exported from [`web/src/ui/index.ts`](../../web/src/ui/index.ts).
+Everything is exported from [`web/src/ui/index.ts`](../../web/src/ui/index.ts). The app installs
+the library with `app.use(createCottage({ link: RouterLink }))`, so any component given `to`
+becomes a router link.
 
 | Group | Components | Notes |
 |---|---|---|
-| Buttons | `KButton`, `KIconButton` | `main` (one per view), `second`, `quiet`, `danger` (confirm dialogs only); `sm` inside cards and toasts; `loading`, `disabled`; `as` renders a link or `RouterLink` |
-| Fields | `KTextField`, `KTextArea`, `KSelect`, `KSearchField`, `KCheckbox`, `KSwitch`, `KFieldShell` | A label above, help or an error below. Errors set `aria-invalid` and `aria-describedby`. The token field can be `revealable` |
-| Chips | `KChip`, `KStatusChip`, `KBlockKindTag`, `KFlag`, `KBadge` | Page status: Uploaded, Transcribing, Indexing, Ready, Failed. Job status: Waiting, Working, Done, Failed. Flags: not quite sure, already here, edited by you, saved |
+| Buttons | `KButton`, `KIconButton` | `main` (one per view), `second`, `quiet`, `danger` (confirm dialogs only); `sm` inside cards and toasts; `loading`, `disabled`, `icon`; `to` makes it a link, `as` any other element |
+| Fields | `KTextField`, `KTextArea`, `KSelect`, `KSearchField`, `KCheckbox`, `KSwitch`, `KFieldShell`, `KFieldNote` | A label (beside a checkbox or switch, else above), help or an error below. Errors set `aria-invalid` and `aria-describedby`. The token field can be `revealable` |
+| Chips | `KChip`, `KStatusChip`, `KBlockKindTag`, `KFlag`, `KBadge` | Page status: Uploaded, Transcribing, Indexing, Ready, Failed. Job status: Waiting, Working, Done, Failed. Upload status borrows both, plus Sending, Already here, Deleted. Flags: not quite sure, already here, edited by you, saved |
 | Pickers | `KFilterChips`, `KSegmented` | Single choice, `aria-pressed` |
-| Feedback | `KToast` + `KToastStack` + `useToasts()`, `KBanner` | See below |
+| Feedback | `KToast` + `KToastStack` + `useToasts()`, `KBanner`, `KIconBadge` | See below |
 | Overlays | `KDialog`, `KMenu`, `KTooltip` | Native `<dialog>`; a `form` dialog wraps body and footer in one form and emits `submit`; `:dismissible="false"` holds it open while saving. The menu has arrow keys and Escape, with danger items alone at the bottom; a custom `#trigger` spreads `triggerProps` |
-| Navigation | `KTopNav`, `KNavLink`, `KBreadcrumb`, `KPageStepper`, `KShelfPager`, `KLoadMore` | On phones the nav links fold behind a menu button |
-| Progress | `KProgressBar`, `KSpinner` (ring, daisy), `KTypingDots`, `KSkeleton`, `KEmptyState` | A bar when we know how long, a daisy when we don't |
+| Navigation | `KTopNav`, `KNavLink`, `KBreadcrumb`, `KPager`, `KLoadMore` | On phones the nav links fold behind a menu button. `KPager` puts two arrows around what its slot says ("12 of 48"), or after it (`text-first`) |
+| Progress | `KProgressBar`, `KSpinner` (ring, daisy), `KTypingDots`, `KSkeleton`, `KEmptyState` | A bar when we know how long, a daisy when we don't. A `meter` bar shows a measure, like a score |
 | Journals and pages | `KJournalCover`, `KAddTile`, `KPageCard`, `KDropzone`, `KUploadRow`, `KBlockCard` | See the screens below |
 | Search and chat | `KSearchResult`, `KScoreBars`, `KHighlight`, `KMessage`, `KToolActivity`, `KCitationChip`, `KSourceCard`, `KComposer` | Built ahead of their screens |
 
@@ -74,8 +76,19 @@ Every component has to work twice on one page, anywhere on it.
   `inheritAttrs: false` and `useSplitAttrs()` (`ui/attrs.ts`): `class` and `style` on the root,
   the rest (`name`, `id`, `aria-*`, listeners) on the input or button. Merge a caller's
   `aria-describedby` with your own through `joinIds()` instead of overwriting it.
-- **Buttons that can be links** (`as`) get their `type`, `disabled` and the disabled-link
-  handling from `usePolymorphic()` (`ui/polymorphic.ts`).
+- **Anything that can be a link** takes `to` (and `as` for other elements) and gets its element,
+  `type`, `disabled` and the disabled-link handling from `usePolymorphic()`
+  (`ui/polymorphic.ts`). Never ask callers for a link component; the app sets it once.
+- **The same words for the same idea:** `selected` for the picked item in a set, `current` for
+  where you are, `variant` for a button's look, `size` for how big, `headingLevel` when a title is
+  a heading, `disabled` on everything you can press.
+- **Shared looks live in `ui/styles.ts`** (`focusRing`, `disabledClass`, `pillClass`,
+  `fieldClass`, `coverShape`) **and `ui/tones.ts`** (`toneClasses`, `intentLooks`). Colours and
+  shadows come from the theme tokens in `styles/main.css`, never as raw hex or `rgb()`.
+- **Build on the small pieces** (`KIconButton`, `KChip`, `KIconBadge`, `KFieldShell`,
+  `KProgressBar`, `KDoodle`) instead of drawing the same thing again.
+- **Leave room:** a slot where callers may need more than plain text (`#title`, `#text`,
+  `#actions`, `#thumb`), with the plain version as its fallback.
 - **A form in a dialog** is `<KDialog form @submit>`, with the submit button in the footer. Never
   link a button to a form by id.
 - **Custom triggers** get the same aria wiring as the built-in one, as slot props.

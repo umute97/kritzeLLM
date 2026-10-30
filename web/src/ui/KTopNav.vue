@@ -36,7 +36,7 @@ const linksId = useId()
       >
         <slot />
       </div>
-      <div v-if="$slots.end" class="hidden font-hand text-xl text-bark sm:block">
+      <div v-if="$slots.end" class="hidden sm:block">
         <slot name="end" />
       </div>
     </div>

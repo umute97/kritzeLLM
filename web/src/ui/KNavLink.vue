@@ -2,21 +2,31 @@
 import type { Component } from 'vue'
 
 import KBadge from './KBadge.vue'
+import { usePolymorphic, type LinkTarget } from './polymorphic'
 
-// The current room gets the accent pill. Pass `as="RouterLink"`-style components with `to`.
-withDefaults(
-  defineProps<{ as?: string | Component; active?: boolean; badge?: number; badgeLabel?: string }>(),
-  { as: 'a', badge: undefined, badgeLabel: undefined },
+// The current room gets the accent pill.
+const props = withDefaults(
+  defineProps<{
+    to?: LinkTarget
+    as?: string | Component
+    current?: boolean
+    badge?: number
+    badgeLabel?: string
+  }>(),
+  { to: undefined, as: undefined, badge: undefined, badgeLabel: undefined },
 )
+
+const element = usePolymorphic(() => ({ as: props.as, to: props.to }), 'a')
 </script>
 
 <template>
   <component
-    :is="as"
-    :aria-current="active ? 'page' : undefined"
+    :is="element.is"
+    v-bind="element.attrs"
+    :aria-current="current ? 'page' : undefined"
     :class="[
       'inline-flex min-h-10 items-center gap-1.5 rounded-full border-[1.5px] px-4 font-bold text-ink no-underline hover:text-ink',
-      active ? 'border-ink bg-accent' : 'border-transparent hover:bg-paper',
+      current ? 'border-ink bg-accent' : 'border-transparent hover:bg-paper',
     ]"
   >
     <slot />

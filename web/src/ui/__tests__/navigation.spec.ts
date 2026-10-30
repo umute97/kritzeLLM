@@ -5,9 +5,8 @@ import { h } from 'vue'
 import KBreadcrumb from '../KBreadcrumb.vue'
 import KLoadMore from '../KLoadMore.vue'
 import KNavLink from '../KNavLink.vue'
-import KPageStepper from '../KPageStepper.vue'
+import KPager from '../KPager.vue'
 import KProgressBar from '../KProgressBar.vue'
-import KShelfPager from '../KShelfPager.vue'
 import KTopNav from '../KTopNav.vue'
 
 describe('KTopNav and KNavLink', () => {
@@ -15,7 +14,7 @@ describe('KTopNav and KNavLink', () => {
     const wrapper = mount(KTopNav, {
       slots: {
         default: () => [
-          h(KNavLink, { active: true, href: '#' }, () => 'Pages'),
+          h(KNavLink, { current: true, href: '#' }, () => 'Pages'),
           h(KNavLink, { href: '#' }, () => 'Search'),
         ],
         end: 'hi there',
@@ -61,36 +60,47 @@ describe('KBreadcrumb', () => {
   })
 })
 
-describe('KShelfPager', () => {
-  it('rests the arrows at the ends', async () => {
-    const wrapper = mount(KShelfPager, {
-      props: { range: 'Journals 1–4', canBack: false, canNext: true, noun: 'journals' },
+describe('KPager', () => {
+  it('steps between neighbours around what it says', async () => {
+    const wrapper = mount(KPager, {
+      props: { prevLabel: 'Page 11', nextLabel: 'Page 13', canPrev: true, canNext: false },
+      slots: { default: '<span>12 of 48</span>' },
     })
-    const [back, next] = wrapper.findAll('button')
-    expect(back!.attributes('aria-label')).toBe('Previous journals')
-    expect(back!.attributes('disabled')).toBeDefined()
-    expect(next!.attributes('disabled')).toBeUndefined()
-    await next!.trigger('click')
+    const [prev, middle, next] = wrapper.element.children
+    expect(prev!.getAttribute('aria-label')).toBe('Page 11')
+    expect(middle!.textContent).toBe('12 of 48')
+    expect(next!.getAttribute('disabled')).not.toBeNull()
+    await wrapper.get('button[aria-label="Page 11"]').trigger('click')
+    expect(wrapper.emitted('prev')).toHaveLength(1)
+  })
+
+  it('can say where you are before the arrows', async () => {
+    const wrapper = mount(KPager, {
+      props: {
+        prevLabel: 'Previous journals',
+        nextLabel: 'More journals',
+        canPrev: false,
+        canNext: true,
+        textFirst: true,
+      },
+      slots: { default: '<span>Journals 1–4</span>' },
+    })
+    expect(wrapper.element.firstElementChild!.textContent).toBe('Journals 1–4')
+    expect(
+      wrapper.get('button[aria-label="Previous journals"]').attributes('disabled'),
+    ).toBeDefined()
+    await wrapper.get('button[aria-label="More journals"]').trigger('click')
     expect(wrapper.emitted('next')).toHaveLength(1)
   })
 })
 
-describe('KPageStepper', () => {
-  it('steps between neighbouring pages', async () => {
-    const wrapper = mount(KPageStepper, {
-      props: {
-        current: 12,
-        total: 48,
-        prevLabel: 'Page 11',
-        nextLabel: 'Page 13',
-        canPrev: true,
-        canNext: false,
-      },
+describe('KProgressBar as a meter', () => {
+  it('measures instead of counting down', () => {
+    const wrapper = mount(KProgressBar, {
+      props: { value: 0.5, max: 1, label: 'Words score', meter: true, color: 'lemon' },
     })
-    expect(wrapper.text()).toContain('12 of 48')
-    await wrapper.get('button[aria-label="Page 11"]').trigger('click')
-    expect(wrapper.emitted('prev')).toHaveLength(1)
-    expect(wrapper.get('button[aria-label="Page 13"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.attributes('role')).toBe('meter')
+    expect(wrapper.find('.bg-lemon').attributes('style')).toContain('width: 50%')
   })
 })
 

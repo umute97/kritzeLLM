@@ -3,18 +3,21 @@ import { computed, ref } from 'vue'
 
 import type { IconName } from './icons'
 import KButton from './KButton.vue'
-import KIcon from './KIcon.vue'
+import KIconBadge from './KIconBadge.vue'
 import KIconButton from './KIconButton.vue'
 import KProgressBar from './KProgressBar.vue'
 import KSpinner from './KSpinner.vue'
 import type { ToastTone } from './toasts'
+import { intentLooks } from './tones'
 
 const props = withDefaults(
   defineProps<{
     tone: ToastTone
     title: string
     detail?: string
-    details?: string
+    /** Behind "Show details", e.g. the status of an API problem. */
+    technical?: string
+    icon?: IconName
     actionLabel?: string
     progress?: { value: number; max: number }
     dismissible?: boolean
@@ -26,41 +29,26 @@ const emit = defineEmits<{ dismiss: []; action: [] }>()
 
 const open = ref(false)
 
-const looks: Record<ToastTone, { icon?: IconName; badge: string; card: string }> = {
-  success: { icon: 'check', badge: 'bg-herb text-ink', card: 'bg-paper border-[1.5px] border-ink' },
-  info: { icon: 'info', badge: 'bg-orchid text-ink', card: 'bg-paper border-[1.5px] border-ink' },
-  loading: { badge: 'bg-lemon text-ink', card: 'bg-paper border-[1.5px] border-ink' },
-  warning: {
-    icon: 'reconnect',
-    badge: 'bg-lemon text-ink',
-    card: 'bg-lemon-soft border-[1.5px] border-ink',
-  },
-  error: {
-    icon: 'alert',
-    badge: 'bg-bark text-cream',
-    card: 'bg-bark-soft border-2 border-bark shadow-[0_5px_0_rgb(138_74_58/0.3)]',
-  },
-}
-
-const look = computed(() => looks[props.tone])
+const look = computed(() =>
+  props.tone === 'loading'
+    ? { ...intentLooks.info, badge: 'bg-lemon text-ink' }
+    : intentLooks[props.tone],
+)
 const canDismiss = computed(() => props.dismissible ?? props.tone !== 'loading')
 </script>
 
 <template>
   <div
     :role="tone === 'error' ? 'alert' : 'status'"
-    :class="['flex items-start gap-3 rounded-card py-3.5 pr-2.5 pl-3.5 shadow-soft', look.card]"
+    :class="[
+      'flex items-start gap-3 rounded-card py-3.5 pr-2.5 pl-3.5',
+      tone === 'error' ? 'shadow-bark' : 'shadow-soft',
+      look.card,
+    ]"
   >
-    <span
-      aria-hidden="true"
-      :class="[
-        'flex size-8 shrink-0 items-center justify-center rounded-full border-[1.5px] border-ink',
-        look.badge,
-      ]"
-    >
+    <KIconBadge :icon="icon ?? look.icon" size="sm" :class="look.badge">
       <KSpinner v-if="tone === 'loading'" :size="18" />
-      <KIcon v-else-if="look.icon" :name="look.icon" :size="16" />
-    </span>
+    </KIconBadge>
     <div class="flex min-w-0 flex-1 flex-col gap-0.5">
       <div class="flex items-baseline justify-between gap-2">
         <strong class="text-[15px]">{{ title }}</strong>
@@ -83,14 +71,14 @@ const canDismiss = computed(() => props.dismissible ?? props.tone !== 'loading')
         :label="title"
       />
       <div
-        v-if="actionLabel || details || $slots.default"
+        v-if="actionLabel || technical || $slots.default"
         class="mt-1.5 flex flex-wrap items-center gap-2"
       >
         <KButton v-if="actionLabel" variant="second" size="sm" @click="emit('action')">
           {{ actionLabel }}
         </KButton>
         <button
-          v-if="details"
+          v-if="technical"
           type="button"
           :aria-expanded="open"
           class="min-h-9 cursor-pointer px-2 text-[13px] font-bold text-bark underline underline-offset-3"
@@ -101,16 +89,16 @@ const canDismiss = computed(() => props.dismissible ?? props.tone !== 'loading')
         <slot />
       </div>
       <code
-        v-if="details && open"
+        v-if="technical && open"
         class="mt-1.5 rounded-lg border border-dashed border-bark bg-paper px-2.5 py-2 font-mono text-xs whitespace-pre-wrap"
-        >{{ details }}</code
+        >{{ technical }}</code
       >
     </div>
     <KIconButton
       v-if="canDismiss"
       icon="close"
       label="Dismiss"
-      variant="plain"
+      variant="quiet"
       size="sm"
       @click="emit('dismiss')"
     />

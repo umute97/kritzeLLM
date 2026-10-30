@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
-
 import { KButton, KDoodle, KEmptyState } from '@/ui'
 </script>
 
@@ -11,7 +9,7 @@ import { KButton, KDoodle, KEmptyState } from '@/ui'
       text="This address doesn’t lead anywhere in the cottage."
     >
       <template #illustration><KDoodle name="squiggle" /></template>
-      <KButton :as="RouterLink" to="/">Back to your journals</KButton>
+      <KButton to="/">Back to your journals</KButton>
     </KEmptyState>
   </main>
 </template>
