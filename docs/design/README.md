@@ -87,6 +87,9 @@ Every component has to work twice on one page, anywhere on it.
   shadows come from the theme tokens in `styles/main.css`, never as raw hex or `rgb()`.
 - **Build on the small pieces** (`KIconButton`, `KChip`, `KIconBadge`, `KFieldShell`,
   `KProgressBar`, `KDoodle`) instead of drawing the same thing again.
+- **Words come from the catalog.** Anything the library says by itself lives in `ui/messages.ts`
+  and is read with `useUiMessages()`; words that change with the number or a name are functions.
+  Words about this app's things (photos, journals) are props the screen fills in.
 - **Leave room:** a slot where callers may need more than plain text (`#title`, `#text`,
   `#actions`, `#thumb`), with the plain version as its fallback.
 - **A form in a dialog** is `<KDialog form @submit>`, with the submit button in the footer. Never

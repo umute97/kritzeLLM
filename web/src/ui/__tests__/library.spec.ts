@@ -64,9 +64,16 @@ function fileList(...files: File[]) {
   return { files, items: files.map(() => ({})) }
 }
 
+const photos = {
+  title: 'Drop page photos here',
+  hint: 'JPEG or PNG',
+  chooseLabel: 'Choose photos',
+  countLabel: (n: number) => (n === 1 ? '1 photo' : `${n} photos`),
+}
+
 describe('KDropzone', () => {
   it('hands over dropped files', async () => {
-    const wrapper = mount(KDropzone)
+    const wrapper = mount(KDropzone, { props: photos })
     const photo = new File(['x'], 'IMG_2041.jpg', { type: 'image/jpeg' })
     await wrapper.trigger('dragenter', { dataTransfer: fileList(photo, photo) })
     expect(wrapper.text()).toContain('Let go to tuck them in')
@@ -77,7 +84,7 @@ describe('KDropzone', () => {
   })
 
   it('hands over picked files and resets the input', async () => {
-    const wrapper = mount(KDropzone)
+    const wrapper = mount(KDropzone, { props: photos })
     const input = wrapper.get('input[type="file"]')
     const photo = new File(['x'], 'IMG_2042.png', { type: 'image/png' })
     Object.defineProperty(input.element, 'files', { value: [photo], configurable: true })
@@ -86,14 +93,24 @@ describe('KDropzone', () => {
   })
 
   it('gives input attributes to the file input', () => {
-    const wrapper = mount(KDropzone, { attrs: { capture: 'environment', class: 'flex-1' } })
+    const wrapper = mount(KDropzone, {
+      props: photos,
+      attrs: { capture: 'environment', class: 'flex-1' },
+    })
     expect(wrapper.get('input[type="file"]').attributes('capture')).toBe('environment')
     expect(wrapper.classes()).toContain('flex-1')
   })
 
+  it('counts files in plain words without a count label', async () => {
+    const wrapper = mount(KDropzone, { props: { ...photos, countLabel: undefined } })
+    const file = new File(['x'], 'a.jpg', { type: 'image/jpeg' })
+    await wrapper.trigger('dragenter', { dataTransfer: fileList(file, file) })
+    expect(wrapper.text()).toContain('2 files')
+  })
+
   it('says what went wrong', () => {
     const wrapper = mount(KDropzone, {
-      props: { error: 'notes.pdf isn’t a photo', errorHint: 'PDF import is coming.' },
+      props: { ...photos, error: 'notes.pdf isn’t a photo', errorHint: 'PDF import is coming.' },
     })
     expect(wrapper.get('h2').text()).toBe('notes.pdf isn’t a photo')
     expect(wrapper.text()).toContain('PDF import is coming.')

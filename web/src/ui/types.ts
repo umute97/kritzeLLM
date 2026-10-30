@@ -37,27 +37,12 @@ export interface MenuItem {
   disabled?: boolean
 }
 
-export const pageStatusLabels: Record<PageStatus, string> = {
-  uploaded: 'Uploaded',
-  transcribing: 'Transcribing',
-  indexing: 'Indexing',
-  ready: 'Ready',
-  failed: 'Failed',
-}
-
 export const pageStatusTones: Record<PageStatus, Tone> = {
   uploaded: 'plain',
   transcribing: 'lemon',
   indexing: 'orchid',
   ready: 'herb',
   failed: 'bark',
-}
-
-export const jobStatusLabels: Record<JobStatus, string> = {
-  queued: 'Waiting',
-  running: 'Working',
-  succeeded: 'Done',
-  failed: 'Failed',
 }
 
 export const jobStatusTones: Record<JobStatus, Tone> = {
@@ -67,18 +52,7 @@ export const jobStatusTones: Record<JobStatus, Tone> = {
   failed: 'bark',
 }
 
-// An upload follows its page's job, so it borrows their words and colours, plus a few of its own.
-export const uploadStatusLabels: Record<UploadStatus, string> = {
-  sending: 'Sending',
-  queued: jobStatusLabels.queued,
-  transcribing: pageStatusLabels.transcribing,
-  indexing: pageStatusLabels.indexing,
-  ready: pageStatusLabels.ready,
-  duplicate: 'Already here',
-  failed: pageStatusLabels.failed,
-  deleted: 'Deleted',
-}
-
+// An upload follows its page's job, so it borrows their colours, plus a few of its own.
 export const uploadStatusTones: Record<UploadStatus, Tone> = {
   sending: 'plain',
   queued: jobStatusTones.queued,
@@ -88,15 +62,6 @@ export const uploadStatusTones: Record<UploadStatus, Tone> = {
   duplicate: 'orchid',
   failed: pageStatusTones.failed,
   deleted: 'plain',
-}
-
-export const blockKindLabels: Record<BlockKind, string> = {
-  heading: 'Heading',
-  paragraph: 'Paragraph',
-  list: 'List',
-  marginNote: 'Margin note',
-  drawing: 'Drawing',
-  other: 'Other',
 }
 
 /** A gentle, repeating tilt for pinned page cards, by position in the grid. */

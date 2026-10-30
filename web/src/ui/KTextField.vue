@@ -5,6 +5,7 @@ import { joinIds, useSplitAttrs } from './attrs'
 import KFieldShell from './KFieldShell.vue'
 import KIconButton from './KIconButton.vue'
 import { fieldClass } from './styles'
+import { useUiMessages } from './messages'
 
 defineOptions({ inheritAttrs: false })
 
@@ -34,6 +35,8 @@ const inputType = computed(() =>
   props.type === 'password' && revealed.value ? 'text' : props.type,
 )
 const { rootAttrs, controlAttrs } = useSplitAttrs()
+
+const ui = useUiMessages()
 </script>
 
 <template>
@@ -62,7 +65,7 @@ const { rootAttrs, controlAttrs } = useSplitAttrs()
       <KIconButton
         v-if="revealable"
         :icon="revealed ? 'eye-off' : 'eye'"
-        :label="revealed ? `Hide ${label}` : `Show ${label}`"
+        :label="revealed ? ui.hide(label) : ui.show(label)"
         variant="quiet"
         :pressed="revealed"
         class="absolute top-1/2 right-0.5 -translate-y-1/2"

@@ -2,16 +2,19 @@
 import { ref, useId } from 'vue'
 
 import KIconButton from './KIconButton.vue'
+import { useUiMessages } from './messages'
 
 // Brand, links (KNavLink) and a little greeting. On phones the links fold behind a menu button.
 defineProps<{ label?: string }>()
 
 const open = ref(false)
 const linksId = useId()
+
+const ui = useUiMessages()
 </script>
 
 <template>
-  <nav :aria-label="label ?? 'Main'" class="border-b-[1.5px] border-ink bg-cream">
+  <nav :aria-label="label ?? ui.mainNav" class="border-b-[1.5px] border-ink bg-cream">
     <div
       class="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-7 gap-y-2 px-4 py-3 sm:px-6"
     >
@@ -19,7 +22,7 @@ const linksId = useId()
         <slot name="brand" />
         <KIconButton
           icon="menu"
-          label="Menu"
+          :label="ui.menu"
           :aria-expanded="open"
           :aria-controls="linksId"
           :class="['sm:hidden', open && 'bg-accent!']"

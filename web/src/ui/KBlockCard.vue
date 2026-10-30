@@ -5,7 +5,8 @@ import KButton from './KButton.vue'
 import KFlag from './KFlag.vue'
 import KIconBadge from './KIconBadge.vue'
 import { focusRing } from './styles'
-import { blockKindLabels, type BlockKind } from './types'
+import type { BlockKind } from './types'
+import { useUiMessages } from './messages'
 
 // One transcribed block, editable. Cmd/Ctrl+Enter saves, Escape undoes.
 // `selected` mirrors hover/focus so the page can point at the same block elsewhere.
@@ -46,6 +47,8 @@ function onKeydown(event: KeyboardEvent) {
     emit('undo')
   }
 }
+
+const ui = useUiMessages()
 </script>
 
 <template>
@@ -63,25 +66,27 @@ function onKeydown(event: KeyboardEvent) {
       <KIconBadge size="xs" :class="selected || dirty ? 'bg-accent' : 'bg-paper'">{{
         seq
       }}</KIconBadge>
-      <span class="text-sm font-bold">{{ blockKindLabels[kind] }}</span>
+      <span class="text-sm font-bold">{{ ui.blockKind[kind] }}</span>
       <KFlag v-if="uncertain && !dirty" kind="unsure" />
-      <span v-if="dirty" class="text-xs font-bold text-muted">changed, not saved</span>
+      <span v-if="dirty" class="text-xs font-bold text-muted">{{ ui.changedNotSaved }}</span>
       <KFlag v-else-if="saved" kind="saved" />
       <span class="flex-1" />
       <slot name="actions" :dirty="dirty" :saving="saving">
         <template v-if="dirty">
-          <KButton variant="quiet" size="sm" :disabled="saving" @click="emit('undo')">Undo</KButton>
-          <KButton size="sm" :loading="saving" @click="emit('save')">Save</KButton>
+          <KButton variant="quiet" size="sm" :disabled="saving" @click="emit('undo')">{{
+            ui.undo
+          }}</KButton>
+          <KButton size="sm" :loading="saving" @click="emit('save')">{{ ui.save }}</KButton>
         </template>
         <KButton v-else-if="uncertain" variant="second" size="sm" @click="emit('confirm')">
-          Looks right
+          {{ ui.looksRight }}
         </KButton>
       </slot>
     </div>
     <textarea
       v-model="text"
       :rows="rows"
-      :aria-label="`Block ${seq}, ${blockKindLabels[kind]}`"
+      :aria-label="ui.block(seq, ui.blockKind[kind])"
       :class="[
         'w-full resize-y rounded-field bg-paper px-3 py-2.5 leading-normal text-ink',
         focusRing,

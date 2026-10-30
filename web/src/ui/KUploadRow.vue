@@ -4,6 +4,7 @@ import type { Component } from 'vue'
 import KProgressBar from './KProgressBar.vue'
 import KStatusChip from './KStatusChip.vue'
 import type { UploadStatus } from './types'
+import { useUiMessages } from './messages'
 
 // One photo in an upload batch, following its page's job from sending to ready.
 withDefaults(
@@ -19,6 +20,8 @@ withDefaults(
   }>(),
   { note: undefined, statusLabel: undefined, progress: undefined, as: 'li' },
 )
+
+const ui = useUiMessages()
 </script>
 
 <template>
@@ -50,7 +53,7 @@ withDefaults(
       class="w-30 shrink-0"
       size="sm"
       :value="progress"
-      :label="`Sending ${fileName}`"
+      :label="ui.sending(fileName)"
     />
     <KStatusChip kind="upload" :status="status" :label="statusLabel" size="sm" />
     <slot />

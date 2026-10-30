@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { blockKindLabels, type BlockKind } from './types'
+import type { BlockKind } from './types'
+import { useUiMessages } from './messages'
 
 defineProps<{ kind: BlockKind }>()
 
@@ -11,6 +12,8 @@ const marks: Record<BlockKind, string> = {
   drawing: '✿',
   other: '?',
 }
+
+const ui = useUiMessages()
 </script>
 
 <template>
@@ -20,6 +23,6 @@ const marks: Record<BlockKind, string> = {
     <span aria-hidden="true" class="font-hand text-base leading-none text-bark">{{
       marks[kind]
     }}</span>
-    {{ blockKindLabels[kind] }}
+    {{ ui.blockKind[kind] }}
   </span>
 </template>

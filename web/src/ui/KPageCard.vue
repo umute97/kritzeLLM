@@ -3,6 +3,7 @@ import { computed, type Component } from 'vue'
 
 import { useSplitAttrs } from './attrs'
 import KButton from './KButton.vue'
+import { useUiMessages } from './messages'
 import { usePolymorphic, type LinkTarget } from './polymorphic'
 import KSpinner from './KSpinner.vue'
 import KStatusChip from './KStatusChip.vue'
@@ -31,7 +32,7 @@ const props = withDefaults(
     imageUrl: undefined,
     excerpt: undefined,
     tilt: 0,
-    failedText: 'couldn’t read this one',
+    failedText: undefined,
     to: undefined,
     as: undefined,
   },
@@ -42,8 +43,14 @@ const { rootAttrs, controlAttrs } = useSplitAttrs()
 
 const emit = defineEmits<{ retry: [] }>()
 
+const ui = useUiMessages()
+
 const reading = computed(() =>
-  props.status === 'uploaded' ? 'waiting…' : props.status === 'transcribing' ? 'reading…' : null,
+  props.status === 'uploaded'
+    ? ui.value.pageWaiting
+    : props.status === 'transcribing'
+      ? ui.value.pageReading
+      : null,
 )
 const failed = computed(() => props.status === 'failed')
 </script>
@@ -89,7 +96,7 @@ const failed = computed(() => props.status === 'failed')
       </span>
       <span class="flex items-center justify-between gap-2">
         <span class="flex flex-col leading-tight">
-          <strong class="text-sm">Page {{ pageNumber }}</strong>
+          <strong class="text-sm">{{ ui.page(pageNumber) }}</strong>
           <span v-if="date" class="text-[13px] text-muted">{{ date }}</span>
         </span>
         <KStatusChip :status="status" size="sm" />
@@ -99,8 +106,10 @@ const failed = computed(() => props.status === 'failed')
       v-if="failed"
       class="absolute inset-x-3 top-3 flex h-[190px] flex-col items-center justify-center gap-2 rounded bg-bark-soft/85 p-2.5 text-center"
     >
-      <span class="font-hand text-xl leading-tight text-bark">{{ failedText }}</span>
-      <KButton variant="second" size="sm" @click="emit('retry')">Try again</KButton>
+      <span class="font-hand text-xl leading-tight text-bark">{{
+        failedText ?? ui.pageUnreadable
+      }}</span>
+      <KButton variant="second" size="sm" @click="emit('retry')">{{ ui.tryAgain }}</KButton>
     </div>
   </div>
 </template>
