@@ -1,19 +1,24 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 
+import { usePolymorphic, type LinkTarget } from './polymorphic'
+import { coverShape } from './styles'
 import type { CoverColor } from './types'
 
 // A notebook on the shelf. The open one lifts and gets a thicker line.
-withDefaults(
+const props = withDefaults(
   defineProps<{
     name: string
     meta?: string
     color?: CoverColor
     selected?: boolean
+    to?: LinkTarget
     as?: string | Component
   }>(),
-  { meta: undefined, color: 'herb', as: 'button' },
+  { meta: undefined, color: 'herb', to: undefined, as: undefined },
 )
+
+const element = usePolymorphic(() => ({ as: props.as, to: props.to }))
 
 const covers: Record<CoverColor, string> = {
   herb: 'bg-herb text-ink',
@@ -25,10 +30,10 @@ const covers: Record<CoverColor, string> = {
 
 <template>
   <component
-    :is="as"
-    :type="as === 'button' ? 'button' : undefined"
-    :aria-pressed="as === 'button' ? selected : undefined"
-    :aria-current="as !== 'button' && selected ? 'true' : undefined"
+    :is="element.is"
+    v-bind="element.attrs"
+    :aria-pressed="element.is === 'button' ? selected : undefined"
+    :aria-current="element.is !== 'button' && selected ? 'true' : undefined"
     :class="[
       'flex w-full cursor-pointer flex-col gap-2.5 bg-transparent p-0 text-left text-ink no-underline transition-transform hover:text-ink',
       selected ? '-translate-y-1' : 'hover:-translate-y-0.5',
@@ -36,11 +41,10 @@ const covers: Record<CoverColor, string> = {
   >
     <span
       :class="[
-        'relative block h-[132px] w-full overflow-hidden rounded-[9px_18px_18px_9px] border-ink',
+        'relative block overflow-hidden border-ink',
+        coverShape,
         covers[color],
-        selected
-          ? 'border-[2.5px] shadow-[0_6px_0_var(--color-ink)]'
-          : 'border-[1.5px] shadow-[0_3px_0_rgb(61_43_34/0.35)]',
+        selected ? 'border-[2.5px] shadow-lift' : 'border-[1.5px] shadow-cover',
       ]"
     >
       <span aria-hidden="true" class="absolute inset-y-0 left-4 w-[3px] bg-ink/30" />

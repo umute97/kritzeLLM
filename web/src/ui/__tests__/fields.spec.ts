@@ -49,9 +49,14 @@ describe('KTextField', () => {
     expect(ids[1]).toBe('token-tip')
   })
 
-  it('passes attributes to the input, not the wrapper', () => {
-    const wrapper = mount(KTextField, { props: { label: 'Token' }, attrs: { autocomplete: 'off' } })
+  it('passes attributes to the input, and layout classes to the field', () => {
+    const wrapper = mount(KTextField, {
+      props: { label: 'Token' },
+      attrs: { autocomplete: 'off', class: 'col-span-2' },
+    })
     expect(wrapper.get('input').attributes('autocomplete')).toBe('off')
+    expect(wrapper.classes()).toContain('col-span-2')
+    expect(wrapper.get('input').classes()).not.toContain('col-span-2')
   })
 
   it('lets you peek at a password', async () => {
@@ -88,12 +93,12 @@ describe('KTextArea', () => {
 
 describe('KSelect', () => {
   it('takes plain strings or options', async () => {
-    const wrapper = mount(KSelect, {
+    const wrapper = mount(KSelect<string>, {
       props: {
         label: 'Journal',
         options: ['All journals', { value: 'jrn_1', label: 'Green notebook' }],
         modelValue: 'All journals',
-        'onUpdate:modelValue': (v: string) => wrapper.setProps({ modelValue: v }),
+        'onUpdate:modelValue': (v?: string) => wrapper.setProps({ modelValue: v }),
       },
     })
     const options = wrapper.findAll('option')
@@ -143,7 +148,16 @@ describe('KCheckbox', () => {
     expect(wrapper.get('label').text()).toContain('Remember this token')
   })
 
-  it('gives form attributes to the checkbox and layout to the label', () => {
+  it('says what is wrong under the box', () => {
+    const wrapper = mount(KCheckbox, {
+      props: { label: 'I read the terms', error: 'Tick this to go on' },
+    })
+    const input = wrapper.get('input')
+    expect(input.attributes('aria-invalid')).toBe('true')
+    expect(wrapper.get(`#${input.attributes('aria-describedby')}`).text()).toContain('Tick this')
+  })
+
+  it('gives form attributes to the checkbox and layout to its wrapper', () => {
     const wrapper = mount(KCheckbox, {
       props: { label: 'Remember me' },
       attrs: { name: 'remember', 'aria-describedby': 'why', class: 'mt-4' },
@@ -152,8 +166,8 @@ describe('KCheckbox', () => {
     expect(input.attributes('name')).toBe('remember')
     expect(input.attributes('aria-describedby')).toBe('why')
     expect(input.classes()).not.toContain('mt-4')
-    expect(wrapper.get('label').classes()).toContain('mt-4')
-    expect(wrapper.get('label').attributes('name')).toBeUndefined()
+    expect(wrapper.classes()).toContain('mt-4')
+    expect(wrapper.attributes('name')).toBeUndefined()
   })
 })
 

@@ -28,6 +28,14 @@ describe('KStatusChip', () => {
     )
   })
 
+  it('speaks upload status, borrowing the page and job words', () => {
+    const chip = (status: 'queued' | 'duplicate' | 'ready') =>
+      mount(KStatusChip, { props: { kind: 'upload' as const, status } })
+    expect(chip('queued').text()).toBe('Waiting')
+    expect(chip('duplicate').text()).toBe('Already here')
+    expect(chip('ready').classes()).toContain('bg-herb-soft')
+  })
+
   it('falls back to plain words when a status of the other kind slips through', () => {
     // Templates refuse this at type level; the cast plays a caller that got around it.
     const wrapper = mount(KStatusChip, { props: { status: 'queued' as never } })

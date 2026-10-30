@@ -1,6 +1,9 @@
 // The cottage component library. Every screen is built from these pieces; the design notes live
 // in docs/design/README.md.
 
+export { createCottage, type CottageOptions } from './plugin'
+export type { LinkTarget } from './polymorphic'
+
 // Brand and icons
 export { default as KDoodle } from './KDoodle.vue'
 export { default as KIcon } from './KIcon.vue'
@@ -10,6 +13,7 @@ export { icons, type IconName } from './icons'
 // Buttons and fields
 export { default as KButton } from './KButton.vue'
 export { default as KCheckbox } from './KCheckbox.vue'
+export { default as KFieldNote } from './KFieldNote.vue'
 export { default as KFieldShell } from './KFieldShell.vue'
 export { default as KIconButton } from './KIconButton.vue'
 export { default as KSearchField } from './KSearchField.vue'
@@ -30,6 +34,7 @@ export { default as KStatusChip } from './KStatusChip.vue'
 // Feedback and overlays
 export { default as KBanner } from './KBanner.vue'
 export { default as KDialog } from './KDialog.vue'
+export { default as KIconBadge } from './KIconBadge.vue'
 export { default as KMenu } from './KMenu.vue'
 export { default as KToast } from './KToast.vue'
 export { default as KToastStack } from './KToastStack.vue'
@@ -40,8 +45,7 @@ export { AUTO_DISMISS_MS, useToasts, type Toast, type ToastOptions, type ToastTo
 export { default as KBreadcrumb } from './KBreadcrumb.vue'
 export { default as KLoadMore } from './KLoadMore.vue'
 export { default as KNavLink } from './KNavLink.vue'
-export { default as KPageStepper } from './KPageStepper.vue'
-export { default as KShelfPager } from './KShelfPager.vue'
+export { default as KPager } from './KPager.vue'
 export { default as KTopNav } from './KTopNav.vue'
 
 // Progress and empty states

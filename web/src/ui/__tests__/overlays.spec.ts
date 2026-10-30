@@ -33,6 +33,15 @@ describe('KDialog', () => {
     wrapper.unmount()
   })
 
+  it('can take a richer title at another heading level', () => {
+    const wrapper = mount(KDialog, {
+      props: { title: 'Rename', open: true, headingLevel: 3 },
+      slots: { title: 'Rename <em>Green notebook</em>' },
+    })
+    expect(wrapper.get('h3 em').text()).toBe('Green notebook')
+    wrapper.unmount()
+  })
+
   it('closes when the backdrop is clicked', async () => {
     const wrapper = mount(KDialog, {
       attachTo: document.body,

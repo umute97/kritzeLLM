@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import { useSplitAttrs } from './attrs'
 import KButton from './KButton.vue'
 import KIcon from './KIcon.vue'
 
 // Drop photos here or choose them. The caller checks the files and sets `error` to reject.
+defineOptions({ inheritAttrs: false })
+
 const props = withDefaults(
   defineProps<{
     title?: string
@@ -15,6 +18,7 @@ const props = withDefaults(
     /** Shown instead of the title, e.g. "notes.pdf isn't a photo". */
     error?: string
     errorHint?: string
+    headingLevel?: 2 | 3
   }>(),
   {
     title: 'Drop page photos here',
@@ -23,8 +27,11 @@ const props = withDefaults(
     multiple: true,
     error: undefined,
     errorHint: undefined,
+    headingLevel: 2,
   },
 )
+
+const { rootAttrs, controlAttrs } = useSplitAttrs()
 
 const emit = defineEmits<{ files: [files: File[]] }>()
 
@@ -58,6 +65,7 @@ function onPick(event: Event) {
 
 <template>
   <div
+    v-bind="rootAttrs()"
     :class="[
       'flex flex-col items-center justify-center gap-2 rounded-card px-6 py-9 text-center transition-[transform,background-color]',
       dragging
@@ -78,19 +86,19 @@ function onPick(event: Event) {
         :class="error && !dragging ? 'text-bark' : 'text-ink'"
       />
     </slot>
-    <h2 class="m-0 text-[26px] leading-tight" aria-live="polite">
+    <component :is="`h${headingLevel}`" class="m-0 text-[26px] leading-tight" aria-live="polite">
       {{ dragging ? 'Let go to tuck them in' : (error ?? title) }}
-    </h2>
+    </component>
     <p v-if="dragging" class="m-0 font-hand text-xl">
       {{ count === 1 ? '1 photo' : `${count} photos` }}
     </p>
     <p v-else class="m-0 max-w-[340px] text-sm" :class="error ? 'text-ink' : 'text-muted'">
       {{ error ? errorHint : hint }}
     </p>
-    <KButton as="label" class="relative mt-1.5" :disabled="disabled">
-      <template #icon><KIcon name="upload" /></template>
+    <KButton as="label" icon="upload" class="relative mt-1.5" :disabled="disabled">
       Choose photos
       <input
+        v-bind="controlAttrs()"
         type="file"
         class="sr-only"
         :accept="accept"

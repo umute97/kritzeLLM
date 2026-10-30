@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
 
-import { joinIds } from './attrs'
-import { fieldClass } from './field'
+import { joinIds, useSplitAttrs } from './attrs'
 import KFieldShell from './KFieldShell.vue'
+import { fieldClass } from './styles'
 
 defineOptions({ inheritAttrs: false })
 
@@ -26,10 +26,12 @@ const props = withDefaults(
 
 const autoId = useId()
 const fieldId = computed(() => props.id ?? autoId)
+const { rootAttrs, controlAttrs } = useSplitAttrs()
 </script>
 
 <template>
   <KFieldShell
+    v-bind="rootAttrs()"
     :id="fieldId"
     v-slot="{ describedby, invalid }"
     :label="label"
@@ -41,7 +43,7 @@ const fieldId = computed(() => props.id ?? autoId)
     <textarea
       :id="fieldId"
       v-model="model"
-      v-bind="$attrs"
+      v-bind="controlAttrs()"
       :rows="rows"
       :disabled="disabled"
       :placeholder="placeholder"

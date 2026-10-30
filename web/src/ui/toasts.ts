@@ -1,5 +1,7 @@
 import { computed, reactive } from 'vue'
 
+import type { IconName } from './icons'
+
 export type ToastTone = 'success' | 'info' | 'warning' | 'error' | 'loading'
 
 export interface ToastOptions {
@@ -7,7 +9,8 @@ export interface ToastOptions {
   title: string
   detail?: string
   /** Shown behind "Show details", e.g. the HTTP status of an API problem. */
-  details?: string
+  technical?: string
+  icon?: IconName
   action?: { label: string; run: () => void }
   progress?: { value: number; max: number }
   /** Milliseconds until it leaves on its own; `null` stays until dismissed. */

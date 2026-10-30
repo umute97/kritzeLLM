@@ -1,11 +1,12 @@
 <script setup lang="ts" generic="T extends string">
 import KIcon from './KIcon.vue'
+import { pillClass } from './styles'
 import type { Option } from './types'
 
 // Picked chips get a tick, not just colour.
 const model = defineModel<T>({ required: true })
 
-defineProps<{ label: string; options: Option<T>[] }>()
+defineProps<{ label: string; options: Option<T>[]; disabled?: boolean }>()
 </script>
 
 <template>
@@ -15,9 +16,10 @@ defineProps<{ label: string; options: Option<T>[] }>()
       :key="option.value"
       type="button"
       :aria-pressed="option.value === model"
+      :disabled="disabled"
       :class="[
-        'inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border-[1.5px] border-ink px-4 text-sm font-bold text-ink',
-        option.value === model ? 'bg-accent' : 'bg-paper hover:bg-cream',
+        pillClass({ on: option.value === model, framed: true, disabled }),
+        'min-h-10 px-4 text-sm',
       ]"
       @click="model = option.value"
     >

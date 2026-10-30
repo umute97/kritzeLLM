@@ -13,7 +13,7 @@ export function toastError(error: unknown, title: string, retry?: () => void) {
     tone: 'error',
     title,
     detail: problem?.detail ?? problem?.title ?? 'Something went wrong. Try again in a moment.',
-    details: problem ? `${problem.status} ${problem.title}` : undefined,
+    technical: problem ? `${problem.status} ${problem.title}` : undefined,
     action: retry ? { label: 'Try again', run: retry } : undefined,
   })
 }

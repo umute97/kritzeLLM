@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { Component } from 'vue'
-
 import KHighlight from './KHighlight.vue'
 import KIcon from './KIcon.vue'
+import { useLinkComponent } from './plugin'
+import { linkAttrs, type LinkTarget } from './polymorphic'
 
 // A cited page in the Sources panel. The picked one lifts and its quote takes the accent.
 withDefaults(
@@ -12,27 +12,27 @@ withDefaults(
     before?: string
     quote: string
     after?: string
-    active?: boolean
-    linkAs?: string | Component
-    to?: string | Record<string, unknown>
+    selected?: boolean
+    to?: LinkTarget
     linkLabel?: string
   }>(),
   {
     date: undefined,
     before: '',
     after: '',
-    linkAs: 'a',
     to: undefined,
     linkLabel: 'Open the page',
   },
 )
+
+const link = useLinkComponent()
 </script>
 
 <template>
   <div
     :class="[
       'flex flex-col gap-2.5 rounded-field bg-paper p-3',
-      active ? 'border-2 border-ink shadow-[0_5px_0_rgb(61_43_34/0.25)]' : 'border border-line',
+      selected ? 'border-2 border-ink shadow-soft' : 'border border-line',
     ]"
   >
     <div class="flex items-baseline justify-between gap-2">
@@ -42,13 +42,12 @@ withDefaults(
     <p
       class="paper-lines m-0 rounded border border-sand px-3 py-2.5 font-hand text-[19px] leading-[26px] [--line:26px]"
     >
-      <KHighlight :before="before" :hit="quote" :after="after" :soft="!active" />
+      <KHighlight :before="before" :hit="quote" :after="after" :soft="!selected" />
     </p>
     <component
-      :is="linkAs"
+      :is="link"
       v-if="to"
-      :to="to"
-      :href="typeof to === 'string' ? to : undefined"
+      v-bind="linkAttrs(link, to)"
       class="inline-flex items-center gap-1.5 self-start text-sm font-bold"
     >
       {{ linkLabel }}

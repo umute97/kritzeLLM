@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, useId } from 'vue'
 
-import { joinIds } from './attrs'
-import { fieldClass } from './field'
+import { joinIds, useSplitAttrs } from './attrs'
 import KFieldShell from './KFieldShell.vue'
-import KIcon from './KIcon.vue'
+import KIconButton from './KIconButton.vue'
+import { fieldClass } from './styles'
 
 defineOptions({ inheritAttrs: false })
 
@@ -33,10 +33,12 @@ const revealed = ref(false)
 const inputType = computed(() =>
   props.type === 'password' && revealed.value ? 'text' : props.type,
 )
+const { rootAttrs, controlAttrs } = useSplitAttrs()
 </script>
 
 <template>
   <KFieldShell
+    v-bind="rootAttrs()"
     :id="fieldId"
     v-slot="{ describedby, invalid }"
     :label="label"
@@ -49,7 +51,7 @@ const inputType = computed(() =>
       <input
         :id="fieldId"
         v-model="model"
-        v-bind="$attrs"
+        v-bind="controlAttrs()"
         :type="inputType"
         :disabled="disabled"
         :placeholder="placeholder"
@@ -57,16 +59,15 @@ const inputType = computed(() =>
         :aria-describedby="joinIds(describedby, $attrs['aria-describedby'])"
         :class="[fieldClass({ invalid, disabled }), 'min-h-[46px] px-4', revealable && 'pr-12']"
       />
-      <button
+      <KIconButton
         v-if="revealable"
-        type="button"
-        class="absolute top-1/2 right-0.5 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-ink"
-        :aria-label="revealed ? `Hide ${label}` : `Show ${label}`"
-        :aria-pressed="revealed"
+        :icon="revealed ? 'eye-off' : 'eye'"
+        :label="revealed ? `Hide ${label}` : `Show ${label}`"
+        variant="quiet"
+        :pressed="revealed"
+        class="absolute top-1/2 right-0.5 -translate-y-1/2"
         @click="revealed = !revealed"
-      >
-        <KIcon :name="revealed ? 'eye-off' : 'eye'" :size="20" />
-      </button>
+      />
     </div>
   </KFieldShell>
 </template>

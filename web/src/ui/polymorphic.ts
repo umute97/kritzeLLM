@@ -1,6 +1,15 @@
-import { computed, toValue, type Component, type MaybeRefOrGetter } from 'vue'
+import { computed, type Component } from 'vue'
+
+import { useLinkComponent } from './plugin'
 
 type ButtonType = 'button' | 'submit' | 'reset'
+
+export type LinkTarget = string | Record<string, unknown>
+
+/** `to` for a link component, `href` for a plain `<a>` (which can only follow a path). */
+export function linkAttrs(is: string | Component, to: LinkTarget) {
+  return typeof is === 'string' ? { href: typeof to === 'string' ? to : undefined } : { to }
+}
 
 function stay(event: Event) {
   event.preventDefault()
@@ -8,18 +17,28 @@ function stay(event: Event) {
 }
 
 /**
- * Attributes for something that is a `<button>` unless `as` makes it a link. A link has no
- * native `disabled`, so an inactive one says `aria-disabled`, leaves the tab order and swallows
- * the click before the router sees it.
+ * What to render and with which attributes, for something that can be a button or a link.
+ * `as` wins; otherwise `to` makes it the app's link component (see `createCottage`), and
+ * without either it's `fallback`. A link has no native `disabled`, so an inactive one says
+ * `aria-disabled`, leaves the tab order and swallows the click before the router sees it.
  */
 export function usePolymorphic(
-  as: MaybeRefOrGetter<string | Component>,
-  inactive: MaybeRefOrGetter<boolean | undefined>,
-  type: MaybeRefOrGetter<ButtonType> = 'button',
+  source: () => {
+    as?: string | Component
+    to?: LinkTarget
+    inactive?: boolean
+    type?: ButtonType
+  },
+  fallback: string | Component = 'button',
 ) {
+  const link = useLinkComponent()
   return computed(() => {
-    const off = !!toValue(inactive)
-    if (toValue(as) === 'button') return { type: toValue(type), disabled: off }
-    return off ? { 'aria-disabled': 'true' as const, tabindex: -1, onClickCapture: stay } : {}
+    const { as, to, inactive, type = 'button' } = source()
+    const is = as ?? (to !== undefined ? link : fallback)
+    const attrs: Record<string, unknown> = to !== undefined ? linkAttrs(is, to) : {}
+    if (is === 'button') Object.assign(attrs, { type, disabled: !!inactive })
+    else if (inactive)
+      Object.assign(attrs, { 'aria-disabled': 'true', tabindex: -1, onClickCapture: stay })
+    return { is, attrs }
   })
 }

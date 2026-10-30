@@ -20,3 +20,7 @@ export function useSplitAttrs() {
       ),
   }
 }
+
+export function noteId(id: string, note: { help?: string; error?: string }) {
+  return note.error ? `${id}-error` : note.help ? `${id}-help` : undefined
+}

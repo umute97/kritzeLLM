@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, useId, useTemplateRef } from 'vue'
 
+import { joinIds, useSplitAttrs } from './attrs'
+import KFieldShell from './KFieldShell.vue'
 import KIcon from './KIcon.vue'
+import KIconButton from './KIconButton.vue'
+import { focusWithinRing } from './styles'
 
 // Round like the buttons, and a search form of its own: Enter or a submit button in the
 // trailing slot searches. So don't put it inside another form.
@@ -19,6 +23,7 @@ const emit = defineEmits<{ search: [query: string] }>()
 const autoId = useId()
 const fieldId = computed(() => props.id ?? autoId)
 const input = useTemplateRef('input')
+const { rootAttrs, controlAttrs } = useSplitAttrs()
 
 function clear() {
   model.value = ''
@@ -27,41 +32,40 @@ function clear() {
 </script>
 
 <template>
-  <form
-    role="search"
-    :class="[
-      'flex items-center gap-1 rounded-full border-ink bg-paper pl-4 focus-within:ring-4 focus-within:ring-accent/55',
-      size === 'lg'
-        ? 'min-h-14 border-2 pl-5 shadow-[0_4px_0_rgb(61_43_34/0.15)]'
-        : 'min-h-[46px] border-[1.5px]',
-    ]"
-    @submit.prevent="emit('search', model)"
-  >
-    <KIcon name="search" :size="size === 'lg' ? 22 : 18" class="text-ink" />
-    <label :for="fieldId" class="sr-only">{{ label }}</label>
-    <input
-      :id="fieldId"
-      ref="input"
-      v-model="model"
-      v-bind="$attrs"
-      type="search"
-      :placeholder="placeholder"
-      :class="[
-        'min-w-0 flex-1 bg-transparent px-2 text-ink placeholder:text-hint focus:outline-none [&::-webkit-search-cancel-button]:hidden',
-        size === 'lg' ? 'h-13 text-lg' : 'h-11 text-base',
-      ]"
-    />
-    <button
-      v-if="model"
-      type="button"
-      aria-label="Clear search"
-      class="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-ink hover:bg-ink/5"
-      @click="clear"
-    >
-      <KIcon name="close" :size="16" />
-    </button>
-    <div v-if="$slots.default" class="pr-1.5">
-      <slot />
-    </div>
+  <form v-bind="rootAttrs()" role="search" @submit.prevent="emit('search', model)">
+    <KFieldShell :id="fieldId" v-slot="{ describedby }" :label="label" label-hidden>
+      <div
+        :class="[
+          'flex items-center gap-1 rounded-full border-ink bg-paper pl-4',
+          focusWithinRing,
+          size === 'lg' ? 'min-h-14 border-2 pl-5 shadow-soft' : 'min-h-[46px] border-[1.5px]',
+        ]"
+      >
+        <KIcon name="search" :size="size === 'lg' ? 22 : 18" class="text-ink" />
+        <input
+          :id="fieldId"
+          ref="input"
+          v-model="model"
+          v-bind="controlAttrs()"
+          type="search"
+          :placeholder="placeholder"
+          :aria-describedby="joinIds(describedby, $attrs['aria-describedby'])"
+          :class="[
+            'min-w-0 flex-1 bg-transparent px-2 text-ink placeholder:text-hint focus:outline-none [&::-webkit-search-cancel-button]:hidden',
+            size === 'lg' ? 'h-13 text-lg' : 'h-11 text-base',
+          ]"
+        />
+        <KIconButton
+          v-if="model"
+          icon="close"
+          label="Clear search"
+          variant="quiet"
+          @click="clear"
+        />
+        <div v-if="$slots.default" class="pr-1.5">
+          <slot />
+        </div>
+      </div>
+    </KFieldShell>
   </form>
 </template>

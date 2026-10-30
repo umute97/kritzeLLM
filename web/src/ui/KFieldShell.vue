@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
 
-import KIcon from './KIcon.vue'
+import { noteId } from './attrs'
+import KFieldNote from './KFieldNote.vue'
 
 // A label above, help or an error below, never just a placeholder.
 const props = defineProps<{
@@ -15,9 +16,7 @@ const props = defineProps<{
 
 const autoId = useId()
 const id = computed(() => props.id ?? autoId)
-const describedby = computed(() =>
-  props.error ? `${id.value}-error` : props.help ? `${id.value}-help` : undefined,
-)
+const describedby = computed(() => noteId(id.value, props))
 </script>
 
 <template>
@@ -27,14 +26,6 @@ const describedby = computed(() =>
       <span v-if="optional" class="font-normal text-muted">(optional)</span>
     </label>
     <slot :id="id" :describedby="describedby" :invalid="!!error" />
-    <p
-      v-if="error"
-      :id="`${id}-error`"
-      class="flex items-center gap-1.5 text-sm font-bold text-bark"
-    >
-      <KIcon name="alert-circle" :size="16" />
-      {{ error }}
-    </p>
-    <p v-else-if="help" :id="`${id}-help`" class="text-[13px] text-muted">{{ help }}</p>
+    <KFieldNote :id="id" :help="help" :error="error" />
   </div>
 </template>

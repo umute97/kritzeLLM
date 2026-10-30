@@ -85,6 +85,12 @@ describe('KDropzone', () => {
     expect(wrapper.emitted('files')).toEqual([[[photo]]])
   })
 
+  it('gives input attributes to the file input', () => {
+    const wrapper = mount(KDropzone, { attrs: { capture: 'environment', class: 'flex-1' } })
+    expect(wrapper.get('input[type="file"]').attributes('capture')).toBe('environment')
+    expect(wrapper.classes()).toContain('flex-1')
+  })
+
   it('says what went wrong', () => {
     const wrapper = mount(KDropzone, {
       props: { error: 'notes.pdf isn’t a photo', errorHint: 'PDF import is coming.' },

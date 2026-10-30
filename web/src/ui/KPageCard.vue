@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
 
+import { useSplitAttrs } from './attrs'
 import KButton from './KButton.vue'
+import { usePolymorphic, type LinkTarget } from './polymorphic'
 import KSpinner from './KSpinner.vue'
 import KStatusChip from './KStatusChip.vue'
 import type { PageStatus } from './types'
 
 // A page pinned to the board. Without a photo yet it shows lined paper (and an excerpt if any).
-// Attributes such as `href` or `to` go to the link, not the outer frame.
+// `class` and `style` place the tilted frame; other attributes go to the link.
 defineOptions({ inheritAttrs: false })
 
 const props = withDefaults(
@@ -21,6 +23,7 @@ const props = withDefaults(
     tilt?: number
     selected?: boolean
     failedText?: string
+    to?: LinkTarget
     as?: string | Component
   }>(),
   {
@@ -29,9 +32,13 @@ const props = withDefaults(
     excerpt: undefined,
     tilt: 0,
     failedText: 'couldn’t read this one',
-    as: 'a',
+    to: undefined,
+    as: undefined,
   },
 )
+
+const element = usePolymorphic(() => ({ as: props.as, to: props.to }), 'a')
+const { rootAttrs, controlAttrs } = useSplitAttrs()
 
 const emit = defineEmits<{ retry: [] }>()
 
@@ -43,17 +50,18 @@ const failed = computed(() => props.status === 'failed')
 
 <template>
   <div
+    v-bind="rootAttrs()"
     class="group relative rotate-(--tilt) transition-[rotate,translate] duration-150 focus-within:rotate-0 hover:-translate-y-1 hover:rotate-0"
     :style="{ '--tilt': `${tilt}deg` }"
   >
     <component
-      :is="as"
-      v-bind="$attrs"
+      :is="element.is"
+      v-bind="{ ...controlAttrs(), ...element.attrs }"
       :class="[
         'flex flex-col gap-2.5 rounded-field bg-paper p-3 pb-3.5 text-ink no-underline hover:text-ink',
         selected
-          ? 'border-[2.5px] border-ink shadow-[0_8px_0_var(--color-ink)]'
-          : 'border border-line shadow-pin group-hover:border-ink group-hover:shadow-[0_8px_0_var(--color-ink)]',
+          ? 'border-[2.5px] border-ink shadow-lift-lg'
+          : 'border border-line shadow-pin group-hover:border-ink group-hover:shadow-lift-lg',
       ]"
     >
       <span class="relative block h-[190px] overflow-hidden rounded border border-sand">

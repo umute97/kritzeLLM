@@ -47,14 +47,14 @@ describe('KComposer', () => {
 describe('KMessage', () => {
   it('shows a caret while streaming and raises an alert when it broke off', () => {
     const streaming = mount(KMessage, {
-      props: { role: 'assistant', streaming: true },
+      props: { author: 'assistant', streaming: true },
       slots: { default: 'They bloomed in late May' },
     })
     expect(streaming.find('.animate-blink').exists()).toBe(true)
     expect(streaming.find('[aria-live="polite"]').exists()).toBe(true)
 
     const broken = mount(KMessage, {
-      props: { role: 'assistant', error: true },
+      props: { author: 'assistant', error: true },
       slots: { default: 'The answer stopped halfway.', actions: '<button>Ask again</button>' },
     })
     expect(broken.attributes('role')).toBe('alert')
@@ -62,7 +62,7 @@ describe('KMessage', () => {
   })
 
   it('puts your own messages on the right', () => {
-    const mine = mount(KMessage, { props: { role: 'user' }, slots: { default: 'Hi' } })
+    const mine = mount(KMessage, { props: { author: 'user' }, slots: { default: 'Hi' } })
     expect(mine.classes()).toContain('self-end')
   })
 })
@@ -92,7 +92,9 @@ describe('KToolActivity', () => {
 describe('KCitationChip and KSourceCard', () => {
   it('press the chip that is shown in Sources', () => {
     expect(
-      mount(KCitationChip, { props: { label: 'p. 12', active: true } }).attributes('aria-pressed'),
+      mount(KCitationChip, { props: { label: 'p. 12', selected: true } }).attributes(
+        'aria-pressed',
+      ),
     ).toBe('true')
     expect(mount(KCitationChip, { props: { label: 'p. 14' } }).attributes('aria-pressed')).toBe(
       'false',

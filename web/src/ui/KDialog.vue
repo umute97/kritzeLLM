@@ -13,11 +13,12 @@ const props = withDefaults(
   defineProps<{
     title: string
     description?: string
-    width?: 'sm' | 'md'
+    size?: 'sm' | 'md'
+    headingLevel?: 2 | 3
     form?: boolean
     dismissible?: boolean
   }>(),
-  { description: undefined, width: 'sm', dismissible: true },
+  { description: undefined, size: 'sm', headingLevel: 2, dismissible: true },
 )
 
 const emit = defineEmits<{ submit: [] }>()
@@ -59,10 +60,10 @@ function onSubmit(event: Event) {
   <dialog
     ref="dialog"
     :aria-labelledby="titleId"
-    :aria-describedby="description ? descriptionId : undefined"
+    :aria-describedby="description || $slots.description ? descriptionId : undefined"
     :class="[
       'm-auto w-[calc(100%-2rem)] overflow-visible rounded-card border-[1.5px] border-ink bg-cream p-0 text-ink shadow-pop backdrop:bg-ink/50',
-      width === 'sm' ? 'max-w-[420px]' : 'max-w-[460px]',
+      size === 'sm' ? 'max-w-[420px]' : 'max-w-[460px]',
     ]"
     @cancel="onCancel"
     @close="open = false"
@@ -76,18 +77,22 @@ function onSubmit(event: Event) {
     >
       <slot name="decoration" />
       <div class="flex items-start justify-between gap-3">
-        <h2 :id="titleId" class="m-0 text-[26px] leading-tight">{{ title }}</h2>
+        <component :is="`h${headingLevel}`" :id="titleId" class="m-0 text-[26px] leading-tight">
+          <slot name="title">{{ title }}</slot>
+        </component>
         <KIconButton
           icon="close"
           label="Close"
-          variant="plain"
+          variant="quiet"
           size="sm"
           :disabled="!dismissible"
           class="-mt-1 -mr-2.5"
           @click="dismiss"
         />
       </div>
-      <p v-if="description" :id="descriptionId" class="m-0">{{ description }}</p>
+      <p v-if="description || $slots.description" :id="descriptionId" class="m-0">
+        <slot name="description">{{ description }}</slot>
+      </p>
       <slot />
       <div v-if="$slots.footer" class="mt-2 flex flex-wrap justify-end gap-2.5">
         <slot name="footer" />

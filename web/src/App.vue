@@ -40,8 +40,8 @@ watch(
           <KLogo />
         </RouterLink>
       </template>
-      <KNavLink :as="RouterLink" to="/" active>Pages</KNavLink>
-      <template #end>hi there</template>
+      <KNavLink to="/" current>Pages</KNavLink>
+      <template #end><span class="font-hand text-xl text-bark">hi there</span></template>
     </KTopNav>
 
     <div

@@ -1,8 +1,19 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { defineComponent, h } from 'vue'
 
 import KButton from '../KButton.vue'
 import KIconButton from '../KIconButton.vue'
+import { createCottage } from '../plugin'
+
+// Stands in for RouterLink: renders an anchor that shows where `to` pointed.
+const FakeLink = defineComponent({
+  props: { to: { type: [String, Object], required: true } },
+  setup:
+    (props, { slots }) =>
+    () =>
+      h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()),
+})
 
 describe('KButton', () => {
   it('is a plain button that clicks', async () => {
@@ -52,6 +63,27 @@ describe('KButton', () => {
     const click = new MouseEvent('click', { bubbles: true, cancelable: true })
     link.element.dispatchEvent(click)
     expect(click.defaultPrevented).toBe(false)
+  })
+
+  it('becomes the app’s link component when it has `to`', () => {
+    const wrapper = mount(KButton, {
+      props: { to: { name: 'journal' } },
+      slots: { default: 'Open' },
+      global: { plugins: [createCottage({ link: FakeLink })] },
+    })
+    expect(wrapper.findComponent(FakeLink).exists()).toBe(true)
+    expect(wrapper.get('a').attributes('data-to')).toBe('{"name":"journal"}')
+    expect(wrapper.get('a').attributes('type')).toBeUndefined()
+  })
+
+  it('is a plain link to a path without a link component', () => {
+    const wrapper = mount(KButton, { props: { to: '/journals' }, slots: { default: 'Open' } })
+    expect(wrapper.get('a').attributes('href')).toBe('/journals')
+  })
+
+  it('takes a leading icon', () => {
+    const wrapper = mount(KButton, { props: { icon: 'plus' }, slots: { default: 'New journal' } })
+    expect(wrapper.find('svg').exists()).toBe(true)
   })
 
   it('looks dashed when disabled, whatever the variant', () => {

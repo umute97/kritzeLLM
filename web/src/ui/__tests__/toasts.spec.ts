@@ -57,7 +57,7 @@ describe('useToasts', () => {
 describe('KToast', () => {
   it('raises an alert for errors and hides details until asked', async () => {
     const wrapper = mount(KToast, {
-      props: { tone: 'error', title: 'Couldn’t save', details: '409 Conflict' },
+      props: { tone: 'error', title: 'Couldn’t save', technical: '409 Conflict' },
     })
     expect(wrapper.attributes('role')).toBe('alert')
     expect(wrapper.find('code').exists()).toBe(false)
@@ -65,6 +65,14 @@ describe('KToast', () => {
     await toggle.trigger('click')
     expect(wrapper.get('code').text()).toBe('409 Conflict')
     expect(toggle.text()).toBe('Hide details')
+  })
+
+  it('takes an icon that says it better than its tone', () => {
+    const plain = mount(KToast, { props: { tone: 'warning', title: 'Already reading' } })
+    const custom = mount(KToast, {
+      props: { tone: 'warning', title: 'Lost the connection', icon: 'reconnect' },
+    })
+    expect(plain.get('svg path').attributes('d')).not.toBe(custom.get('svg path').attributes('d'))
   })
 
   it('is a polite status otherwise, with a working dismiss and action', async () => {

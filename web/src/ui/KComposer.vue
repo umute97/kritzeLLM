@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed } from 'vue'
 
+import { useSplitAttrs } from './attrs'
 import KButton from './KButton.vue'
+import KFieldShell from './KFieldShell.vue'
 import KIconButton from './KIconButton.vue'
+import { focusWithinRing } from './styles'
 
 // The writing box. Enter sends, Shift+Enter adds a line; while an answer streams, send becomes stop.
+defineOptions({ inheritAttrs: false })
+
 const text = defineModel<string>({ default: '' })
 
 const props = withDefaults(
@@ -14,8 +19,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{ send: [text: string]; stop: [] }>()
 
-const id = useId()
 const canSend = computed(() => !props.disabled && !props.streaming && text.value.trim() !== '')
+const { rootAttrs, controlAttrs } = useSplitAttrs()
 
 function send() {
   if (canSend.value) emit('send', text.value.trim())
@@ -31,19 +36,25 @@ function onKeydown(event: KeyboardEvent) {
 
 <template>
   <form
-    class="flex items-end gap-2.5 rounded-card border-[1.5px] border-ink bg-paper p-2 focus-within:ring-4 focus-within:ring-accent/45"
+    v-bind="rootAttrs()"
+    :class="[
+      'flex items-end gap-2.5 rounded-card border-[1.5px] border-ink bg-paper p-2',
+      focusWithinRing,
+    ]"
     @submit.prevent="send"
   >
-    <label :for="id" class="sr-only">{{ label }}</label>
-    <textarea
-      :id="id"
-      v-model="text"
-      rows="2"
-      :placeholder="placeholder"
-      :disabled="disabled"
-      class="min-w-0 flex-1 resize-none bg-transparent px-2.5 py-2 leading-normal text-ink placeholder:text-hint focus:outline-none"
-      @keydown="onKeydown"
-    />
+    <KFieldShell v-slot="{ id }" :label="label" label-hidden class="min-w-0 flex-1">
+      <textarea
+        :id="id"
+        v-model="text"
+        v-bind="controlAttrs()"
+        rows="2"
+        :placeholder="placeholder"
+        :disabled="disabled"
+        class="w-full resize-none bg-transparent px-2.5 py-2 leading-normal text-ink placeholder:text-hint focus:outline-none"
+        @keydown="onKeydown"
+      />
+    </KFieldShell>
     <KButton v-if="streaming" variant="second" class="min-h-[46px]" @click="emit('stop')">
       <template #icon><span aria-hidden="true" class="size-3 rounded-[3px] bg-ink" /></template>
       Stop
