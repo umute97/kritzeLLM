@@ -1697,6 +1697,72 @@
           }
         }
       }
+    },
+    "/admin/reindex": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Re-index every page",
+        "description": "Chunks and embeds every ready page again, e.g. after switching the embedding model.\n\nPages stay searchable with their old chunks until their new ones are in. Calls made while a\nre-index is still queued share its job.",
+        "operationId": "reindexAll",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "headers": {
+              "Location": {
+                "description": "URL of the job to poll.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request couldn't be parsed (e.g. malformed JSON or multipart).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong bearer token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Some values are invalid (including malformed IDs). Each one is listed in `errors`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1891,11 +1957,17 @@
             "type": "string",
             "title": "Transcribe",
             "description": "Model that reads page images."
+          },
+          "embed": {
+            "type": "string",
+            "title": "Embed",
+            "description": "Model that embeds page text for search."
           }
         },
         "type": "object",
         "required": [
-          "transcribe"
+          "transcribe",
+          "embed"
         ],
         "title": "ConfiguredModels",
         "description": "The OpenAI models the server is configured with."
@@ -1970,7 +2042,15 @@
             "$ref": "#/components/schemas/JobStatus"
           },
           "target": {
-            "$ref": "#/components/schemas/JobTarget"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobTarget"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the job works on; `null` for jobs over the whole library (`reindexAll`)."
           },
           "progress": {
             "anyOf": [
@@ -2049,7 +2129,8 @@
         "enum": [
           "ingestPage",
           "transcribePage",
-          "reindexPage"
+          "reindexPage",
+          "reindexAll"
         ],
         "title": "JobKind",
         "description": "What a job does."
@@ -2875,6 +2956,10 @@
     {
       "name": "jobs",
       "description": "Background work and its progress."
+    },
+    {
+      "name": "admin",
+      "description": "Upkeep of the whole library."
     }
   ]
 }

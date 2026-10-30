@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from conftest import FakeVisionModel, get_job, get_page, new_journal, upload
+from conftest import FakeVisionModel, chunks_of, get_job, get_page, new_journal, ok, upload
 from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from kritzellm import worker as worker_module
 from kritzellm.api.schemas.jobs import JobKind, JobStatus
 from kritzellm.config import Settings
-from kritzellm.core import jobs
+from kritzellm.core import indexing, jobs
+from kritzellm.core.embeddings import EMBED_DIMENSIONS
 from kritzellm.core.storage import Staging
 from kritzellm.db import models as db
 from kritzellm.ids import Prefix, new_id
@@ -68,6 +69,7 @@ def test_a_duplicate_gets_the_pages_latest_job(
 def test_the_worker_transcribes_the_page(
     db_client: TestClient,
     make_image: MakeImage,
+    settings: Settings,
     work: Callable[[], None],
     vision_model: FakeVisionModel,
 ) -> None:
@@ -94,6 +96,10 @@ def test_the_worker_transcribes_the_page(
     ]
     assert all(b["id"].startswith("blk_") and b["pageId"] == page["id"] for b in page["blocks"])
     assert len(vision_model.calls) == 1
+    (chunk,) = chunks_of(str(settings.database_url), page["id"])
+    assert chunk.block_ids == [b["id"] for b in page["blocks"]]
+    assert chunk.text == "14. März\n\nEndlich beim Arzt gewesen.\n\nanrufen [?]"
+    assert (chunk.embed_model, len(chunk.embedding)) == ("test", EMBED_DIMENSIONS)
 
 
 def test_the_fake_model_needs_no_key(
@@ -106,6 +112,64 @@ def test_the_fake_model_needs_no_key(
     page = get_page(db_client, item["page"]["id"])
     assert page["status"] == "ready"
     assert page["blocks"]
+
+
+def test_a_blank_page_has_no_chunks(
+    db_client: TestClient,
+    make_image: MakeImage,
+    settings: Settings,
+    work: Callable[[], None],
+    vision_model: FakeVisionModel,
+) -> None:
+    (item,) = upload(db_client, new_journal(db_client), make_image(color="white"))
+
+    work()
+
+    assert get_page(db_client, item["page"]["id"])["status"] == "ready"
+    assert chunks_of(str(settings.database_url), item["page"]["id"]) == []
+
+
+def test_an_edited_block_is_indexed_again(
+    db_client: TestClient,
+    make_image: MakeImage,
+    settings: Settings,
+    work: Callable[[], None],
+    vision_model: FakeVisionModel,
+) -> None:
+    vision_model.outputs = [PAGE]
+    (item,) = upload(db_client, new_journal(db_client), make_image(color="olive"))
+    work()
+    block = get_page(db_client, item["page"]["id"])["blocks"][1]
+
+    edit = ok(db_client.patch(f"/blocks/{block['id']}", json={"text": "Nicht beim Arzt."}))
+    work()
+
+    assert get_job(db_client, edit["job"]["id"])["status"] == "succeeded"
+    (chunk,) = chunks_of(str(settings.database_url), item["page"]["id"])
+    assert chunk.text == "14. März\n\nNicht beim Arzt.\n\nanrufen [?]"
+
+
+def test_failing_to_embed_fails_the_page(
+    db_client: TestClient,
+    make_image: MakeImage,
+    settings: Settings,
+    work: Callable[[], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def no_vectors(texts: list[str], settings: Settings) -> list[list[float]]:
+        raise RuntimeError("OpenAI is down")
+
+    monkeypatch.setattr(indexing, "embed", no_vectors)
+    (item,) = upload(db_client, new_journal(db_client), make_image(color="maroon"))
+
+    work()
+
+    job = get_job(db_client, item["job"]["id"])
+    assert (job["status"], job["error"]["detail"]) == ("failed", "OpenAI is down")
+    page = get_page(db_client, item["page"]["id"])
+    assert (page["status"], page["error"]) == ("failed", job["error"])
+    assert page["blocks"]
+    assert chunks_of(str(settings.database_url), item["page"]["id"]) == []
 
 
 def test_label_and_dates_set_by_hand_are_kept(
@@ -259,7 +323,8 @@ def test_a_failed_upload_leaves_no_pages_files_or_jobs(
 
     assert db_client.get(f"/pages?journalId={journal_id}").json()["items"] == []
     assert not (data_dir / "pages").exists() or not any((data_dir / "pages").iterdir())
-    listed = {job["target"]["id"] for job in db_client.get("/jobs?limit=100").json()["items"]}
+    jobs_listed = db_client.get("/jobs?limit=100").json()["items"]
+    listed = {job["target"]["id"] for job in jobs_listed if job["target"]}
     assert listed.isdisjoint(calls)
 
 

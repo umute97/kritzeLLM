@@ -23,7 +23,7 @@ from kritzellm.api.schemas.common import Problem
 from kritzellm.api.schemas.jobs import JobKind
 from kritzellm.api.schemas.pages import ImageVariant, PageStatus
 from kritzellm.config import Settings, get_settings
-from kritzellm.core import jobs
+from kritzellm.core import indexing, jobs
 from kritzellm.core import pages as core_pages
 from kritzellm.core.storage import variant_path
 from kritzellm.core.transcribe import transcribe
@@ -50,6 +50,7 @@ READ_STEPS = 2
 async def read_page(session: AsyncSession, job: db.Job, settings: Settings) -> None:
     """Reads a page into blocks (afresh, if it was read before), then indexes them."""
     job_id, page_id = job.id, job.page_id
+    assert page_id is not None
     page = await session.get(db.Page, page_id)
     if page is None:
         return  # The page was deleted, and its job with it.
@@ -65,31 +66,51 @@ async def read_page(session: AsyncSession, job: db.Job, settings: Settings) -> N
     model = settings.transcribe_model
     if not await core_pages.save_transcription(session, page_id, transcription, model):
         return
-    await _index(session, job_id, page_id, done=1, total=READ_STEPS)
+    await _index(session, job_id, page_id, settings, done=1, total=READ_STEPS)
 
 
 async def reindex_page(session: AsyncSession, job: db.Job, settings: Settings) -> None:
     """Indexes a page again after its blocks were edited."""
-    await _index(session, job.id, job.page_id, done=0, total=1)
+    assert job.page_id is not None
+    await _index(session, job.id, job.page_id, settings, done=0, total=1)
 
 
 async def _index(
-    session: AsyncSession, job_id: str, page_id: str, *, done: int, total: int
+    session: AsyncSession, job_id: str, page_id: str, settings: Settings, *, done: int, total: int
 ) -> None:
-    """The last step of a page job: indexing its blocks for search. Still a placeholder."""
+    """The last step of a page job: chunking and embedding its blocks for search."""
     if not await core_pages.set_status(session, page_id, PageStatus.INDEXING):
         return
     await jobs.set_progress(session, job_id, done, total)
     await session.commit()
 
+    if not await indexing.index_page(session, page_id, settings):
+        return
     await core_pages.set_status(session, page_id, PageStatus.READY)
     await jobs.set_progress(session, job_id, total, total)
+
+
+async def reindex_all(session: AsyncSession, job: db.Job, settings: Settings) -> None:
+    """Indexes every ready page again, e.g. after switching `EMBED_MODEL`.
+
+    Each page is saved on its own and stays `ready` throughout, keeping its old chunks until the
+    new ones are in.
+    """
+    job_id = job.id
+    page_ids = await indexing.ready_page_ids(session)
+    await jobs.set_progress(session, job_id, 0, len(page_ids))
+    await session.commit()
+    for done, page_id in enumerate(page_ids, start=1):
+        await indexing.index_page(session, page_id, settings)
+        await jobs.set_progress(session, job_id, done, len(page_ids))
+        await session.commit()
 
 
 HANDLERS: dict[JobKind, Handler] = {
     JobKind.INGEST_PAGE: read_page,
     JobKind.TRANSCRIBE_PAGE: read_page,
     JobKind.REINDEX_PAGE: reindex_page,
+    JobKind.REINDEX_ALL: reindex_all,
 }
 
 
@@ -155,7 +176,8 @@ class Worker:
                 await session.rollback()
                 problem = _problem(exc)
                 await jobs.fail(session, job_id, problem)
-                await core_pages.set_status(session, page_id, PageStatus.FAILED, error=problem)
+                if page_id is not None:
+                    await core_pages.set_status(session, page_id, PageStatus.FAILED, error=problem)
                 await session.commit()
             else:
                 elapsed = time.perf_counter() - started

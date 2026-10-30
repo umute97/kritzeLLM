@@ -4,6 +4,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     CheckConstraint,
     Date,
@@ -12,6 +13,7 @@ from sqlalchemy import (
     Index,
     LargeBinary,
     MetaData,
+    PrimaryKeyConstraint,
     String,
     Text,
     UniqueConstraint,
@@ -26,6 +28,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, column_property, mapped_colu
 from kritzellm.api.schemas.blocks import BlockKind
 from kritzellm.api.schemas.jobs import JobKind, JobStatus
 from kritzellm.api.schemas.pages import PageStatus
+from kritzellm.core.embeddings import EMBED_DIMENSIONS
 from kritzellm.ids import Prefix, new_id
 
 from .types import TypeId
@@ -158,6 +161,7 @@ class Job(Base):
         CheckConstraint("progress_done BETWEEN 0 AND progress_total", name="progress_in_range"),
         _one_of("kind", JobKind),
         _one_of("status", JobStatus),
+        CheckConstraint(f"(kind = '{JobKind.REINDEX_ALL}') = (page_id IS NULL)", name="page_given"),
         Index("ix_jobs_queued", "id", postgresql_where=sql("status = 'queued'")),
     )
 
@@ -167,10 +171,10 @@ class Job(Base):
     status: Mapped[JobStatus] = mapped_column(
         _enum(JobStatus), server_default=JobStatus.QUEUED.value
     )
-    page_id: Mapped[str] = mapped_column(
+    page_id: Mapped[str | None] = mapped_column(
         TypeId(Prefix.PAGE), ForeignKey("pages.id", ondelete="CASCADE"), index=True
     )
-    """The page the job works on. Deleting the page deletes its jobs."""
+    """The page the job works on, `None` for the whole library. Deleting the page deletes its jobs."""
     progress_done: Mapped[int | None]
     progress_total: Mapped[int | None]
     error: Mapped[dict[str, Any] | None]
@@ -178,3 +182,25 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     started_at: Mapped[datetime | None]
     finished_at: Mapped[datetime | None]
+
+
+class Chunk(Base):
+    """A run of a page's consecutive blocks, embedded for search. Rebuilt whenever the page is indexed."""
+
+    __tablename__ = "chunks"
+    __table_args__ = (
+        PrimaryKeyConstraint("page_id", "seq"),
+        CheckConstraint("seq >= 0", name="seq_not_negative"),
+    )
+
+    page_id: Mapped[str] = mapped_column(
+        TypeId(Prefix.PAGE), ForeignKey("pages.id", ondelete="CASCADE")
+    )
+    seq: Mapped[int]
+    """Position on the page, from 0."""
+    block_ids: Mapped[list[str]] = mapped_column(ARRAY(TypeId(Prefix.BLOCK)))
+    """The blocks the text comes from, in order. A long block can be spread over several chunks."""
+    text: Mapped[str]
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBED_DIMENSIONS))
+    embed_model: Mapped[str]
+    """Model that made `embedding`."""

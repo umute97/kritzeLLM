@@ -13,11 +13,12 @@ from PIL import ExifTags, Image
 from pydantic import PostgresDsn
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from sqlalchemy import make_url, text
+from sqlalchemy import Executable, make_url, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from kritzellm.config import Settings
 from kritzellm.core import transcribe
+from kritzellm.db import models as db
 from kritzellm.db.migrate import upgrade
 from kritzellm.main import create_app
 from kritzellm.worker import Worker
@@ -67,6 +68,32 @@ def get_page(client: TestClient, page_id: str) -> dict:
 
 def get_job(client: TestClient, job_id: str) -> dict:
     return ok(client.get(f"/jobs/{job_id}"))
+
+
+def run_sql(database_url: str, statement: Executable) -> None:
+    """Runs a statement straight against the database, e.g. to set up a state the API won't."""
+
+    async def run() -> None:
+        engine = create_async_engine(database_url)
+        async with engine.begin() as connection:
+            await connection.execute(statement)
+        await engine.dispose()
+
+    asyncio.run(run())
+
+
+def chunks_of(database_url: str, page_id: str) -> list[db.Chunk]:
+    """The page's chunks, in order."""
+
+    async def fetch() -> list[db.Chunk]:
+        engine = create_async_engine(database_url)
+        async with AsyncSession(engine) as session:
+            query = select(db.Chunk).where(db.Chunk.page_id == page_id).order_by(db.Chunk.seq)
+            chunks = list((await session.scalars(query)).all())
+        await engine.dispose()
+        return chunks
+
+    return asyncio.run(fetch())
 
 
 @pytest.fixture
@@ -189,12 +216,13 @@ def db_client(database_url: str, data_dir: Path) -> Iterator[TestClient]:
 
 @pytest.fixture
 def settings(database_url: str, data_dir: Path) -> Settings:
-    """The worker's settings: the fake `test` model, unless a test swaps in `vision_model`."""
+    """The worker's settings: the fake `test` models, unless a test swaps in `vision_model`."""
     return Settings(
         api_token=None,
         database_url=PostgresDsn(database_url),
         data_dir=data_dir,
         transcribe_model="test",
+        embed_model="test",
     )
 
 
