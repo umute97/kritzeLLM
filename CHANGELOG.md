@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.1](https://github.com/umute97/kritzeLLM/compare/v0.5.0...v0.5.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **web:** let journals be renamed and deleted, and unstick the upload list 🎀 ([#77](https://github.com/umute97/kritzeLLM/issues/77)) ([20fee7b](https://github.com/umute97/kritzeLLM/commit/20fee7b1d19f42c38b18a557829f96a52f122141))
+* **web:** make the cottage components safe to reuse 🎀 ([#82](https://github.com/umute97/kritzeLLM/issues/82)) ([cc6839d](https://github.com/umute97/kritzeLLM/commit/cc6839d23dd4426b73d19c2bfcef6ed98b5f01c6))
+* **web:** move uploading into the journal and tidy its header 🌸 ([#88](https://github.com/umute97/kritzeLLM/issues/88)) ([cde18ea](https://github.com/umute97/kritzeLLM/commit/cde18ea925457891eddb4ce5cb060040232ee235))
+
+
+### Refactoring
+
+* **web:** build the screens from layout and pattern components 🦋 ([#85](https://github.com/umute97/kritzeLLM/issues/85)) ([4421d50](https://github.com/umute97/kritzeLLM/commit/4421d50746d0604a3ee2ea62a21d99ebf4600958))
+* **web:** give the cottage components one consistent API ✨ ([#83](https://github.com/umute97/kritzeLLM/issues/83)) ([0d53549](https://github.com/umute97/kritzeLLM/commit/0d53549b2e2b8c1a488be4e0b50fa9dd26f80e3d))
+* **web:** keep the library's own words in one message catalog 🌷 ([#84](https://github.com/umute97/kritzeLLM/issues/84)) ([b931286](https://github.com/umute97/kritzeLLM/commit/b931286b9e82cf8ace774b601a7a8b23d711454b))
+
 ## [0.5.0](https://github.com/umute97/kritzeLLM/compare/v0.4.0...v0.5.0) (2026-10-25)
 
 
