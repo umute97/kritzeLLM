@@ -2,7 +2,8 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
 import KBlockCard from '../KBlockCard.vue'
-import KDropzone from '../KDropzone.vue'
+import KDropTarget from '../KDropTarget.vue'
+import KFileButton from '../KFileButton.vue'
 import KJournalCover from '../KJournalCover.vue'
 import KPageCard from '../KPageCard.vue'
 import KUploadRow from '../KUploadRow.vue'
@@ -64,56 +65,74 @@ function fileList(...files: File[]) {
   return { files, items: files.map(() => ({})) }
 }
 
-const photos = {
-  title: 'Drop page photos here',
-  hint: 'JPEG or PNG',
-  chooseLabel: 'Choose photos',
-  countLabel: (n: number) => (n === 1 ? '1 photo' : `${n} photos`),
-}
+const countLabel = (n: number) => (n === 1 ? '1 photo' : `${n} photos`)
 
-describe('KDropzone', () => {
-  it('hands over dropped files', async () => {
-    const wrapper = mount(KDropzone, { props: photos })
+describe('KDropTarget', () => {
+  it('lays a hint over its content while dragging, then hands over the files', async () => {
+    const wrapper = mount(KDropTarget, {
+      props: { countLabel },
+      slots: { default: '<p>Green notebook</p>' },
+    })
     const photo = new File(['x'], 'IMG_2041.jpg', { type: 'image/jpeg' })
     await wrapper.trigger('dragenter', { dataTransfer: fileList(photo, photo) })
     expect(wrapper.text()).toContain('Let go to tuck them in')
     expect(wrapper.text()).toContain('2 photos')
+    expect(wrapper.text()).toContain('Green notebook')
     await wrapper.trigger('drop', { dataTransfer: fileList(photo) })
     expect(wrapper.emitted('files')).toEqual([[[photo]]])
-    expect(wrapper.text()).toContain('Drop page photos here')
+    expect(wrapper.text()).not.toContain('Let go to tuck them in')
   })
 
-  it('hands over picked files and resets the input', async () => {
-    const wrapper = mount(KDropzone, { props: photos })
-    const input = wrapper.get('input[type="file"]')
-    const photo = new File(['x'], 'IMG_2042.png', { type: 'image/png' })
-    Object.defineProperty(input.element, 'files', { value: [photo], configurable: true })
-    await input.trigger('change')
-    expect(wrapper.emitted('files')).toEqual([[[photo]]])
-  })
-
-  it('gives input attributes to the file input', () => {
-    const wrapper = mount(KDropzone, {
-      props: photos,
-      attrs: { capture: 'environment', class: 'flex-1' },
-    })
-    expect(wrapper.get('input[type="file"]').attributes('capture')).toBe('environment')
-    expect(wrapper.classes()).toContain('flex-1')
+  it('only lets go of the hint when the drag leaves it entirely', async () => {
+    const wrapper = mount(KDropTarget, { props: { countLabel } })
+    const photo = new File(['x'], 'a.jpg', { type: 'image/jpeg' })
+    await wrapper.trigger('dragenter', { dataTransfer: fileList(photo) })
+    await wrapper.trigger('dragenter', { dataTransfer: fileList(photo) })
+    await wrapper.trigger('dragleave')
+    expect(wrapper.text()).toContain('Let go to tuck them in')
+    await wrapper.trigger('dragleave')
+    expect(wrapper.text()).not.toContain('Let go to tuck them in')
   })
 
   it('counts files in plain words without a count label', async () => {
-    const wrapper = mount(KDropzone, { props: { ...photos, countLabel: undefined } })
+    const wrapper = mount(KDropTarget)
     const file = new File(['x'], 'a.jpg', { type: 'image/jpeg' })
     await wrapper.trigger('dragenter', { dataTransfer: fileList(file, file) })
     expect(wrapper.text()).toContain('2 files')
   })
 
-  it('says what went wrong', () => {
-    const wrapper = mount(KDropzone, {
-      props: { ...photos, error: 'notes.pdf isn’t a photo', errorHint: 'PDF import is coming.' },
-    })
-    expect(wrapper.get('h2').text()).toBe('notes.pdf isn’t a photo')
-    expect(wrapper.text()).toContain('PDF import is coming.')
+  it('ignores drops while disabled', async () => {
+    const wrapper = mount(KDropTarget, { props: { disabled: true } })
+    const file = new File(['x'], 'a.jpg', { type: 'image/jpeg' })
+    await wrapper.trigger('dragenter', { dataTransfer: fileList(file) })
+    expect(wrapper.text()).not.toContain('Let go to tuck them in')
+    await wrapper.trigger('drop', { dataTransfer: fileList(file) })
+    expect(wrapper.emitted('files')).toBeUndefined()
+  })
+})
+
+describe('KFileButton', () => {
+  it('hands over picked files and resets the input', async () => {
+    const wrapper = mount(KFileButton, { slots: { default: 'Add photos' } })
+    expect(wrapper.text()).toBe('Add photos')
+    const input = wrapper.get('input[type="file"]')
+    const photo = new File(['x'], 'IMG_2042.png', { type: 'image/png' })
+    Object.defineProperty(input.element, 'files', { value: [photo], configurable: true })
+    await input.trigger('change')
+    expect(wrapper.emitted('files')).toEqual([[[photo]]])
+    expect((input.element as HTMLInputElement).value).toBe('')
+  })
+
+  it('gives input attributes to the file input', () => {
+    const wrapper = mount(KFileButton, { attrs: { capture: 'environment', class: 'flex-1' } })
+    expect(wrapper.get('input[type="file"]').attributes('capture')).toBe('environment')
+    expect(wrapper.classes()).toContain('flex-1')
+  })
+
+  it('can’t be used while disabled', () => {
+    const wrapper = mount(KFileButton, { props: { disabled: true } })
+    expect(wrapper.get('input').attributes('disabled')).toBeDefined()
+    expect(wrapper.attributes('aria-disabled')).toBe('true')
   })
 })
 

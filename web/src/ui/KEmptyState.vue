@@ -20,7 +20,7 @@ withDefaults(
   <component
     :is="framed ? KCard : 'div'"
     v-bind="framed ? { variant: 'dashed', padding: 'none' } : {}"
-    class="flex flex-col items-center gap-2 px-5 py-7 text-center"
+    class="flex flex-col items-center justify-center gap-2 px-5 py-7 text-center"
   >
     <slot name="illustration"><KDoodle v-if="doodle" :name="doodle" /></slot>
     <component :is="`h${headingLevel}`" class="m-0 text-[22px]">{{ title }}</component>

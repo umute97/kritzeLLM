@@ -33,6 +33,65 @@ describe('the page list', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps the old list up while another status loads, then swaps it in one go', async () => {
+    const all = [makePage({ pageNumber: 1 }), makePage({ pageNumber: 2, status: 'failed' })]
+    let answer!: (response: Response) => void
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(json({ items: all, nextCursor: null }))
+      .mockReturnValueOnce(new Promise<Response>((resolve) => (answer = resolve)))
+    vi.stubGlobal('fetch', fetch)
+    const pages = usePages()
+    await pages.load('jrn_1')
+
+    const loading = pages.load('jrn_1', 'failed')
+    expect(pages.items).toHaveLength(2)
+    expect(pages.view).toEqual({ journalId: 'jrn_1', status: undefined })
+
+    answer(json({ items: [all[1]], nextCursor: null }))
+    await loading
+    expect(pages.items.map((p) => p.pageNumber)).toEqual([2])
+    expect(pages.view).toEqual({ journalId: 'jrn_1', status: 'failed' })
+  })
+
+  it('clears the list straight away for another journal', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(json({ items: [makePage()], nextCursor: null }))
+        .mockReturnValueOnce(new Promise(() => {})),
+    )
+    const pages = usePages()
+    await pages.load('jrn_1')
+
+    void pages.load('jrn_2')
+    expect(pages.items).toEqual([])
+    expect(pages.view).toBeNull()
+    expect(pages.loading).toBe(true)
+  })
+
+  it('drops an answer that a newer request overtook', async () => {
+    let slow!: (response: Response) => void
+    const fetch = vi
+      .fn()
+      .mockReturnValueOnce(new Promise<Response>((resolve) => (slow = resolve)))
+      .mockResolvedValueOnce(
+        json({ items: [makePage({ pageNumber: 5, status: 'failed' })], nextCursor: null }),
+      )
+    vi.stubGlobal('fetch', fetch)
+    const pages = usePages()
+
+    const first = pages.load('jrn_1', 'ready')
+    await pages.load('jrn_1', 'failed')
+    slow(json({ items: [makePage({ pageNumber: 1 })], nextCursor: 'jrn_1.1' }))
+    await first
+    expect(pages.items.map((p) => p.pageNumber)).toEqual([5])
+    expect(pages.view?.status).toBe('failed')
+    expect(pages.nextCursor).toBeNull()
+    expect(pages.loading).toBe(false)
+  })
+
   it('slots new pages in by number, and only where they belong', async () => {
     vi.stubGlobal(
       'fetch',

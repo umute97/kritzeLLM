@@ -3,7 +3,7 @@ import { computed, reactive, ref } from 'vue'
 
 import { api, call } from '@/api/client'
 import { ApiError } from '@/api/errors'
-import type { Page, PageStatus } from '@/api/types'
+import type { Page, PageList, PageStatus } from '@/api/types'
 
 export const PAGE_BATCH = 24
 const POLL_MS = 2000
@@ -13,17 +13,22 @@ export function isBusy(status: PageStatus): boolean {
   return status === 'uploaded' || status === 'transcribing' || status === 'indexing'
 }
 
+type View = { journalId: string; status?: PageStatus }
+
 /**
  * Pages: everything seen so far by id, the list on screen (one journal, maybe one status), and a
  * poller that follows busy pages until they're ready or failed.
  */
 export const usePages = defineStore('pages', () => {
   const byId = reactive(new Map<string, Page>())
-  const view = ref<{ journalId: string; status?: PageStatus } | null>(null)
+  /** What the list on screen shows; null until a journal's first batch is in. */
+  const view = ref<View | null>(null)
   const ids = ref<string[]>([])
   const nextCursor = ref<string | null>(null)
   const loading = ref(false)
   const tracked = new Set<string>()
+  /** Bumped by every list request, so an answer that's been overtaken is dropped. */
+  let latest = 0
   let timer: ReturnType<typeof setInterval> | undefined
 
   const items = computed(() => ids.value.map((id) => byId.get(id)).filter((p) => p !== undefined))
@@ -70,47 +75,58 @@ export const usePages = defineStore('pages', () => {
     }
   }
 
-  async function fetchBatch(cursor?: string) {
-    const current = view.value!
-    const list = await call(
+  function fetchBatch(at: View, cursor?: string) {
+    return call(
       api.GET('/pages', {
         params: {
-          query: {
-            journalId: current.journalId,
-            status: current.status,
-            limit: PAGE_BATCH,
-            cursor,
-          },
+          query: { journalId: at.journalId, status: at.status, limit: PAGE_BATCH, cursor },
         },
       }),
     )
+  }
+
+  function show(list: PageList, after: string[]) {
     list.items.forEach((page) => {
       byId.set(page.id, page)
       if (isBusy(page.status)) track(page.id)
     })
-    ids.value = [...ids.value, ...list.items.map((page) => page.id)]
+    ids.value = [...after, ...list.items.map((page) => page.id)]
     nextCursor.value = list.nextCursor
   }
 
+  /**
+   * Shows a journal's pages, maybe of one status. A new status keeps the old list up until the
+   * new one is in, so the grid swaps in one go instead of flashing empty.
+   */
   async function load(journalId: string, status?: PageStatus) {
-    view.value = { journalId, status }
-    ids.value = []
-    nextCursor.value = null
+    const mine = ++latest
+    if (view.value?.journalId !== journalId) {
+      view.value = null
+      ids.value = []
+      nextCursor.value = null
+    }
     loading.value = true
     try {
-      await fetchBatch()
+      const list = await fetchBatch({ journalId, status })
+      if (mine !== latest) return
+      view.value = { journalId, status }
+      show(list, [])
     } finally {
-      loading.value = false
+      if (mine === latest) loading.value = false
     }
   }
 
   async function more() {
-    if (!nextCursor.value || loading.value) return
+    const at = view.value
+    const cursor = nextCursor.value
+    if (!at || !cursor || loading.value) return
+    const mine = ++latest
     loading.value = true
     try {
-      await fetchBatch(nextCursor.value)
+      const list = await fetchBatch(at, cursor)
+      if (mine === latest) show(list, ids.value)
     } finally {
-      loading.value = false
+      if (mine === latest) loading.value = false
     }
   }
 

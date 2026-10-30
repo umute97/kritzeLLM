@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 
 import { plural } from '@/utils/format'
 import { useUploads } from '@/stores/uploads'
 import { KButton, KProgressBar, KSection, KUploadRow } from '@/ui'
 
-// The batch card next to the dropzone: one row per photo into this journal, following it to
-// "Ready".
+// The batch strip above the journal's pages: overall progress, with one row per photo behind a
+// toggle, following it to "Ready".
 const props = defineProps<{ journalId: string; journalName: string }>()
 
 const uploads = useUploads()
+const listId = useId()
 
 const batch = computed(() => uploads.batch(props.journalId))
 const total = computed(() => batch.value.rows.length)
@@ -25,20 +26,39 @@ const summary = computed(() => {
     .filter(Boolean)
     .join(' · ')
 })
+
+const open = ref(false)
+// Trouble opens the list, so a skipped or failed photo is never tucked away.
+watch(
+  () => batch.value.counts.skipped + batch.value.counts.failed,
+  (trouble, before = 0) => {
+    if (trouble > before) open.value = true
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <KSection
     :title="`${plural(total, 'photo')} into ${journalName}`"
+    :heading-level="3"
     framed
     align="baseline"
-    class="flex-[1_1_420px]"
   >
     <template #aside>
       <span class="text-sm text-muted">{{ summary }}</span>
+      <KButton
+        variant="quiet"
+        size="sm"
+        :aria-expanded="open"
+        :aria-controls="listId"
+        @click="open = !open"
+      >
+        {{ open ? 'Hide each photo' : 'Show each photo' }}
+      </KButton>
     </template>
     <KProgressBar :value="settled" :max="total" label="Upload progress" />
-    <ul class="m-0 flex list-none flex-col gap-2 p-0">
+    <ul v-show="open" :id="listId" class="m-0 flex list-none flex-col gap-2 p-0">
       <KUploadRow
         v-for="row in batch.rows"
         :key="row.key"

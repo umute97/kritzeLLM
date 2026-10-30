@@ -11,8 +11,9 @@ withDefaults(
     size?: 'md' | 'lg'
     framed?: boolean
     align?: 'center' | 'end' | 'baseline'
+    headingLevel?: 2 | 3
   }>(),
-  { description: undefined, size: 'md', align: 'center' },
+  { description: undefined, size: 'md', align: 'center', headingLevel: 2 },
 )
 
 const titleId = useId()
@@ -32,10 +33,14 @@ const titleId = useId()
       ]"
     >
       <div class="flex min-w-0 flex-col gap-1">
-        <div class="flex items-center gap-2">
-          <h2 :id="titleId" :class="['m-0', size === 'md' ? 'text-[22px]' : 'text-3xl']">
+        <div class="flex flex-wrap items-center gap-2">
+          <component
+            :is="`h${headingLevel}`"
+            :id="titleId"
+            :class="['m-0', size === 'md' ? 'text-[22px]' : 'text-3xl']"
+          >
             {{ title }}
-          </h2>
+          </component>
           <slot name="title-after" />
         </div>
         <p
@@ -45,7 +50,9 @@ const titleId = useId()
           {{ description }}
         </p>
       </div>
-      <slot name="aside" />
+      <div v-if="$slots.aside" class="flex flex-wrap items-center gap-2.5">
+        <slot name="aside" />
+      </div>
     </div>
     <slot />
   </component>
