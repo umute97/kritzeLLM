@@ -37,9 +37,17 @@ export { default as KFlag } from './KFlag.vue'
 export { default as KSegmented } from './KSegmented.vue'
 export { default as KStatusChip } from './KStatusChip.vue'
 
+// Layout
+export { default as KCard } from './KCard.vue'
+export { default as KCardGrid } from './KCardGrid.vue'
+export { default as KPage } from './KPage.vue'
+export { default as KPageHeader } from './KPageHeader.vue'
+export { default as KSection } from './KSection.vue'
+
 // Feedback and overlays
 export { default as KBanner } from './KBanner.vue'
 export { default as KDialog } from './KDialog.vue'
+export { default as KConfirmDialog } from './KConfirmDialog.vue'
 export { default as KIconBadge } from './KIconBadge.vue'
 export { default as KMenu } from './KMenu.vue'
 export { default as KToast } from './KToast.vue'
@@ -67,6 +75,7 @@ export { default as KBlockCard } from './KBlockCard.vue'
 export { default as KDropzone } from './KDropzone.vue'
 export { default as KJournalCover } from './KJournalCover.vue'
 export { default as KPageCard } from './KPageCard.vue'
+export { default as KPhoto } from './KPhoto.vue'
 export { default as KUploadRow } from './KUploadRow.vue'
 
 // Search and chat

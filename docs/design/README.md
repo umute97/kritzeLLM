@@ -55,15 +55,16 @@ becomes a router link.
 
 | Group | Components | Notes |
 |---|---|---|
+| Layout | `KPage`, `KPageHeader`, `KSection`, `KCard`, `KCardGrid` | A screen is a `KPage` (wide, or narrow for a lone card) with one `KPageHeader` and its `KSection`s. A section owns its heading and its id; `framed` puts it on a `KCard`. `KCardGrid` lays out covers or page cards, with skeletons while loading |
 | Buttons | `KButton`, `KIconButton` | `main` (one per view), `second`, `quiet`, `danger` (confirm dialogs only); `sm` inside cards and toasts; `loading`, `disabled`, `icon`; `to` makes it a link, `as` any other element |
 | Fields | `KTextField`, `KTextArea`, `KSelect`, `KSearchField`, `KCheckbox`, `KSwitch`, `KFieldShell`, `KFieldNote` | A label (beside a checkbox or switch, else above), help or an error below. Errors set `aria-invalid` and `aria-describedby`. The token field can be `revealable` |
 | Chips | `KChip`, `KStatusChip`, `KBlockKindTag`, `KFlag`, `KBadge` | Page status: Uploaded, Transcribing, Indexing, Ready, Failed. Job status: Waiting, Working, Done, Failed. Upload status borrows both, plus Sending, Already here, Deleted. Flags: not quite sure, already here, edited by you, saved |
 | Pickers | `KFilterChips`, `KSegmented` | Single choice, `aria-pressed` |
 | Feedback | `KToast` + `KToastStack` + `useToasts()`, `KBanner`, `KIconBadge` | See below |
-| Overlays | `KDialog`, `KMenu`, `KTooltip` | Native `<dialog>`; a `form` dialog wraps body and footer in one form and emits `submit`; `:dismissible="false"` holds it open while saving. The menu has arrow keys and Escape, with danger items alone at the bottom; a custom `#trigger` spreads `triggerProps` |
+| Overlays | `KDialog`, `KConfirmDialog`, `KMenu`, `KTooltip` | Native `<dialog>`; `KConfirmDialog` is the "are you sure?" with the safe choice focused, held open while it works; a `form` dialog wraps body and footer in one form and emits `submit`; `:dismissible="false"` holds it open while saving. The menu has arrow keys and Escape, with danger items alone at the bottom; an item can `run` its own action and say why it's off (`hint`); a custom `#trigger` spreads `triggerProps` |
 | Navigation | `KTopNav`, `KNavLink`, `KBreadcrumb`, `KPager`, `KLoadMore` | On phones the nav links fold behind a menu button. `KPager` puts two arrows around what its slot says ("12 of 48"), or after it (`text-first`) |
 | Progress | `KProgressBar`, `KSpinner` (ring, daisy), `KTypingDots`, `KSkeleton`, `KEmptyState` | A bar when we know how long, a daisy when we don't. A `meter` bar shows a measure, like a score |
-| Journals and pages | `KJournalCover`, `KAddTile`, `KPageCard`, `KDropzone`, `KUploadRow`, `KBlockCard` | See the screens below |
+| Journals and pages | `KJournalCover`, `KAddTile`, `KPageCard`, `KPhoto`, `KDropzone`, `KUploadRow`, `KBlockCard` | See the screens below. `KPhoto` is lined paper until the photo is there |
 | Search and chat | `KSearchResult`, `KScoreBars`, `KHighlight`, `KMessage`, `KToolActivity`, `KCitationChip`, `KSourceCard`, `KComposer` | Built ahead of their screens |
 
 ### Writing a component
@@ -90,6 +91,8 @@ Every component has to work twice on one page, anywhere on it.
 - **Words come from the catalog.** Anything the library says by itself lives in `ui/messages.ts`
   and is read with `useUiMessages()`; words that change with the number or a name are functions.
   Words about this app's things (photos, journals) are props the screen fills in.
+- **Screens only put pieces together.** If a screen needs a class string, an id or a shadow of its
+  own, that's a missing component (or prop).
 - **Leave room:** a slot where callers may need more than plain text (`#title`, `#text`,
   `#actions`, `#thumb`), with the plain version as its fallback.
 - **A form in a dialog** is `<KDialog form @submit>`, with the submit button in the footer. Never
@@ -124,9 +127,10 @@ the nav when its backend exists.
 
 - **Header:** "Your journals" and a *New journal* button, which opens a dialog with a name and an
   optional description.
-- **Shelf:** journal covers, 4 at a time, with `KShelfPager` arrows. `GET /journals` pages with a
+- **Shelf:** journal covers, 4 at a time, with `KPager` arrows. `GET /journals` pages with a
   cursor and has no total, so the shelf shows "Journals 1–4" and the next arrow rests when
-  `nextCursor` is null. Picking a cover opens that journal.
+  `nextCursor` is null. Picking a cover opens that journal. When the last shelf has room, a
+  `KAddTile` after the covers starts a new journal too.
 - **Upload:**
   - The dropzone takes JPEG, PNG, HEIC/HEIF or WebP, up to 25 MB each and 100 per upload
     (`POST /journals/{id}/pages`). Anything else is rejected right there.
@@ -139,7 +143,8 @@ the nav when its backend exists.
 - **Journal header:** the journal's name, with its description (if it has one) underneath.
 - **Journal actions:** a ⋯ menu next to the journal's name, with *Rename journal* (the new-journal
   dialog, filled in; `PATCH /journals/{id}`) and *Delete journal*. Deleting asks first, naming the
-  page count, and waits until no photos are still going up into it (`DELETE /journals/{id}`).
+  page count, and waits until no photos are still going up into it, saying so in the menu
+  (`DELETE /journals/{id}`).
   Afterwards the first journal on the shelf opens.
 - **Page grid:**
   - Pinned `KPageCard`s with the thumbnail, number, date and status.
@@ -160,7 +165,7 @@ the nav when its backend exists.
   Cmd/Ctrl+Enter saves, Escape undoes. Unsure blocks get "Looks right".
 - Header: breadcrumb, page number and status, *Re-transcribe* (`POST /pages/{id}/transcribe`),
   a page actions menu, and *Delete page* with a confirm dialog.
-- A failed page shows a banner with its error. `KPageStepper` moves to the neighbouring pages.
+- A failed page shows a banner with its error. `KPager` moves to the neighbouring pages.
 
 ### Search (#17, #18): designed, waiting for the API
 

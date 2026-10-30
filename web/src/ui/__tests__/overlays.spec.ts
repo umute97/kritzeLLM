@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { nextTick } from 'vue'
 
 import KBanner from '../KBanner.vue'
+import KConfirmDialog from '../KConfirmDialog.vue'
 import KDialog from '../KDialog.vue'
 import KMenu from '../KMenu.vue'
 import KTooltip from '../KTooltip.vue'
@@ -180,6 +181,69 @@ describe('KMenu with its own trigger', () => {
 
     await menu.trigger('keydown', { key: 'Escape' })
     expect(document.activeElement).toBe(trigger.element)
+    wrapper.unmount()
+  })
+})
+
+describe('KMenu items', () => {
+  it('run their own action and explain why they are off', async () => {
+    let renamed = false
+    const wrapper = mount(KMenu, {
+      attachTo: document.body,
+      props: {
+        label: 'Journal actions',
+        items: [
+          { id: 'rename', label: 'Rename journal', run: () => (renamed = true) },
+          { id: 'delete', label: 'Delete journal', danger: true, disabled: true, hint: 'Busy' },
+        ],
+      },
+    })
+    await wrapper.get('button[aria-haspopup="menu"]').trigger('click')
+    await nextTick()
+    expect(wrapper.text()).toContain('Busy')
+    await wrapper.findAll('[role="menuitem"]')[0]!.trigger('click')
+    expect(renamed).toBe(true)
+    expect(wrapper.emitted('select')).toEqual([['rename']])
+    wrapper.unmount()
+  })
+})
+
+describe('KConfirmDialog', () => {
+  function confirm(props: Record<string, unknown> = {}) {
+    const wrapper = mount(KConfirmDialog, {
+      attachTo: document.body,
+      props: {
+        title: 'Delete Green notebook?',
+        confirmLabel: 'Delete journal',
+        open: true,
+        'onUpdate:open': (v: boolean) => wrapper.setProps({ open: v }),
+        ...props,
+      },
+    })
+    return wrapper
+  }
+
+  it('asks, with the safe choice first and focused', async () => {
+    const wrapper = confirm()
+    const [keep, go] = wrapper.findAll('dialog button:not([aria-label])')
+    expect(keep!.text()).toBe('Keep it')
+    expect(keep!.attributes('autofocus')).toBeDefined()
+    expect(go!.classes()).toContain('bg-bark')
+    await go!.trigger('click')
+    expect(wrapper.emitted('confirm')).toHaveLength(1)
+    await keep!.trigger('click')
+    expect(wrapper.props('open')).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('holds on while it works, and keeps its words while it closes', async () => {
+    const wrapper = confirm({ loading: true })
+    const cancel = new Event('cancel', { cancelable: true })
+    wrapper.get('dialog').element.dispatchEvent(cancel)
+    expect(cancel.defaultPrevented).toBe(true)
+
+    await wrapper.setProps({ open: false, title: 'Delete undefined?', loading: false })
+    expect(wrapper.get('h2').text()).toBe('Delete Green notebook?')
     wrapper.unmount()
   })
 })

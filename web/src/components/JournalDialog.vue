@@ -5,7 +5,7 @@ import { ApiError } from '@/api/errors'
 import type { Journal } from '@/api/types'
 import { toastError } from '@/utils/notify'
 import { useJournals } from '@/stores/journals'
-import { KButton, KDialog, KDoodle, KTextArea, KTextField } from '@/ui'
+import { KButton, KDialog, KTextArea, KTextField } from '@/ui'
 
 // Makes a new journal, or renames `journal` when one is given.
 const props = defineProps<{ journal?: Journal }>()
@@ -64,11 +64,9 @@ async function save() {
     size="md"
     form
     :dismissible="!busy"
+    doodle="sprig"
     @submit="save"
   >
-    <template #decoration>
-      <KDoodle name="sprig" :size="46" class="absolute -top-5 right-7" />
-    </template>
     <div class="flex flex-col gap-3.5">
       <KTextField
         v-model="name"

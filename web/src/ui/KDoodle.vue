@@ -1,9 +1,8 @@
 <script setup lang="ts">
+import type { DoodleName } from './types'
+
 // Little hand-drawn decorations. Sprinkle lightly: one per empty state or dialog, never everywhere.
-withDefaults(
-  defineProps<{ name: 'daisy' | 'sprig' | 'heart' | 'sparkle' | 'squiggle'; size?: number }>(),
-  { size: 56 },
-)
+withDefaults(defineProps<{ name: DoodleName; size?: number }>(), { size: 56 })
 </script>
 
 <template>

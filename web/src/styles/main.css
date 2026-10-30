@@ -115,6 +115,15 @@
   a {
     color: var(--color-bark);
   }
+
+  code {
+    border: 1px solid var(--color-line);
+    border-radius: 0.375rem;
+    background-color: var(--color-paper);
+    padding-inline: 0.375rem;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+  }
   a:hover {
     color: var(--color-ink);
   }

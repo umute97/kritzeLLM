@@ -4,6 +4,7 @@ import { computed, type Component } from 'vue'
 import { useSplitAttrs } from './attrs'
 import KButton from './KButton.vue'
 import { useUiMessages } from './messages'
+import KPhoto from './KPhoto.vue'
 import { usePolymorphic, type LinkTarget } from './polymorphic'
 import KSpinner from './KSpinner.vue'
 import KStatusChip from './KStatusChip.vue'
@@ -71,29 +72,23 @@ const failed = computed(() => props.status === 'failed')
           : 'border border-line shadow-pin group-hover:border-ink group-hover:shadow-lift-lg',
       ]"
     >
-      <span class="relative block h-[190px] overflow-hidden rounded border border-sand">
-        <img
-          v-if="imageUrl"
-          :src="imageUrl"
-          alt=""
-          loading="lazy"
-          class="size-full object-cover"
-          :class="(reading || failed) && 'opacity-35'"
-        />
-        <span
-          v-else
-          class="paper-lines block size-full p-3 font-hand text-[15px] leading-6"
-          :class="(reading || failed) && 'opacity-35'"
-          >{{ excerpt }}</span
-        >
-        <span
-          v-if="reading"
-          class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-paper/55"
-        >
-          <KSpinner :size="26" class="text-ink" />
-          <span class="font-hand text-xl text-bark">{{ reading }}</span>
-        </span>
-      </span>
+      <KPhoto
+        :src="imageUrl"
+        lazy
+        :dimmed="!!(reading || failed)"
+        class="h-[190px] rounded border border-sand"
+      >
+        <span class="block p-3 font-hand text-[15px] leading-6">{{ excerpt }}</span>
+        <template #overlay>
+          <span
+            v-if="reading"
+            class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-paper/55"
+          >
+            <KSpinner :size="26" class="text-ink" />
+            <span class="font-hand text-xl text-bark">{{ reading }}</span>
+          </span>
+        </template>
+      </KPhoto>
       <span class="flex items-center justify-between gap-2">
         <span class="flex flex-col leading-tight">
           <strong class="text-sm">{{ ui.page(pageNumber) }}</strong>

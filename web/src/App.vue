@@ -6,7 +6,7 @@ import TokenPrompt from '@/components/TokenPrompt.vue'
 import { verifySession } from '@/utils/session'
 import { useAuth } from '@/stores/auth'
 import { useHealth } from '@/stores/health'
-import { KBanner, KButton, KLogo, KNavLink, KSpinner, KToastStack, KTopNav } from '@/ui'
+import { KBanner, KButton, KLogo, KNavLink, KPage, KSpinner, KToastStack, KTopNav } from '@/ui'
 
 const auth = useAuth()
 const health = useHealth()
@@ -44,16 +44,11 @@ watch(
       <template #end><span class="font-hand text-xl text-bark">hi there</span></template>
     </KTopNav>
 
-    <div
-      v-if="health.offline || health.database !== 'ok'"
-      class="mx-auto max-w-[1200px] px-4 pt-6 sm:px-6"
-    >
+    <KPage v-if="health.offline || health.database !== 'ok'" as="div" bare class="pt-6">
       <KBanner :title="health.offline ? 'The cottage door is shut' : 'The database is napping'">
         <template v-if="health.offline">
           kritzeLLM can’t reach the API. Is
-          <code class="rounded-md border border-line bg-paper px-1.5 font-mono text-sm"
-            >just up</code
-          >
+          <code>just up</code>
           running?
         </template>
         <template v-else
@@ -65,13 +60,17 @@ watch(
           </KButton>
         </template>
       </KBanner>
-    </div>
+    </KPage>
 
     <TokenPrompt v-if="auth.state === 'needed'" />
     <RouterView v-else-if="auth.state === 'ok'" />
-    <div v-else-if="!health.offline" class="flex justify-center py-24">
-      <KSpinner variant="daisy" :size="56" label="Opening the cottage door" />
-    </div>
+    <KSpinner
+      v-else-if="!health.offline"
+      block
+      variant="daisy"
+      :size="56"
+      label="Opening the cottage door"
+    />
 
     <KToastStack />
   </div>

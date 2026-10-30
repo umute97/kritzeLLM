@@ -8,6 +8,8 @@ export const disabledClass =
 
 export const coverShape = 'h-[132px] w-full rounded-[9px_18px_18px_9px]'
 
+export const pageWidth = 'mx-auto w-full max-w-[1200px] px-4 sm:px-6'
+
 // Shared look of every text-like control: resting, focused, wrong and disabled.
 export function fieldClass(state: { invalid?: boolean; disabled?: boolean }) {
   return [
