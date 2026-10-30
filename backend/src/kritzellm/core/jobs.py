@@ -19,8 +19,8 @@ CHANNEL = "kritzellm_jobs"
 """Postgres `NOTIFY` channel that wakes the worker when jobs are queued."""
 
 
-async def enqueue(session: AsyncSession, kind: JobKind, *, page_id: str) -> db.Job:
-    """Queues a job as part of the session's transaction. The caller commits."""
+async def enqueue(session: AsyncSession, kind: JobKind, *, page_id: str | None = None) -> db.Job:
+    """Queues a job (on a page, or the whole library) in the session's transaction. The caller commits."""
     job = db.Job(kind=kind, page_id=page_id)
     session.add(job)
     await session.flush()
@@ -29,13 +29,16 @@ async def enqueue(session: AsyncSession, kind: JobKind, *, page_id: str) -> db.J
     return job
 
 
-async def enqueue_once(session: AsyncSession, kind: JobKind, *, page_id: str) -> db.Job:
-    """The page's queued job of this kind, or a newly queued one. The caller commits.
+async def enqueue_once(
+    session: AsyncSession, kind: JobKind, *, page_id: str | None = None
+) -> db.Job:
+    """The page's (or library's) queued job of this kind, or a newly queued one. The caller commits.
 
     A queued job hasn't started, so it'll still see whatever changed since it was queued.
     """
     queued = await session.scalar(
         select(db.Job)
+        # `== None` is `IS NULL` in SQLAlchemy.
         .where(db.Job.page_id == page_id, db.Job.kind == kind, db.Job.status == JobStatus.QUEUED)
         .limit(1)
     )
@@ -62,7 +65,7 @@ async def latest_jobs(session: AsyncSession, page_ids: Collection[str]) -> dict[
         .ext(distinct_on(db.Job.page_id))
         .order_by(db.Job.page_id, db.Job.id.desc())
     )
-    return {job.page_id: job for job in await session.scalars(query)}
+    return {job.page_id: job for job in await session.scalars(query) if job.page_id is not None}
 
 
 async def claim_next(session: AsyncSession) -> db.Job | None:

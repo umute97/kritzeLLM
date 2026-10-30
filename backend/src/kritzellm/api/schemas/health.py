@@ -24,6 +24,8 @@ class ConfiguredModels(ApiModel):
 
     transcribe: str
     """Model that reads page images."""
+    embed: str
+    """Model that embeds page text for search."""
 
 
 class Health(ApiModel):

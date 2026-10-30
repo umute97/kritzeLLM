@@ -20,9 +20,11 @@ class Settings(BaseSettings):
     """Where page images are stored."""
 
     openai_api_key: SecretStr | None = None
-    """Key for the OpenAI API. Not needed with `TRANSCRIBE_MODEL=test`."""
+    """Key for the OpenAI API. Not needed when both models are `test`."""
     transcribe_model: str = "gpt-6-luna"
     """OpenAI model that reads page images. `test` fakes it: made-up text, no API calls."""
+    embed_model: str = "text-embedding-3-small"
+    """OpenAI model that embeds page text for search. `test` fakes it: dummy vectors, no API calls."""
 
 
 @lru_cache

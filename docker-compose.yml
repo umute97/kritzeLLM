@@ -17,6 +17,7 @@ x-backend-env: &backend-env
   DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kritzellm}:${POSTGRES_PASSWORD:-kritzellm}@db:5432/${POSTGRES_DB:-kritzellm}
   DATA_DIR: /data
   TRANSCRIBE_MODEL: ${TRANSCRIBE_MODEL:-}
+  EMBED_MODEL: ${EMBED_MODEL:-}
 
 services:
   db:

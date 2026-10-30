@@ -17,6 +17,7 @@ class JobKind(StrEnum):
     INGEST_PAGE = "ingestPage"
     TRANSCRIBE_PAGE = "transcribePage"
     REINDEX_PAGE = "reindexPage"
+    REINDEX_ALL = "reindexAll"
 
 
 class JobStatus(StrEnum):
@@ -56,7 +57,8 @@ class Job(ApiModel):
     id: JobId
     kind: JobKind
     status: JobStatus
-    target: JobTarget
+    target: JobTarget | None
+    """What the job works on; `null` for jobs over the whole library (`reindexAll`)."""
     progress: JobProgress | None
     """How far along the job is, when it can tell."""
     error: Problem | None
@@ -70,15 +72,17 @@ class Job(ApiModel):
     @classmethod
     def from_db(cls, job: db.Job) -> Self:
         """The API view of a stored job."""
-        progress = None
+        progress = target = None
         if job.progress_done is not None and job.progress_total is not None:
             progress = {"done": job.progress_done, "total": job.progress_total}
+        if job.page_id is not None:
+            target = {"type": JobTargetType.PAGE, "id": job.page_id}
         return cls.model_validate(
             {
                 "id": job.id,
                 "kind": job.kind,
                 "status": job.status,
-                "target": {"type": JobTargetType.PAGE, "id": job.page_id},
+                "target": target,
                 "progress": progress,
                 "error": job.error,
                 "created_at": job.created_at,

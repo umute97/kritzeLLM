@@ -98,8 +98,9 @@ jobs:
       - name: Start the stack
         run: uvx --from rust-just just up
         env:
-          # Fake transcription: no OpenAI key in CI.
+          # Fake models: no OpenAI key in CI.
           TRANSCRIBE_MODEL: test
+          EMBED_MODEL: test
       - name: Check Postgres, pgvector and the migrated tables
         run: uvx --from rust-just just db-check
       - name: Check the API
