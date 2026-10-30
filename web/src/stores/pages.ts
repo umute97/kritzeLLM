@@ -51,6 +51,12 @@ export const usePages = defineStore('pages', () => {
     if (isBusy(page.status)) track(page.id)
   }
 
+  /** Asks for a fresh reading; the page goes back to "uploaded" and is followed again. */
+  async function retranscribe(page: Page) {
+    await call(api.POST('/pages/{pageId}/transcribe', { params: { path: { pageId: page.id } } }))
+    put({ ...page, status: 'uploaded', error: null })
+  }
+
   function remove(id: string) {
     byId.delete(id)
     tracked.delete(id)
@@ -151,6 +157,7 @@ export const usePages = defineStore('pages', () => {
     nextCursor,
     loading,
     put,
+    retranscribe,
     remove,
     forgetJournal,
     load,

@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { KButton, KDoodle, KEmptyState } from '@/ui'
+import LostState from '@/components/LostState.vue'
+import { KPage } from '@/ui'
 </script>
 
 <template>
-  <main class="mx-auto max-w-[560px] px-4 py-20">
-    <KEmptyState
+  <KPage width="narrow">
+    <LostState
       title="Nothing lives here"
       text="This address doesn’t lead anywhere in the cottage."
-    >
-      <template #illustration><KDoodle name="squiggle" /></template>
-      <KButton to="/">Back to your journals</KButton>
-    </KEmptyState>
-  </main>
+    />
+  </KPage>
 </template>

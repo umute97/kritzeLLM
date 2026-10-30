@@ -2,16 +2,15 @@
 import KDoodle from './KDoodle.vue'
 
 // Daisy for whole-page waits, ring inside buttons and rows. With a `label` it announces itself.
-withDefaults(defineProps<{ variant?: 'ring' | 'daisy'; size?: number; label?: string }>(), {
-  variant: 'ring',
-  size: 18,
-  label: undefined,
-})
+withDefaults(
+  defineProps<{ variant?: 'ring' | 'daisy'; size?: number; label?: string; block?: boolean }>(),
+  { variant: 'ring', size: 18, label: undefined },
+)
 </script>
 
 <template>
   <span
-    class="inline-flex shrink-0"
+    :class="block ? 'flex justify-center py-24' : 'inline-flex shrink-0'"
     :role="label ? 'status' : undefined"
     :aria-label="label"
     :aria-hidden="label ? undefined : 'true'"

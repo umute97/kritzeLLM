@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 
+import KPhoto from './KPhoto.vue'
 import KProgressBar from './KProgressBar.vue'
 import KStatusChip from './KStatusChip.vue'
 import type { UploadStatus } from './types'
@@ -35,9 +36,9 @@ const ui = useUiMessages()
     ]"
   >
     <slot name="thumb">
-      <span
+      <KPhoto
         aria-hidden="true"
-        class="paper-lines h-11 w-9 shrink-0 rounded border border-line [--line:8px]"
+        class="h-11 w-9 shrink-0 rounded border border-line [--line:8px]"
       />
     </slot>
     <span class="flex min-w-0 flex-[1_1_160px] flex-col leading-snug">

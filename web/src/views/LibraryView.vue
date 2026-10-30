@@ -1,22 +1,25 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, useId, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { api, call } from '@/api/client'
 import { ApiError } from '@/api/errors'
 import type { Journal, Page } from '@/api/types'
 import JournalDialog from '@/components/JournalDialog.vue'
 import PageThumb from '@/components/PageThumb.vue'
 import UploadBatch from '@/components/UploadBatch.vue'
+import { useAction } from '@/composables/useAction'
+import { useConfirm } from '@/composables/useConfirm'
 import { coverColor } from '@/utils/covers'
 import { plural } from '@/utils/format'
 import { toastError } from '@/utils/notify'
-import { useJournals } from '@/stores/journals'
+import { PER_SHELF, useJournals } from '@/stores/journals'
 import { usePages } from '@/stores/pages'
 import { useUploads } from '@/stores/uploads'
 import {
+  KAddTile,
   KButton,
-  KDialog,
+  KCardGrid,
+  KConfirmDialog,
   KDoodle,
   KDropzone,
   KEmptyState,
@@ -24,8 +27,10 @@ import {
   KJournalCover,
   KLoadMore,
   KMenu,
+  KPage,
+  KPageHeader,
   KPager,
-  KSkeleton,
+  KSection,
   tiltFor,
   useToasts,
   type MenuItem,
@@ -37,6 +42,7 @@ const router = useRouter()
 const journals = useJournals()
 const pages = usePages()
 const uploads = useUploads()
+const toasts = useToasts()
 
 type Filter = 'all' | 'ready' | 'failed'
 const filters: { value: Filter; label: string }[] = [
@@ -48,15 +54,13 @@ const filter = ref<Filter>('all')
 const dropError = ref<string>()
 const newJournal = ref(false)
 const renaming = ref(false)
-const confirmDelete = ref(false)
-// The journal the delete dialog asks about, kept while it closes after the journal is gone.
-const doomed = ref<Journal>()
-const deleting = ref(false)
-const shelfTitleId = useId()
-const pagesTitleId = useId()
+const deleting = useConfirm<Journal>()
 
 const journal = computed(() => (props.journalId ? journals.byId.get(props.journalId) : undefined))
 const batch = computed(() => (journal.value ? uploads.batch(journal.value.id) : undefined))
+const roomOnShelf = computed(
+  () => journals.loaded && !journals.canNext && journals.shelf.length < PER_SHELF,
+)
 
 async function openShelf() {
   try {
@@ -65,7 +69,7 @@ async function openShelf() {
       await router.replace({ name: 'journal', params: { journalId: journals.shelf[0].id } })
     }
   } catch (error) {
-    toastError(error, 'Couldn’t open the shelf', openShelf)
+    toastError(error, 'Couldn’t open the shelf', { retry: openShelf })
   }
 }
 
@@ -76,15 +80,11 @@ async function loadPages() {
     await pages.load(props.journalId, filter.value === 'all' ? undefined : filter.value)
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
-      useToasts().push({
-        tone: 'info',
-        title: 'That journal is gone',
-        detail: 'Back to the shelf.',
-      })
+      toasts.push({ tone: 'info', title: 'That journal is gone', detail: 'Back to the shelf.' })
       await router.replace({ name: 'library' })
       return
     }
-    toastError(error, 'Couldn’t load the pages', loadPages)
+    toastError(error, 'Couldn’t load the pages', { retry: loadPages })
   }
 }
 
@@ -97,30 +97,21 @@ watch(
   },
 )
 
-async function shelfStep(step: 'back' | 'next') {
-  try {
-    await journals[step]()
-  } catch (error) {
-    toastError(error, 'Couldn’t turn the shelf')
-  }
-}
+const shelfStep = useAction((step: 'back' | 'next') => journals[step](), {
+  title: 'Couldn’t turn the shelf',
+})
+const retry = useAction((page: Page) => pages.retranscribe(page), {
+  title: (page) => `Couldn’t read page ${page.pageNumber} again`,
+})
+const more = useAction(() => pages.more(), { title: 'Couldn’t load more pages' })
 
 function onFiles(files: File[]) {
   if (!journal.value) return
   dropError.value = uploads.add(journal.value.id, files) ?? undefined
 }
 
-async function retry(page: Page) {
-  try {
-    await call(api.POST('/pages/{pageId}/transcribe', { params: { path: { pageId: page.id } } }))
-    pages.put({ ...page, status: 'uploaded', error: null })
-  } catch (error) {
-    toastError(error, `Couldn’t read page ${page.pageNumber} again`)
-  }
-}
-
 function onCreated(created: Journal) {
-  useToasts().push({
+  toasts.push({
     tone: 'success',
     title: 'A new journal',
     detail: `${created.name} is on the shelf.`,
@@ -129,52 +120,41 @@ function onCreated(created: Journal) {
 }
 
 const menu = computed<MenuItem[]>(() => [
-  { id: 'rename', label: 'Rename journal', icon: 'pencil' },
-  // Photos still going up would land in a journal that's gone.
+  { id: 'rename', label: 'Rename journal', icon: 'pencil', run: () => (renaming.value = true) },
   {
     id: 'delete',
     label: 'Delete journal',
     icon: 'trash',
     danger: true,
+    // Photos still going up would land in a journal that's gone.
     disabled: batch.value?.active,
+    hint: 'Photos are still going up',
+    run: () => journal.value && deleting.ask(journal.value),
   },
 ])
 
-function onMenu(id: string) {
-  if (id === 'rename') renaming.value = true
-  else if (id === 'delete') {
-    doomed.value = journal.value
-    confirmDelete.value = true
-  }
-}
-
 const deleteNote = computed(() => {
-  const count = doomed.value?.pageCount ?? 0
+  const count = deleting.subject?.pageCount ?? 0
   const what = count
     ? `Its ${plural(count, 'page')} and all their text go with it.`
     : 'It has no pages yet.'
   return `${what} This can’t be undone.`
 })
 
-async function deleteJournal() {
-  const gone = doomed.value
-  if (!gone) return
-  deleting.value = true
-  try {
-    await journals.remove(gone.id)
-    uploads.forget(gone.id)
-    pages.forgetJournal(gone.id)
-    confirmDelete.value = false
-    useToasts().push({ tone: 'info', title: `${gone.name} is gone` })
-    const first = journals.shelf[0]
-    await router.replace(
-      first ? { name: 'journal', params: { journalId: first.id } } : { name: 'library' },
-    )
-  } catch (error) {
-    toastError(error, 'Couldn’t delete the journal')
-  } finally {
-    deleting.value = false
-  }
+function deleteJournal() {
+  return deleting.run(
+    async (gone) => {
+      await journals.remove(gone.id)
+      uploads.forget(gone.id)
+      pages.forgetJournal(gone.id)
+      toasts.push({ tone: 'info', title: `${gone.name} is gone` })
+      const first = journals.shelf[0]
+      await router.replace(
+        first ? { name: 'journal', params: { journalId: first.id } } : { name: 'library' },
+      )
+    },
+    { title: 'Couldn’t delete the journal' },
+  )
 }
 
 const summary = computed(() => {
@@ -187,30 +167,25 @@ const summary = computed(() => {
 </script>
 
 <template>
-  <main class="mx-auto flex max-w-[1200px] flex-col gap-10 px-4 pt-10 pb-20 sm:px-6">
-    <header class="flex flex-wrap items-end justify-between gap-5">
-      <div class="flex flex-col gap-0.5">
-        <h1 class="m-0 text-[40px] leading-tight sm:text-5xl">Your journals</h1>
-        <span class="font-hand text-[19px] text-bark"
-          >pick a notebook, or tuck in some new pages</span
-        >
-      </div>
-      <KButton variant="second" icon="plus" @click="newJournal = true"> New journal </KButton>
-    </header>
+  <KPage gap="lg">
+    <KPageHeader title="Your journals" subtitle="pick a notebook, or tuck in some new pages">
+      <template #actions>
+        <KButton variant="second" icon="plus" @click="newJournal = true">New journal</KButton>
+      </template>
+    </KPageHeader>
 
     <KEmptyState
       v-if="journals.empty"
       title="Your shelf is empty"
       text="Start a journal, then add photos of its pages."
+      doodle="daisy"
     >
-      <template #illustration><KDoodle name="daisy" /></template>
       <KButton @click="newJournal = true">New journal</KButton>
     </KEmptyState>
 
     <template v-else>
-      <section :aria-labelledby="shelfTitleId" class="flex flex-col gap-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 :id="shelfTitleId" class="m-0 text-[22px]">On the shelf</h2>
+      <KSection title="On the shelf">
+        <template #aside>
           <KPager
             v-if="journals.loaded"
             text-first
@@ -218,29 +193,27 @@ const summary = computed(() => {
             next-label="More journals"
             :can-prev="journals.canBack && !journals.loading"
             :can-next="journals.canNext && !journals.loading"
-            @prev="shelfStep('back')"
-            @next="shelfStep('next')"
+            @prev="shelfStep.run('back')"
+            @next="shelfStep.run('next')"
           >
             <span class="text-sm text-muted">{{ journals.range }}</span>
           </KPager>
-        </div>
-        <div class="grid grid-cols-2 gap-6 sm:grid-cols-4">
-          <template v-if="journals.loaded">
+        </template>
+        <KCardGrid kind="covers" :loading="!journals.loaded">
+          <li v-for="item in journals.shelf" :key="item.id">
             <KJournalCover
-              v-for="item in journals.shelf"
-              :key="item.id"
               :to="{ name: 'journal', params: { journalId: item.id } }"
               :name="item.name"
               :meta="plural(item.pageCount, 'page')"
               :color="coverColor(item.id)"
               :selected="item.id === journalId"
             />
-          </template>
-          <template v-else>
-            <KSkeleton v-for="n in 4" :key="n" shape="block" class="h-[132px]" />
-          </template>
-        </div>
-      </section>
+          </li>
+          <li v-if="roomOnShelf">
+            <KAddTile label="New journal" @click="newJournal = true" />
+          </li>
+        </KCardGrid>
+      </KSection>
 
       <section v-if="journal" aria-label="Upload pages" class="flex flex-wrap gap-6">
         <KDropzone
@@ -262,37 +235,29 @@ const summary = computed(() => {
         />
       </section>
 
-      <section v-if="journal" :aria-labelledby="pagesTitleId" class="flex flex-col gap-5">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div class="flex min-w-0 flex-col gap-1">
-            <div class="flex items-center gap-2">
-              <h2 :id="pagesTitleId" class="m-0 text-3xl">{{ journal.name }}</h2>
-              <KMenu label="Journal actions" :items="menu" align="start" @select="onMenu" />
-            </div>
-            <p
-              v-if="journal.description"
-              class="m-0 max-w-[65ch] font-hand text-[19px] whitespace-pre-line text-bark"
-            >
-              {{ journal.description }}
-            </p>
-          </div>
+      <KSection
+        v-if="journal"
+        :title="journal.name"
+        :description="journal.description ?? undefined"
+        size="lg"
+        align="end"
+      >
+        <template #title-after>
+          <KMenu label="Journal actions" :items="menu" align="start" />
+        </template>
+        <template #aside>
           <KFilterChips v-model="filter" label="Filter pages" :options="filters" />
-        </div>
+        </template>
 
-        <ul
-          v-if="pages.items.length"
-          class="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-x-6 gap-y-8 p-0 pt-3"
+        <KCardGrid
+          v-if="pages.items.length || pages.loading"
+          kind="pages"
+          :loading="!pages.items.length"
         >
           <li v-for="(page, index) in pages.items" :key="page.id">
-            <PageThumb :page="page" :tilt="tiltFor(index)" @retry="retry" />
+            <PageThumb :page="page" :tilt="tiltFor(index)" @retry="retry.run" />
           </li>
-        </ul>
-        <div
-          v-else-if="pages.loading"
-          class="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-x-6 gap-y-8 pt-3"
-        >
-          <KSkeleton v-for="n in 4" :key="n" shape="block" class="h-[250px]" />
-        </div>
+        </KCardGrid>
         <KEmptyState
           v-else-if="filter !== 'all'"
           title="All cosy and calm"
@@ -314,25 +279,21 @@ const summary = computed(() => {
           :has-more="pages.nextCursor !== null"
           :loading="pages.loading"
           label="Show more pages"
-          @more="pages.more().catch((error) => toastError(error, 'Couldn’t load more pages'))"
+          @more="more.run()"
         />
-      </section>
+      </KSection>
     </template>
 
     <JournalDialog v-model:open="newJournal" @created="onCreated" />
     <JournalDialog v-model:open="renaming" :journal="journal" />
 
-    <KDialog
-      v-model:open="confirmDelete"
-      :title="`Delete ${doomed?.name}?`"
+    <KConfirmDialog
+      v-model:open="deleting.open"
+      :title="`Delete ${deleting.subject?.name}?`"
       :description="deleteNote"
-    >
-      <template #footer>
-        <KButton variant="second" autofocus @click="confirmDelete = false">Keep it</KButton>
-        <KButton variant="danger" :loading="deleting" @click="deleteJournal">
-          Delete journal
-        </KButton>
-      </template>
-    </KDialog>
-  </main>
+      confirm-label="Delete journal"
+      :loading="deleting.busy"
+      @confirm="deleteJournal"
+    />
+  </KPage>
 </template>

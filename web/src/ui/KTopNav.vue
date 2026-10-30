@@ -2,6 +2,7 @@
 import { ref, useId } from 'vue'
 
 import KIconButton from './KIconButton.vue'
+import { pageWidth } from './styles'
 import { useUiMessages } from './messages'
 
 // Brand, links (KNavLink) and a little greeting. On phones the links fold behind a menu button.
@@ -15,9 +16,7 @@ const ui = useUiMessages()
 
 <template>
   <nav :aria-label="label ?? ui.mainNav" class="border-b-[1.5px] border-ink bg-cream">
-    <div
-      class="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-7 gap-y-2 px-4 py-3 sm:px-6"
-    >
+    <div :class="[pageWidth, 'flex flex-wrap items-center gap-x-7 gap-y-2 py-3']">
       <div class="flex flex-1 items-center justify-between gap-3 sm:flex-none">
         <slot name="brand" />
         <KIconButton

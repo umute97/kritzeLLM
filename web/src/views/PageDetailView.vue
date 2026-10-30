@@ -6,6 +6,9 @@ import { api, call } from '@/api/client'
 import { ApiError } from '@/api/errors'
 import { downloadImage, useAuthedImage } from '@/api/images'
 import type { Block, Journal, PageDetail } from '@/api/types'
+import LostState from '@/components/LostState.vue'
+import { useAction } from '@/composables/useAction'
+import { useConfirm } from '@/composables/useConfirm'
 import { formatEntryDates, plural } from '@/utils/format'
 import { toastError } from '@/utils/notify'
 import { useJournals } from '@/stores/journals'
@@ -15,14 +18,15 @@ import {
   KBlockCard,
   KBreadcrumb,
   KButton,
-  KDialog,
-  KDoodle,
+  KConfirmDialog,
   KEmptyState,
   KMenu,
+  KPage,
+  KPageHeader,
   KPager,
+  KPhoto,
   KSegmented,
   KSkeleton,
-  KSpinner,
   KStatusChip,
   useToasts,
   type MenuItem,
@@ -47,9 +51,8 @@ const saving = reactive(new Set<string>())
 const saved = reactive(new Set<string>())
 const active = ref<string | null>(null)
 const view = ref<'photo' | 'text' | 'both'>('both')
-const confirmDelete = ref(false)
-const confirmRead = ref(false)
-const working = ref<'delete' | 'read' | null>(null)
+const reading = useConfirm()
+const deleting = useConfirm()
 
 // The poller in the pages store keeps the status fresh while the page is being read.
 const status = computed(() => pages.byId.get(props.pageId)?.status ?? detail.value?.status)
@@ -58,6 +61,11 @@ const busy = computed(
 )
 const photo = useAuthedImage(() => detail.value?.image.urls.normalized)
 const dates = computed(() => (detail.value ? formatEntryDates(detail.value.entryDates) : undefined))
+const meta = computed(() =>
+  detail.value
+    ? [dates.value, plural(detail.value.blocks.length, 'block')].filter(Boolean).join(' · ')
+    : undefined,
+)
 
 async function load() {
   missing.value = false
@@ -72,7 +80,7 @@ async function load() {
     void findNeighbours(page)
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) missing.value = true
-    else toastError(error, 'Couldn’t open this page', load)
+    else toastError(error, 'Couldn’t open this page', { retry: load })
   }
 }
 
@@ -128,16 +136,15 @@ async function patchBlock(block: Block, body: { text?: string; uncertain?: boole
     saved.add(block.id)
     setTimeout(() => saved.delete(block.id), 2500)
   } catch (error) {
-    const what = `Couldn’t save block ${block.seq + 1}`
-    if (error instanceof ApiError && error.status === 409) {
-      toasts.push({
-        tone: 'warning',
-        title: what,
-        detail: 'This page is still being read. Try again once it’s ready.',
-      })
-    } else {
-      toastError(error, what, () => void patchBlock(block, body))
-    }
+    toastError(error, `Couldn’t save block ${block.seq + 1}`, {
+      retry: () => void patchBlock(block, body),
+      byStatus: {
+        409: {
+          tone: 'warning',
+          detail: 'This page is still being read. Try again once it’s ready.',
+        },
+      },
+    })
   } finally {
     saving.delete(block.id)
   }
@@ -146,67 +153,50 @@ async function patchBlock(block: Block, body: { text?: string; uncertain?: boole
 const save = (block: Block) => patchBlock(block, { text: drafts.get(block.id) })
 const looksRight = (block: Block) => patchBlock(block, { uncertain: false })
 
-async function readAgain() {
-  if (!detail.value) return
-  working.value = 'read'
-  try {
-    await call(
-      api.POST('/pages/{pageId}/transcribe', { params: { path: { pageId: props.pageId } } }),
-    )
-    pages.put({ ...detail.value, status: 'uploaded', error: null })
-    confirmRead.value = false
-    toasts.push({ tone: 'info', title: `Reading page ${detail.value.pageNumber} again` })
-  } catch (error) {
-    confirmRead.value = false
-    if (error instanceof ApiError && error.status === 409) {
-      toasts.push({
-        tone: 'info',
-        title: 'Already on it',
-        detail: 'This page is being read right now.',
-      })
-    } else {
-      toastError(error, 'Couldn’t read the page again')
-    }
-  } finally {
-    working.value = null
-  }
+function readAgain() {
+  return reading.run(
+    async () => {
+      if (!detail.value) return
+      await pages.retranscribe(detail.value)
+      toasts.push({ tone: 'info', title: `Reading page ${detail.value.pageNumber} again` })
+    },
+    {
+      title: 'Couldn’t read the page again',
+      byStatus: { 409: { title: 'Already on it', detail: 'This page is being read right now.' } },
+    },
+  )
 }
 
-async function deletePage() {
-  if (!detail.value) return
-  const { pageNumber, journalId } = detail.value
-  working.value = 'delete'
-  try {
-    await call(api.DELETE('/pages/{pageId}', { params: { path: { pageId: props.pageId } } }))
-    pages.remove(props.pageId)
-    void journals.refresh(journalId).catch(() => {})
-    confirmDelete.value = false
-    toasts.push({ tone: 'info', title: `Page ${pageNumber} is gone` })
-    await router.push({ name: 'journal', params: { journalId } })
-  } catch (error) {
-    toastError(error, 'Couldn’t delete the page')
-  } finally {
-    working.value = null
-  }
+function deletePage() {
+  return deleting.run(
+    async () => {
+      if (!detail.value) return
+      const { pageNumber, journalId } = detail.value
+      await call(api.DELETE('/pages/{pageId}', { params: { path: { pageId: props.pageId } } }))
+      pages.remove(props.pageId)
+      void journals.refresh(journalId).catch(() => {})
+      toasts.push({ tone: 'info', title: `Page ${pageNumber} is gone` })
+      await router.push({ name: 'journal', params: { journalId } })
+    },
+    { title: 'Couldn’t delete the page' },
+  )
 }
+
+const download = useAction(
+  (page: PageDetail) => downloadImage(page.image.urls.original, `page-${page.pageNumber}`),
+  { title: 'Couldn’t download the photo' },
+)
 
 const menu: MenuItem[] = [
-  { id: 'read', label: 'Re-transcribe', icon: 'refresh' },
-  { id: 'download', label: 'Download photo', icon: 'download' },
-  { id: 'delete', label: 'Delete page', icon: 'trash', danger: true },
+  { id: 'read', label: 'Re-transcribe', icon: 'refresh', run: () => reading.ask() },
+  {
+    id: 'download',
+    label: 'Download photo',
+    icon: 'download',
+    run: () => detail.value && download.run(detail.value),
+  },
+  { id: 'delete', label: 'Delete page', icon: 'trash', danger: true, run: () => deleting.ask() },
 ]
-
-async function onMenu(id: string) {
-  if (id === 'read') confirmRead.value = true
-  else if (id === 'delete') confirmDelete.value = true
-  else if (id === 'download' && detail.value) {
-    try {
-      await downloadImage(detail.value.image.urls.original, `page-${detail.value.pageNumber}`)
-    } catch (error) {
-      toastError(error, 'Couldn’t download the photo')
-    }
-  }
-}
 
 function step(id?: string) {
   if (id) void router.push({ name: 'page', params: { pageId: id } })
@@ -214,19 +204,16 @@ function step(id?: string) {
 </script>
 
 <template>
-  <main class="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 pt-8 pb-20 sm:px-6">
-    <KEmptyState
+  <KPage>
+    <LostState
       v-if="missing"
       title="This page wandered off"
       text="It may have been deleted. The rest of the journal is still on the shelf."
-    >
-      <template #illustration><KDoodle name="squiggle" /></template>
-      <KButton to="/">Back to your journals</KButton>
-    </KEmptyState>
+    />
 
     <template v-else-if="detail">
-      <header class="flex flex-wrap items-end justify-between gap-4">
-        <div class="flex flex-col gap-1.5">
+      <KPageHeader :title="`Page ${detail.pageNumber}`" :meta="meta">
+        <template #eyebrow>
           <KBreadcrumb
             :items="[
               { label: 'Journals', to: '/' },
@@ -237,16 +224,11 @@ function step(id?: string) {
               { label: `Page ${detail.pageNumber}` },
             ]"
           />
-          <div class="flex flex-wrap items-center gap-3.5">
-            <h1 class="m-0 text-[40px] leading-tight">Page {{ detail.pageNumber }}</h1>
-            <KStatusChip v-if="status" :status="status" />
-          </div>
-          <span class="text-sm text-muted">
-            <template v-if="dates">{{ dates }} · </template
-            >{{ plural(detail.blocks.length, 'block') }}
-          </span>
-        </div>
-        <div class="flex flex-wrap items-center gap-2.5">
+        </template>
+        <template #title-after>
+          <KStatusChip v-if="status" :status="status" />
+        </template>
+        <template #actions>
           <KPager
             :prev-label="neighbours.prevNumber ? `Page ${neighbours.prevNumber}` : 'Previous page'"
             :next-label="neighbours.nextNumber ? `Page ${neighbours.nextNumber}` : 'Next page'"
@@ -262,12 +244,12 @@ function step(id?: string) {
               >
             </span>
           </KPager>
-          <KButton variant="second" icon="refresh" :disabled="busy" @click="confirmRead = true">
+          <KButton variant="second" icon="refresh" :disabled="busy" @click="reading.ask()">
             Re-transcribe
           </KButton>
-          <KMenu label="Page actions" :items="menu" @select="onMenu" />
-        </div>
-      </header>
+          <KMenu label="Page actions" :items="menu" />
+        </template>
+      </KPageHeader>
 
       <KBanner v-if="status === 'failed'" title="We couldn’t read this page">
         {{
@@ -275,7 +257,7 @@ function step(id?: string) {
         }}
         Another try often helps.
         <template #actions>
-          <KButton @click="confirmRead = true">Re-transcribe</KButton>
+          <KButton @click="reading.ask()">Re-transcribe</KButton>
         </template>
       </KBanner>
 
@@ -292,23 +274,15 @@ function step(id?: string) {
 
       <div class="grid items-start gap-7 md:grid-cols-2">
         <figure :class="['m-0', view === 'text' && 'max-md:hidden']">
-          <div
-            class="relative overflow-hidden rounded-field border-[1.5px] border-ink bg-paper shadow-[0_8px_0_rgb(180_106_85/0.2)]"
-            :style="{ aspectRatio: `${detail.image.width} / ${detail.image.height}` }"
-          >
-            <img
-              v-if="photo"
-              :src="photo"
-              :alt="`Photo of page ${detail.pageNumber}`"
-              class="size-full object-contain"
-            />
-            <div
-              v-else
-              class="paper-lines flex size-full items-center justify-center [--line:32px]"
-            >
-              <KSpinner variant="daisy" :size="48" label="Loading the photo" />
-            </div>
-          </div>
+          <KPhoto
+            :src="photo"
+            :alt="`Photo of page ${detail.pageNumber}`"
+            :width="detail.image.width"
+            :height="detail.image.height"
+            fit="contain"
+            loading-label="Loading the photo"
+            class="rounded-field border-[1.5px] border-ink shadow-pin [--line:32px]"
+          />
         </figure>
 
         <section
@@ -354,28 +328,22 @@ function step(id?: string) {
       </div>
     </div>
 
-    <KDialog
-      v-model:open="confirmRead"
+    <KConfirmDialog
+      v-model:open="reading.open"
       :title="`Read page ${detail?.pageNumber} again?`"
       description="A fresh reading replaces the text, including any fixes you made."
-    >
-      <template #footer>
-        <KButton variant="second" autofocus @click="confirmRead = false">Keep it</KButton>
-        <KButton :loading="working === 'read'" @click="readAgain">Read it again</KButton>
-      </template>
-    </KDialog>
-
-    <KDialog
-      v-model:open="confirmDelete"
+      confirm-label="Read it again"
+      tone="main"
+      :loading="reading.busy"
+      @confirm="readAgain"
+    />
+    <KConfirmDialog
+      v-model:open="deleting.open"
       :title="`Delete page ${detail?.pageNumber}?`"
       description="The photo and all its text go with it. This can’t be undone."
-    >
-      <template #footer>
-        <KButton variant="second" autofocus @click="confirmDelete = false">Keep it</KButton>
-        <KButton variant="danger" :loading="working === 'delete'" @click="deletePage">
-          Delete page
-        </KButton>
-      </template>
-    </KDialog>
-  </main>
+      confirm-label="Delete page"
+      :loading="deleting.busy"
+      @confirm="deletePage"
+    />
+  </KPage>
 </template>

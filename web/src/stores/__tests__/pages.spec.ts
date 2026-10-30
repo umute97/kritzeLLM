@@ -113,3 +113,17 @@ describe('the page list', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 })
+
+describe('reading a page again', () => {
+  it('asks the API and follows the page from the start', async () => {
+    vi.useFakeTimers()
+    const fetch = vi.fn(async () => json({}, 202))
+    vi.stubGlobal('fetch', fetch)
+    const pages = usePages()
+    const page = makePage({ status: 'failed' })
+
+    await pages.retranscribe(page)
+    expect(calledUrl(fetch)).toBe(`/api/v1/pages/${page.id}/transcribe`)
+    expect(pages.byId.get(page.id)).toMatchObject({ status: 'uploaded', error: null })
+  })
+})

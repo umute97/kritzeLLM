@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useId, useTemplateRef, watch } from 'vue'
 
+import KDoodle from './KDoodle.vue'
 import KIconButton from './KIconButton.vue'
 import { useUiMessages } from './messages'
+import type { DoodleName } from './types'
 
 // Only for asking first, or a tiny form. Escape, the close button and the backdrop close it,
 // unless it isn't `dismissible` (e.g. while saving). Put `autofocus` on the safe choice in
@@ -18,8 +20,9 @@ const props = withDefaults(
     headingLevel?: 2 | 3
     form?: boolean
     dismissible?: boolean
+    doodle?: DoodleName
   }>(),
-  { description: undefined, size: 'sm', headingLevel: 2, dismissible: true },
+  { description: undefined, size: 'sm', headingLevel: 2, dismissible: true, doodle: undefined },
 )
 
 const emit = defineEmits<{ submit: [] }>()
@@ -78,7 +81,9 @@ const ui = useUiMessages()
       class="relative flex flex-col gap-3 p-7"
       v-on="form ? { submit: onSubmit } : {}"
     >
-      <slot name="decoration" />
+      <slot name="decoration">
+        <KDoodle v-if="doodle" :name="doodle" :size="46" class="absolute -top-5 right-7" />
+      </slot>
       <div class="flex items-start justify-between gap-3">
         <component :is="`h${headingLevel}`" :id="titleId" class="m-0 text-[26px] leading-tight">
           <slot name="title">{{ title }}</slot>

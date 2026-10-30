@@ -29,6 +29,7 @@ export interface UiMessages {
   pageReading: string
   pageUnreadable: string
   dropToAdd: string
+  keepIt: string
   show: (label: string) => string
   hide: (label: string) => string
   page: (n: number) => string
@@ -94,6 +95,7 @@ export const englishMessages: UiMessages = {
   pageReading: 'reading…',
   pageUnreadable: 'couldn’t read this one',
   dropToAdd: 'Let go to tuck them in',
+  keepIt: 'Keep it',
   show: (label) => `Show ${label}`,
   hide: (label) => `Hide ${label}`,
   page: (n) => `Page ${n}`,

@@ -9,6 +9,8 @@ export type BlockKind = 'heading' | 'paragraph' | 'list' | 'marginNote' | 'drawi
 /** Soft colour families for chips. Each pairs a pale ground with readable ink. */
 export type Tone = 'plain' | 'lemon' | 'orchid' | 'herb' | 'bark'
 
+export type DoodleName = 'daisy' | 'sprig' | 'heart' | 'sparkle' | 'squiggle'
+
 /** Journal cover colours, straight from the palette. */
 export type CoverColor = 'herb' | 'clay' | 'orchid' | 'lemon'
 
@@ -28,13 +30,16 @@ export interface Crumb {
   to?: string | Record<string, unknown>
 }
 
-export interface MenuItem {
-  id: string
+export interface MenuItem<Id extends string = string> {
+  id: Id
   label: string
   icon?: IconName
   /** Danger items sit alone at the bottom, under a line. */
   danger?: boolean
   disabled?: boolean
+  /** Why it's disabled, shown under the label. */
+  hint?: string
+  run?: () => void
 }
 
 export const pageStatusTones: Record<PageStatus, Tone> = {

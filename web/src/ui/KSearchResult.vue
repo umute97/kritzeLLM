@@ -3,7 +3,9 @@ import type { Component } from 'vue'
 
 import { usePolymorphic, type LinkTarget } from './polymorphic'
 import KBlockKindTag from './KBlockKindTag.vue'
+import KCard from './KCard.vue'
 import KHighlight from './KHighlight.vue'
+import KPhoto from './KPhoto.vue'
 import KScoreBars from './KScoreBars.vue'
 import type { BlockKind } from './types'
 import { useUiMessages } from './messages'
@@ -41,23 +43,22 @@ const ui = useUiMessages()
 </script>
 
 <template>
-  <component
-    :is="element.is"
+  <KCard
+    :as="element.is"
     v-bind="element.attrs"
-    class="flex gap-4.5 rounded-card border-[1.5px] border-ink bg-cream p-4 text-ink no-underline hover:bg-paper hover:text-ink"
+    padding="sm"
+    class="flex gap-4.5 no-underline hover:bg-paper hover:text-ink"
   >
-    <span
+    <KPhoto
+      :src="imageUrl"
+      lazy
       aria-hidden="true"
-      class="h-35 w-28 shrink-0 overflow-hidden rounded border border-line max-sm:hidden"
+      class="h-35 w-28 shrink-0 rounded border border-line [--line:20px] max-sm:hidden"
     >
-      <img v-if="imageUrl" :src="imageUrl" alt="" loading="lazy" class="size-full object-cover" />
-      <span
-        v-else
-        class="paper-lines block size-full p-2.5 font-hand text-sm leading-5 [--line:20px]"
-      >
+      <span class="block p-2.5 font-hand text-sm leading-5">
         <KHighlight :before="before" :hit="hit" :after="after" />
       </span>
-    </span>
+    </KPhoto>
     <span class="flex min-w-0 flex-1 flex-col gap-2">
       <span class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <strong class="font-display-soft text-xl">{{ ui.page(pageNumber) }}</strong>
@@ -69,5 +70,5 @@ const ui = useUiMessages()
       <span class="leading-relaxed"><KHighlight :before="before" :hit="hit" :after="after" /></span>
       <KScoreBars v-if="scores" class="mt-1" v-bind="scores" />
     </span>
-  </component>
+  </KCard>
 </template>
