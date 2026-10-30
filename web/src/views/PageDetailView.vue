@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onUnmounted, reactive, ref, watch } from 'vue'
+import {
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  useRouter,
+  type RouteLocationNormalized,
+} from 'vue-router'
 
 import { api, call } from '@/api/client'
 import { ApiError } from '@/api/errors'
@@ -49,10 +54,12 @@ const neighbours = ref<{ prev?: string; next?: string; prevNumber?: number; next
 const drafts = reactive(new Map<string, string>())
 const saving = reactive(new Set<string>())
 const saved = reactive(new Set<string>())
+const savedTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const active = ref<string | null>(null)
 const view = ref<'photo' | 'text' | 'both'>('both')
 const reading = useConfirm()
 const deleting = useConfirm()
+const leaving = useConfirm<RouteLocationNormalized>()
 
 // The poller in the pages store keeps the status fresh while the page is being read.
 const status = computed(() => pages.byId.get(props.pageId)?.status ?? detail.value?.status)
@@ -67,26 +74,34 @@ const meta = computed(() =>
     : undefined,
 )
 
+// Bumped by every load, so an answer for a page you've already paged past is dropped.
+let latest = 0
+
 async function load() {
+  const mine = ++latest
   missing.value = false
   try {
     const page = await call(
       api.GET('/pages/{pageId}', { params: { path: { pageId: props.pageId } } }),
     )
+    if (mine !== latest) return
     detail.value = page
     drafts.clear()
     pages.put(page)
-    journal.value = await journals.get(page.journalId)
-    void findNeighbours(page)
+    void findNeighbours(page, mine)
+    const owner = await journals.get(page.journalId)
+    if (mine === latest) journal.value = owner
   } catch (error) {
+    if (mine !== latest) return
     if (error instanceof ApiError && error.status === 404) missing.value = true
     else toastError(error, 'Couldn’t open this page', { retry: load })
   }
 }
 
-async function findNeighbours(page: PageDetail) {
+async function findNeighbours(page: PageDetail, mine: number) {
   try {
     const all = await pages.journalIndex(page.journalId)
+    if (mine !== latest) return
     const at = all.findIndex((p) => p.id === page.id)
     const prev = all[at - 1]
     const next = all[at + 1]
@@ -97,11 +112,20 @@ async function findNeighbours(page: PageDetail) {
       nextNumber: next?.pageNumber,
     }
   } catch {
-    neighbours.value = {}
+    if (mine === latest) neighbours.value = {}
   }
 }
 
-watch(() => props.pageId, load, { immediate: true })
+watch(
+  () => props.pageId,
+  () => {
+    detail.value = undefined
+    active.value = null
+    neighbours.value = {}
+    void load()
+  },
+  { immediate: true },
+)
 
 // Once a fresh reading is done, fetch the new blocks.
 watch(status, (now, before) => {
@@ -126,15 +150,21 @@ function replaceBlock(updated: Block) {
 }
 
 async function patchBlock(block: Block, body: { text?: string; uncertain?: boolean }) {
+  if (saving.has(block.id)) return
   saving.add(block.id)
   try {
     const result = await call(
       api.PATCH('/blocks/{blockId}', { params: { path: { blockId: block.id } }, body }),
     )
     replaceBlock(result.block)
-    drafts.delete(block.id)
+    // Whatever was typed while it saved stays a draft on top of the saved text.
+    if (drafts.get(block.id) === result.block.text) drafts.delete(block.id)
     saved.add(block.id)
-    setTimeout(() => saved.delete(block.id), 2500)
+    clearTimeout(savedTimers.get(block.id))
+    savedTimers.set(
+      block.id,
+      setTimeout(() => saved.delete(block.id), 2500),
+    )
   } catch (error) {
     toastError(error, `Couldn’t save block ${block.seq + 1}`, {
       retry: () => void patchBlock(block, body),
@@ -150,7 +180,20 @@ async function patchBlock(block: Block, body: { text?: string; uncertain?: boole
   }
 }
 
-const save = (block: Block) => patchBlock(block, { text: drafts.get(block.id) })
+function save(block: Block) {
+  const draft = drafts.get(block.id)
+  if (draft === undefined) return
+  if (!draft.trim()) {
+    toasts.push({
+      tone: 'info',
+      title: 'A block can’t be empty',
+      detail: 'Write something in it, or undo to get the old text back.',
+    })
+    return
+  }
+  return patchBlock(block, { text: draft })
+}
+
 const looksRight = (block: Block) => patchBlock(block, { uncertain: false })
 
 function readAgain() {
@@ -201,6 +244,36 @@ const menu: MenuItem[] = [
 function step(id?: string) {
   if (id) void router.push({ name: 'page', params: { pageId: id } })
 }
+
+function holdUnsaved(to: RouteLocationNormalized) {
+  if (drafts.size === 0) return true
+  leaving.ask(to)
+  return false
+}
+
+onBeforeRouteLeave(holdUnsaved)
+onBeforeRouteUpdate(holdUnsaved)
+
+function leave() {
+  return leaving.run(
+    async (to) => {
+      drafts.clear()
+      await router.push(to.fullPath)
+    },
+    { title: 'Couldn’t leave this page' },
+  )
+}
+
+function holdUnload(event: BeforeUnloadEvent) {
+  if (drafts.size > 0) event.preventDefault()
+}
+
+window.addEventListener('beforeunload', holdUnload)
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', holdUnload)
+  savedTimers.forEach(clearTimeout)
+})
 </script>
 
 <template>
@@ -344,6 +417,14 @@ function step(id?: string) {
       confirm-label="Delete page"
       :loading="deleting.busy"
       @confirm="deletePage"
+    />
+    <KConfirmDialog
+      v-model:open="leaving.open"
+      title="Leave without saving?"
+      :description="`Your changes to ${plural(drafts.size, 'block')} will be lost.`"
+      confirm-label="Leave anyway"
+      :loading="leaving.busy"
+      @confirm="leave"
     />
   </KPage>
 </template>

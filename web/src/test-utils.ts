@@ -1,5 +1,5 @@
 // Small builders for tests: API objects with sensible defaults, and JSON responses.
-import type { Journal, Page } from '@/api/types'
+import type { Block, Journal, Page } from '@/api/types'
 
 let counter = 0
 
@@ -43,6 +43,18 @@ export function makePage(overrides: Partial<Page> = {}): Page {
     transcriptionModel: null,
     createdAt: '2026-03-03T10:00:00Z',
     updatedAt: '2026-03-03T10:00:00Z',
+    ...overrides,
+  }
+}
+
+export function makeBlock(overrides: Partial<Block> = {}): Block {
+  return {
+    id: typeId('blk'),
+    pageId: 'pg_1',
+    seq: 0,
+    kind: 'paragraph',
+    text: 'Picked wild garlic by the river.',
+    uncertain: false,
     ...overrides,
   }
 }
