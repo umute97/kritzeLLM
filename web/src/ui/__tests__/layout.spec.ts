@@ -41,6 +41,12 @@ describe('KSection', () => {
     expect(wrapper.text()).toContain('Garden notes')
     expect(wrapper.text()).toContain('3 done')
   })
+
+  it('can sit inside another section as an h3', () => {
+    const wrapper = mount(KSection, { props: { title: '3 photos', headingLevel: 3 } })
+    expect(wrapper.get('h3').attributes('id')).toBe(wrapper.attributes('aria-labelledby'))
+    expect(wrapper.find('h2').exists()).toBe(false)
+  })
 })
 
 describe('KPageHeader', () => {
@@ -67,6 +73,18 @@ describe('KCardGrid', () => {
       slots: { default: '<li>Page 1</li>' },
     })
     expect(pages.text()).toBe('Page 1')
+  })
+
+  it('gives an empty grid a card-tall row, with the stand-in card hidden', () => {
+    const wrapper = mount(KCardGrid, {
+      props: { kind: 'pages', empty: true },
+      slots: { empty: '<p>No pages yet</p>' },
+    })
+    expect(wrapper.find('ul').exists()).toBe(false)
+    const sizer = wrapper.get('[aria-hidden="true"]')
+    expect(sizer.attributes('inert')).toBeDefined()
+    expect(sizer.classes()).toContain('row-start-1')
+    expect(wrapper.get('p').element.parentElement?.classList).toContain('row-start-1')
   })
 })
 
