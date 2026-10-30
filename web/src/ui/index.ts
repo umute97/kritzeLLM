@@ -2,6 +2,12 @@
 // in docs/design/README.md.
 
 export { createCottage, type CottageOptions } from './plugin'
+export {
+  englishMessages,
+  useUiMessages,
+  type UiMessages,
+  type UiMessagesOverride,
+} from './messages'
 export type { LinkTarget } from './polymorphic'
 
 // Brand and icons

@@ -6,6 +6,7 @@ import KFieldShell from './KFieldShell.vue'
 import KIcon from './KIcon.vue'
 import KIconButton from './KIconButton.vue'
 import { focusWithinRing } from './styles'
+import { useUiMessages } from './messages'
 
 // Round like the buttons, and a search form of its own: Enter or a submit button in the
 // trailing slot searches. So don't put it inside another form.
@@ -29,6 +30,8 @@ function clear() {
   model.value = ''
   input.value?.focus()
 }
+
+const ui = useUiMessages()
 </script>
 
 <template>
@@ -58,7 +61,7 @@ function clear() {
         <KIconButton
           v-if="model"
           icon="close"
-          label="Clear search"
+          :label="ui.clearSearch"
           variant="quiet"
           @click="clear"
         />

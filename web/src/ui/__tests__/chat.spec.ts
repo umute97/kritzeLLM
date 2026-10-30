@@ -12,6 +12,7 @@ describe('KComposer', () => {
   function composer(props: Record<string, unknown> = {}) {
     const wrapper = mount(KComposer, {
       props: {
+        label: 'Ask your journal',
         modelValue: '',
         'onUpdate:modelValue': (v: string) => wrapper.setProps({ modelValue: v }),
         ...props,

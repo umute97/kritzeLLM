@@ -3,6 +3,7 @@ import KHighlight from './KHighlight.vue'
 import KIcon from './KIcon.vue'
 import { useLinkComponent } from './plugin'
 import { linkAttrs, type LinkTarget } from './polymorphic'
+import { useUiMessages } from './messages'
 
 // A cited page in the Sources panel. The picked one lifts and its quote takes the accent.
 withDefaults(
@@ -21,11 +22,13 @@ withDefaults(
     before: '',
     after: '',
     to: undefined,
-    linkLabel: 'Open the page',
+    linkLabel: undefined,
   },
 )
 
 const link = useLinkComponent()
+
+const ui = useUiMessages()
 </script>
 
 <template>
@@ -50,7 +53,7 @@ const link = useLinkComponent()
       v-bind="linkAttrs(link, to)"
       class="inline-flex items-center gap-1.5 self-start text-sm font-bold"
     >
-      {{ linkLabel }}
+      {{ linkLabel ?? ui.openPage }}
       <KIcon name="chevron-right" :size="16" />
     </component>
   </div>

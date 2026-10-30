@@ -9,6 +9,7 @@ import KProgressBar from './KProgressBar.vue'
 import KSpinner from './KSpinner.vue'
 import type { ToastTone } from './toasts'
 import { intentLooks } from './tones'
+import { useUiMessages } from './messages'
 
 const props = withDefaults(
   defineProps<{
@@ -35,6 +36,8 @@ const look = computed(() =>
     : intentLooks[props.tone],
 )
 const canDismiss = computed(() => props.dismissible ?? props.tone !== 'loading')
+
+const ui = useUiMessages()
 </script>
 
 <template>
@@ -52,9 +55,9 @@ const canDismiss = computed(() => props.dismissible ?? props.tone !== 'loading')
     <div class="flex min-w-0 flex-1 flex-col gap-0.5">
       <div class="flex items-baseline justify-between gap-2">
         <strong class="text-[15px]">{{ title }}</strong>
-        <span v-if="progress" class="shrink-0 pr-1 text-sm text-muted"
-          >{{ progress.value }} of {{ progress.max }}</span
-        >
+        <span v-if="progress" class="shrink-0 pr-1 text-sm text-muted">{{
+          ui.progress(progress.value, progress.max)
+        }}</span>
       </div>
       <p
         v-if="detail"
@@ -84,7 +87,7 @@ const canDismiss = computed(() => props.dismissible ?? props.tone !== 'loading')
           class="min-h-9 cursor-pointer px-2 text-[13px] font-bold text-bark underline underline-offset-3"
           @click="open = !open"
         >
-          {{ open ? 'Hide details' : 'Show details' }}
+          {{ open ? ui.hideDetails : ui.showDetails }}
         </button>
         <slot />
       </div>
@@ -97,7 +100,7 @@ const canDismiss = computed(() => props.dismissible ?? props.tone !== 'loading')
     <KIconButton
       v-if="canDismiss"
       icon="close"
-      label="Dismiss"
+      :label="ui.dismiss"
       variant="quiet"
       size="sm"
       @click="emit('dismiss')"

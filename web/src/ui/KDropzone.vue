@@ -4,14 +4,18 @@ import { computed, ref } from 'vue'
 import { useSplitAttrs } from './attrs'
 import KButton from './KButton.vue'
 import KIcon from './KIcon.vue'
+import { useUiMessages } from './messages'
 
-// Drop photos here or choose them. The caller checks the files and sets `error` to reject.
+// Drop files here or choose them. The caller checks the files and sets `error` to reject.
 defineOptions({ inheritAttrs: false })
 
 const props = withDefaults(
   defineProps<{
-    title?: string
-    hint?: string
+    title: string
+    hint: string
+    chooseLabel: string
+    /** What a drag holds, e.g. "2 photos". */
+    countLabel?: (count: number) => string
     accept?: string
     multiple?: boolean
     disabled?: boolean
@@ -21,8 +25,7 @@ const props = withDefaults(
     headingLevel?: 2 | 3
   }>(),
   {
-    title: 'Drop page photos here',
-    hint: 'JPEG, PNG, HEIC or WebP, up to 25 MB each and 100 at a time',
+    countLabel: undefined,
     accept: 'image/jpeg,image/png,image/heic,image/heif,image/webp,.heic,.heif',
     multiple: true,
     error: undefined,
@@ -32,6 +35,7 @@ const props = withDefaults(
 )
 
 const { rootAttrs, controlAttrs } = useSplitAttrs()
+const ui = useUiMessages()
 
 const emit = defineEmits<{ files: [files: File[]] }>()
 
@@ -87,16 +91,16 @@ function onPick(event: Event) {
       />
     </slot>
     <component :is="`h${headingLevel}`" class="m-0 text-[26px] leading-tight" aria-live="polite">
-      {{ dragging ? 'Let go to tuck them in' : (error ?? title) }}
+      {{ dragging ? ui.dropToAdd : (error ?? title) }}
     </component>
     <p v-if="dragging" class="m-0 font-hand text-xl">
-      {{ count === 1 ? '1 photo' : `${count} photos` }}
+      {{ (countLabel ?? ui.files)(count) }}
     </p>
     <p v-else class="m-0 max-w-[340px] text-sm" :class="error ? 'text-ink' : 'text-muted'">
       {{ error ? errorHint : hint }}
     </p>
     <KButton as="label" icon="upload" class="relative mt-1.5" :disabled="disabled">
-      Choose photos
+      {{ chooseLabel }}
       <input
         v-bind="controlAttrs()"
         type="file"

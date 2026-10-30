@@ -5,6 +5,7 @@ import { useSplitAttrs } from './attrs'
 import KButton from './KButton.vue'
 import KFieldShell from './KFieldShell.vue'
 import KIconButton from './KIconButton.vue'
+import { useUiMessages } from './messages'
 import { focusWithinRing } from './styles'
 
 // The writing box. Enter sends, Shift+Enter adds a line; while an answer streams, send becomes stop.
@@ -12,15 +13,18 @@ defineOptions({ inheritAttrs: false })
 
 const text = defineModel<string>({ default: '' })
 
-const props = withDefaults(
-  defineProps<{ label?: string; placeholder?: string; streaming?: boolean; disabled?: boolean }>(),
-  { label: 'Ask your journal', placeholder: 'Ask your journal anything' },
-)
+const props = defineProps<{
+  label: string
+  placeholder?: string
+  streaming?: boolean
+  disabled?: boolean
+}>()
 
 const emit = defineEmits<{ send: [text: string]; stop: [] }>()
 
 const canSend = computed(() => !props.disabled && !props.streaming && text.value.trim() !== '')
 const { rootAttrs, controlAttrs } = useSplitAttrs()
+const ui = useUiMessages()
 
 function send() {
   if (canSend.value) emit('send', text.value.trim())
@@ -57,12 +61,12 @@ function onKeydown(event: KeyboardEvent) {
     </KFieldShell>
     <KButton v-if="streaming" variant="second" class="min-h-[46px]" @click="emit('stop')">
       <template #icon><span aria-hidden="true" class="size-3 rounded-[3px] bg-ink" /></template>
-      Stop
+      {{ ui.stop }}
     </KButton>
     <KIconButton
       v-else
       icon="arrow-up"
-      label="Send"
+      :label="ui.send"
       :variant="canSend ? 'main' : 'second'"
       :disabled="!canSend"
       @click="send"

@@ -22,7 +22,7 @@ const date = computed(() => formatEntryDates(props.page.entryDates))
     :date="date"
     :image-url="thumbnail"
     :tilt="tilt"
-    :failed-text="page.error?.title ?? 'couldn’t read this one'"
+    :failed-text="page.error?.title"
     @retry="emit('retry', page)"
   />
 </template>

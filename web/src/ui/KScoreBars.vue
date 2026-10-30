@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import { useUiMessages } from './messages'
 import KProgressBar from './KProgressBar.vue'
 
 // Why a search result came up: word match, closeness of meaning, and the blend that orders them.
 const props = defineProps<{ words: number; meaning: number; blended: number }>()
 
+const ui = useUiMessages()
+
 const bars = computed(() => [
-  { label: 'Words', value: props.words, color: 'lemon' as const },
-  { label: 'Meaning', value: props.meaning, color: 'orchid' as const },
-  { label: 'Blended', value: props.blended, color: 'accent' as const },
+  { label: ui.value.scores.words, value: props.words, color: 'lemon' as const },
+  { label: ui.value.scores.meaning, value: props.meaning, color: 'orchid' as const },
+  { label: ui.value.scores.blended, value: props.blended, color: 'accent' as const },
 ])
 </script>
 
@@ -26,7 +29,7 @@ const bars = computed(() => [
         :max="1"
         :value="bar.value"
         :color="bar.color"
-        :label="`${bar.label} score`"
+        :label="ui.score(bar.label)"
       />
     </div>
   </div>

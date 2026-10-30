@@ -2,12 +2,10 @@
 import { computed } from 'vue'
 
 import KChip from './KChip.vue'
+import { useUiMessages } from './messages'
 import {
-  jobStatusLabels,
   jobStatusTones,
-  pageStatusLabels,
   pageStatusTones,
-  uploadStatusLabels,
   uploadStatusTones,
   type JobStatus,
   type PageStatus,
@@ -28,12 +26,18 @@ const props = withDefaults(
   { kind: undefined, size: 'md', label: undefined },
 )
 
-const tables = {
-  page: { tones: pageStatusTones, labels: pageStatusLabels },
-  job: { tones: jobStatusTones, labels: jobStatusLabels },
-  upload: { tones: uploadStatusTones, labels: uploadStatusLabels },
-}
-const looks = computed(() => tables[props.kind ?? 'page'])
+const ui = useUiMessages()
+
+const looks = computed(() => {
+  const kind = props.kind ?? 'page'
+  const tones = { page: pageStatusTones, job: jobStatusTones, upload: uploadStatusTones }[kind]
+  const labels = {
+    page: ui.value.pageStatus,
+    job: ui.value.jobStatus,
+    upload: ui.value.uploadStatus,
+  }[kind]
+  return { tones, labels }
+})
 const tone = computed<Tone>(
   () => (looks.value.tones as Record<string, Tone>)[props.status] ?? 'plain',
 )

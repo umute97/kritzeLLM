@@ -3,17 +3,20 @@ import { computed } from 'vue'
 
 import KToast from './KToast.vue'
 import { useToasts } from './toasts'
+import { useUiMessages } from './messages'
 
 // Bottom right on wide screens, top and full width on phones. Three at most; older ones fold away.
 const { items, dismiss, pause, resume } = useToasts()
 
 const visible = computed(() => items.value.slice(-3))
+
+const ui = useUiMessages()
 </script>
 
 <template>
   <div
     role="region"
-    aria-label="Notifications"
+    :aria-label="ui.notifications"
     class="pointer-events-none fixed inset-x-4 top-4 z-50 flex flex-col gap-3.5 sm:inset-x-auto sm:top-auto sm:right-6 sm:bottom-6 sm:w-[440px]"
   >
     <KToast

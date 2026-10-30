@@ -2,6 +2,7 @@
 import { useId, useTemplateRef, watch } from 'vue'
 
 import KIconButton from './KIconButton.vue'
+import { useUiMessages } from './messages'
 
 // Only for asking first, or a tiny form. Escape, the close button and the backdrop close it,
 // unless it isn't `dismissible` (e.g. while saving). Put `autofocus` on the safe choice in
@@ -54,6 +55,8 @@ function onSubmit(event: Event) {
   event.preventDefault()
   emit('submit')
 }
+
+const ui = useUiMessages()
 </script>
 
 <template>
@@ -82,7 +85,7 @@ function onSubmit(event: Event) {
         </component>
         <KIconButton
           icon="close"
-          label="Close"
+          :label="ui.close"
           variant="quiet"
           size="sm"
           :disabled="!dismissible"

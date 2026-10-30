@@ -1,11 +1,15 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ label?: string }>(), { label: 'Still writing' })
+import { useUiMessages } from './messages'
+
+defineProps<{ label?: string }>()
+
+const ui = useUiMessages()
 </script>
 
 <template>
   <span
     role="status"
-    :aria-label="label"
+    :aria-label="label ?? ui.stillWriting"
     class="inline-flex gap-1.5 rounded-full border-[1.5px] border-line bg-paper px-4 py-3"
   >
     <span class="size-[9px] animate-bob rounded-full border-[1.5px] border-ink bg-orchid" />

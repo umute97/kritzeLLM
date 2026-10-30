@@ -245,6 +245,9 @@ const summary = computed(() => {
       <section v-if="journal" aria-label="Upload pages" class="flex flex-wrap gap-6">
         <KDropzone
           class="min-w-0 flex-[1_1_420px]"
+          title="Drop page photos here"
+          choose-label="Choose photos"
+          :count-label="(n) => plural(n, 'photo')"
           :hint="`JPEG, PNG, HEIC or WebP, up to 25 MB each. They go into ${journal.name}.`"
           :error="dropError"
           error-hint="Photos only: JPEG, PNG, HEIC or WebP, up to 25 MB each. PDF import is coming."
