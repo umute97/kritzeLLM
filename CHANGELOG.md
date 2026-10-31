@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.6.0](https://github.com/umute97/kritzeLLM/compare/v0.5.1...v0.6.0) (2026-10-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** chunk and embed pages for search 🧩 ([#91](https://github.com/umute97/kritzeLLM/issues/91))
+
+### Features
+
+* **api:** chunk and embed pages for search 🧩 ([#91](https://github.com/umute97/kritzeLLM/issues/91)) ([e7f7d60](https://github.com/umute97/kritzeLLM/commit/e7f7d60cc73921435dfd95101928f70ed76ebf24))
+* **api:** hybrid search 🔎 ([#92](https://github.com/umute97/kritzeLLM/issues/92)) ([666b738](https://github.com/umute97/kritzeLLM/commit/666b738d576250a56810df44a87fb0ecad0cb9f1))
+* **web:** internationalize web app 🏳️‍⚧️ ([#93](https://github.com/umute97/kritzeLLM/issues/93)) ([ad94c5f](https://github.com/umute97/kritzeLLM/commit/ad94c5f00147fc04e5c61322142ff59aa7d269a6))
+
+
+### Bug Fixes
+
+* **web:** keep page edits safe and test the page detail view 🔍 ([#89](https://github.com/umute97/kritzeLLM/issues/89)) ([ad094e5](https://github.com/umute97/kritzeLLM/commit/ad094e522cbc296a33bdc4f89a94e513a3989686))
+
 ## [0.5.1](https://github.com/umute97/kritzeLLM/compare/v0.5.0...v0.5.1) (2026-10-30)
 
 
