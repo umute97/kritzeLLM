@@ -26,10 +26,15 @@ describe('KTopNav and KNavLink', () => {
 
     const menu = wrapper.get('button[aria-label="Menu"]')
     const panel = wrapper.get(`#${menu.attributes('aria-controls')}`)
+    // The end bit folds away with the links, so it's reachable on phones too.
+    const end = wrapper.findAll('nav > div > div').at(-1)!
+    expect(end.text()).toBe('hi there')
     expect(panel.classes()).toContain('hidden')
+    expect(end.classes()).toContain('hidden')
     await menu.trigger('click')
     expect(menu.attributes('aria-expanded')).toBe('true')
     expect(panel.classes()).not.toContain('hidden')
+    expect(end.classes()).not.toContain('hidden')
   })
 })
 

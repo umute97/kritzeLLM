@@ -5,7 +5,7 @@ import KIconButton from './KIconButton.vue'
 import { pageWidth } from './styles'
 import { useUiMessages } from './messages'
 
-// Brand, links (KNavLink) and a little greeting. On phones the links fold behind a menu button.
+// Brand, links (KNavLink) and an end bit, e.g. a greeting. On phones both fold behind a menu button.
 defineProps<{ label?: string }>()
 
 const open = ref(false)
@@ -38,7 +38,7 @@ const ui = useUiMessages()
       >
         <slot />
       </div>
-      <div v-if="$slots.end" class="hidden sm:block">
+      <div v-if="$slots.end" :class="['sm:block', open ? 'w-full' : 'hidden']">
         <slot name="end" />
       </div>
     </div>

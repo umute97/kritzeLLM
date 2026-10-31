@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useId, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
-import { plural } from '@/utils/format'
 import { useUploads } from '@/stores/uploads'
 import { KButton, KProgressBar, KSection, KUploadRow } from '@/ui'
 
@@ -9,6 +9,7 @@ import { KButton, KProgressBar, KSection, KUploadRow } from '@/ui'
 // toggle, following it to "Ready".
 const props = defineProps<{ journalId: string; journalName: string }>()
 
+const { t } = useI18n()
 const uploads = useUploads()
 const listId = useId()
 
@@ -18,10 +19,10 @@ const settled = computed(() => total.value - batch.value.counts.busy)
 const summary = computed(() => {
   const { done, skipped, failed, deleted } = batch.value.counts
   return [
-    `${done} done`,
-    skipped && `${skipped} skipped`,
-    failed && `${failed} ${failed === 1 ? 'needs' : 'need'} a hand`,
-    deleted && `${deleted} deleted`,
+    t('uploads.done', { n: done }),
+    skipped && t('uploads.skipped', { n: skipped }),
+    failed && t('uploads.failed', failed),
+    deleted && t('uploads.deleted', { n: deleted }),
   ]
     .filter(Boolean)
     .join(' · ')
@@ -40,7 +41,7 @@ watch(
 
 <template>
   <KSection
-    :title="`${plural(total, 'photo')} into ${journalName}`"
+    :title="t('uploads.title', { photos: t('counts.photos', total), journal: journalName })"
     :heading-level="3"
     framed
     align="baseline"
@@ -54,10 +55,10 @@ watch(
         :aria-controls="listId"
         @click="open = !open"
       >
-        {{ open ? 'Hide each photo' : 'Show each photo' }}
+        {{ open ? t('uploads.hideEach') : t('uploads.showEach') }}
       </KButton>
     </template>
-    <KProgressBar :value="settled" :max="total" label="Upload progress" />
+    <KProgressBar :value="settled" :max="total" :label="t('uploads.progress')" />
     <ul v-show="open" :id="listId" class="m-0 flex list-none flex-col gap-2 p-0">
       <KUploadRow
         v-for="row in batch.rows"
@@ -74,7 +75,7 @@ watch(
           variant="quiet"
           size="sm"
         >
-          Open
+          {{ t('uploads.open') }}
         </KButton>
       </KUploadRow>
     </ul>
@@ -85,7 +86,7 @@ watch(
       class="self-end"
       @click="uploads.clear(journalId)"
     >
-      Clear the list
+      {{ t('uploads.clear') }}
     </KButton>
   </KSection>
 </template>

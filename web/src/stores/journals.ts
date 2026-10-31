@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue'
 
 import { api, call } from '@/api/client'
 import type { Journal } from '@/api/types'
+import { i18n } from '@/i18n'
 
 export const PER_SHELF = 4
 
@@ -26,7 +27,7 @@ export const useJournals = defineStore('journals', () => {
   const canNext = computed(() => nextCursors.value[index.value] != null)
   const range = computed(() => {
     const first = index.value * PER_SHELF + 1
-    return `Journals ${first}–${first + shelf.value.length - 1}`
+    return i18n.global.t('library.range', { first, last: first + shelf.value.length - 1 })
   })
   const empty = computed(() => loaded.value && shelves.value[0]?.length === 0)
 

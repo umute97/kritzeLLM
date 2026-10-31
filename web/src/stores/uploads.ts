@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 
 import { ApiError } from '@/api/errors'
 import { uploadPage } from '@/api/upload'
+import { i18n } from '@/i18n'
 import { fileSize } from '@/utils/format'
 import { useToasts, type UploadStatus } from '@/ui'
 
@@ -26,11 +27,17 @@ export interface UploadRow {
 }
 
 /** Why a file can't go up, or null when it can. */
-export function rejectReason(file: File): { label: string; note: string } | null {
+export function rejectReason(
+  file: File,
+): { reason: 'type' | 'size'; label: string; note: string } | null {
+  const { t } = i18n.global
   const looksLikePhoto = TYPES.has(file.type) || (file.type === '' && EXTENSIONS.test(file.name))
-  if (!looksLikePhoto) return { label: 'Not a photo', note: 'Photos only: JPEG, PNG, HEIC or WebP' }
+  if (!looksLikePhoto) {
+    return { reason: 'type', label: t('uploads.notPhoto'), note: t('uploads.notPhotoNote') }
+  }
   if (file.size > MAX_BYTES) {
-    return { label: 'Too big', note: `${fileSize(file.size)}, the limit is 25 MB` }
+    const note = t('uploads.tooBigNote', { size: fileSize(file.size) })
+    return { reason: 'size', label: t('uploads.tooBig'), note }
   }
   return null
 }
@@ -46,6 +53,7 @@ export const useUploads = defineStore('uploads', () => {
   let nextKey = 1
 
   const pages = usePages()
+  const { t } = i18n.global
 
   function statusOf(row: UploadRow): {
     status: UploadStatus
@@ -56,20 +64,23 @@ export const useUploads = defineStore('uploads', () => {
     if (row.own) return row.own
     const page = row.pageId ? pages.byId.get(row.pageId) : undefined
     // Uploads put their page in the store, so it's only missing once it was deleted.
-    if (!page) return { status: 'deleted', note: 'Its page was deleted' }
-    const where = `Page ${page.pageNumber}`
-    if (row.duplicate) return { status: 'duplicate', note: `Same photo as page ${page.pageNumber}` }
+    if (!page) return { status: 'deleted', note: t('uploads.pageDeleted') }
+    const n = page.pageNumber
+    if (row.duplicate) return { status: 'duplicate', note: t('uploads.samePhoto', { n }) }
     switch (page.status) {
       case 'uploaded':
-        return { status: 'queued', note: `${where} · waiting its turn` }
+        return { status: 'queued', note: t('uploads.waiting', { n }) }
       case 'transcribing':
-        return { status: 'transcribing', note: `${where} · reading the handwriting` }
+        return { status: 'transcribing', note: t('uploads.reading', { n }) }
       case 'indexing':
-        return { status: 'indexing', note: `${where} · almost there` }
+        return { status: 'indexing', note: t('uploads.indexing', { n }) }
       case 'ready':
-        return { status: 'ready', note: where }
+        return { status: 'ready', note: t('uploads.page', { n }) }
       case 'failed':
-        return { status: 'failed', note: page.error?.detail ?? page.error?.title ?? where }
+        return {
+          status: 'failed',
+          note: page.error?.detail ?? page.error?.title ?? t('uploads.page', { n }),
+        }
     }
   }
 
@@ -94,9 +105,9 @@ export const useUploads = defineStore('uploads', () => {
     const accepted = files.slice(0, MAX_FILES).filter((file) => !rejectReason(file))
     if (accepted.length === 0) {
       const first = files[0]
-      return first
-        ? `${first.name} ${rejectReason(first)?.label === 'Too big' ? 'is too big' : 'isn’t a photo'}`
-        : null
+      if (!first) return null
+      const tooBig = rejectReason(first)?.reason === 'size'
+      return t(tooBig ? 'uploads.isTooBig' : 'uploads.isNotPhoto', { name: first.name })
     }
     for (const file of files.slice(0, MAX_FILES)) {
       const reason = rejectReason(file)
@@ -106,7 +117,11 @@ export const useUploads = defineStore('uploads', () => {
         journalId,
         own: reason
           ? { status: 'failed', statusLabel: reason.label, note: reason.note }
-          : { status: 'sending', progress: 0, note: `0 KB of ${fileSize(file.size)}` },
+          : {
+              status: 'sending',
+              progress: 0,
+              note: t('uploads.sent', { sent: '0 KB', total: fileSize(file.size) }),
+            },
       }
       rows.value.push(row)
       if (!reason) queue.push({ row: rows.value.at(-1)!, file })
@@ -128,7 +143,7 @@ export const useUploads = defineStore('uploads', () => {
           row.own = {
             status: 'sending',
             progress: Math.round((sent / total) * 100),
-            note: `${fileSize(sent)} of ${fileSize(total)}`,
+            note: t('uploads.sent', { sent: fileSize(sent), total: fileSize(total) }),
           }
         })
         const item = result.items[0]!
@@ -141,13 +156,13 @@ export const useUploads = defineStore('uploads', () => {
         const problem = error instanceof ApiError ? error.problem : undefined
         row.own = {
           status: 'failed',
-          statusLabel: problem?.status === 413 ? 'Too big' : undefined,
-          note: problem?.detail ?? problem?.title ?? 'It didn’t go up',
+          statusLabel: problem?.status === 413 ? t('uploads.tooBig') : undefined,
+          note: problem?.detail ?? problem?.title ?? t('uploads.notUp'),
         }
         if (error instanceof ApiError && (error.offline || error.status === 401)) {
           // Everything after it would fail the same way.
           for (const waiting of queue.splice(0)) {
-            waiting.row.own = { status: 'failed', note: 'Didn’t go up, try again' }
+            waiting.row.own = { status: 'failed', note: t('uploads.notUpRetry') }
           }
         }
       }
@@ -158,8 +173,8 @@ export const useUploads = defineStore('uploads', () => {
     if (sent > 0) {
       useToasts().push({
         tone: 'success',
-        title: 'Pages tucked in',
-        detail: `${sent === 1 ? '1 photo is' : `${sent} photos are`} on their way in.`,
+        title: t('uploads.tuckedInTitle'),
+        detail: t('uploads.tuckedIn', sent),
       })
     }
   }

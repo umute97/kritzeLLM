@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   onBeforeRouteLeave,
   onBeforeRouteUpdate,
@@ -14,7 +15,7 @@ import type { Block, Journal, PageDetail } from '@/api/types'
 import LostState from '@/components/LostState.vue'
 import { useAction } from '@/composables/useAction'
 import { useConfirm } from '@/composables/useConfirm'
-import { formatEntryDates, plural } from '@/utils/format'
+import { formatEntryDates } from '@/utils/format'
 import { toastError } from '@/utils/notify'
 import { useJournals } from '@/stores/journals'
 import { isBusy, usePages } from '@/stores/pages'
@@ -39,6 +40,7 @@ import {
 
 const props = defineProps<{ pageId: string }>()
 
+const { t } = useI18n()
 const router = useRouter()
 const journals = useJournals()
 const pages = usePages()
@@ -70,7 +72,7 @@ const photo = useAuthedImage(() => detail.value?.image.urls.normalized)
 const dates = computed(() => (detail.value ? formatEntryDates(detail.value.entryDates) : undefined))
 const meta = computed(() =>
   detail.value
-    ? [dates.value, plural(detail.value.blocks.length, 'block')].filter(Boolean).join(' · ')
+    ? [dates.value, t('counts.blocks', detail.value.blocks.length)].filter(Boolean).join(' · ')
     : undefined,
 )
 
@@ -94,7 +96,7 @@ async function load() {
   } catch (error) {
     if (mine !== latest) return
     if (error instanceof ApiError && error.status === 404) missing.value = true
-    else toastError(error, 'Couldn’t open this page', { retry: load })
+    else toastError(error, t('page.openFailed'), { retry: load })
   }
 }
 
@@ -166,12 +168,12 @@ async function patchBlock(block: Block, body: { text?: string; uncertain?: boole
       setTimeout(() => saved.delete(block.id), 2500),
     )
   } catch (error) {
-    toastError(error, `Couldn’t save block ${block.seq + 1}`, {
+    toastError(error, t('page.saveFailed', { n: block.seq + 1 }), {
       retry: () => void patchBlock(block, body),
       byStatus: {
         409: {
           tone: 'warning',
-          detail: 'This page is still being read. Try again once it’s ready.',
+          detail: t('page.busy'),
         },
       },
     })
@@ -186,8 +188,8 @@ function save(block: Block) {
   if (!draft.trim()) {
     toasts.push({
       tone: 'info',
-      title: 'A block can’t be empty',
-      detail: 'Write something in it, or undo to get the old text back.',
+      title: t('page.blockEmptyTitle'),
+      detail: t('page.blockEmpty'),
     })
     return
   }
@@ -201,11 +203,11 @@ function readAgain() {
     async () => {
       if (!detail.value) return
       await pages.retranscribe(detail.value)
-      toasts.push({ tone: 'info', title: `Reading page ${detail.value.pageNumber} again` })
+      toasts.push({ tone: 'info', title: t('page.readingAgain', { n: detail.value.pageNumber }) })
     },
     {
-      title: 'Couldn’t read the page again',
-      byStatus: { 409: { title: 'Already on it', detail: 'This page is being read right now.' } },
+      title: t('page.readFailed'),
+      byStatus: { 409: { title: t('page.alreadyTitle'), detail: t('page.already') } },
     },
   )
 }
@@ -218,28 +220,34 @@ function deletePage() {
       await call(api.DELETE('/pages/{pageId}', { params: { path: { pageId: props.pageId } } }))
       pages.remove(props.pageId)
       void journals.refresh(journalId).catch(() => {})
-      toasts.push({ tone: 'info', title: `Page ${pageNumber} is gone` })
+      toasts.push({ tone: 'info', title: t('page.deleted', { n: pageNumber }) })
       await router.push({ name: 'journal', params: { journalId } })
     },
-    { title: 'Couldn’t delete the page' },
+    { title: t('page.deleteFailed') },
   )
 }
 
 const download = useAction(
   (page: PageDetail) => downloadImage(page.image.urls.original, `page-${page.pageNumber}`),
-  { title: 'Couldn’t download the photo' },
+  { title: () => t('page.downloadFailed') },
 )
 
-const menu: MenuItem[] = [
-  { id: 'read', label: 'Re-transcribe', icon: 'refresh', run: () => reading.ask() },
+const menu = computed<MenuItem[]>(() => [
+  { id: 'read', label: t('page.retranscribe'), icon: 'refresh', run: () => reading.ask() },
   {
     id: 'download',
-    label: 'Download photo',
+    label: t('page.download'),
     icon: 'download',
     run: () => detail.value && download.run(detail.value),
   },
-  { id: 'delete', label: 'Delete page', icon: 'trash', danger: true, run: () => deleting.ask() },
-]
+  {
+    id: 'delete',
+    label: t('page.delete'),
+    icon: 'trash',
+    danger: true,
+    run: () => deleting.ask(),
+  },
+])
 
 function step(id?: string) {
   if (id) void router.push({ name: 'page', params: { pageId: id } })
@@ -260,7 +268,7 @@ function leave() {
       drafts.clear()
       await router.push(to.fullPath)
     },
-    { title: 'Couldn’t leave this page' },
+    { title: t('page.leaveFailed') },
   )
 }
 
@@ -278,23 +286,19 @@ onUnmounted(() => {
 
 <template>
   <KPage>
-    <LostState
-      v-if="missing"
-      title="This page wandered off"
-      text="It may have been deleted. The rest of the journal is still on the shelf."
-    />
+    <LostState v-if="missing" :title="t('page.lostTitle')" :text="t('page.lost')" />
 
     <template v-else-if="detail">
-      <KPageHeader :title="`Page ${detail.pageNumber}`" :meta="meta">
+      <KPageHeader :title="t('page.title', { n: detail.pageNumber })" :meta="meta">
         <template #eyebrow>
           <KBreadcrumb
             :items="[
-              { label: 'Journals', to: '/' },
+              { label: t('page.journals'), to: '/' },
               {
-                label: journal?.name ?? 'Journal',
+                label: journal?.name ?? t('page.journal'),
                 to: { name: 'journal', params: { journalId: detail.journalId } },
               },
-              { label: `Page ${detail.pageNumber}` },
+              { label: t('page.title', { n: detail.pageNumber }) },
             ]"
           />
         </template>
@@ -303,8 +307,14 @@ onUnmounted(() => {
         </template>
         <template #actions>
           <KPager
-            :prev-label="neighbours.prevNumber ? `Page ${neighbours.prevNumber}` : 'Previous page'"
-            :next-label="neighbours.nextNumber ? `Page ${neighbours.nextNumber}` : 'Next page'"
+            :prev-label="
+              neighbours.prevNumber
+                ? t('page.title', { n: neighbours.prevNumber })
+                : t('page.previous')
+            "
+            :next-label="
+              neighbours.nextNumber ? t('page.title', { n: neighbours.nextNumber }) : t('page.next')
+            "
             :can-prev="!!neighbours.prev"
             :can-next="!!neighbours.next"
             @prev="step(neighbours.prev)"
@@ -313,35 +323,33 @@ onUnmounted(() => {
             <span class="font-bold">
               {{ detail.pageNumber
               }}<span v-if="journal?.pageCount" class="font-normal text-muted">
-                of {{ journal.pageCount }}</span
+                {{ t('page.of', { n: journal.pageCount }) }}</span
               >
             </span>
           </KPager>
           <KButton variant="second" icon="refresh" :disabled="busy" @click="reading.ask()">
-            Re-transcribe
+            {{ t('page.retranscribe') }}
           </KButton>
-          <KMenu label="Page actions" :items="menu" />
+          <KMenu :label="t('page.actions')" :items="menu" />
         </template>
       </KPageHeader>
 
-      <KBanner v-if="status === 'failed'" title="We couldn’t read this page">
-        {{
-          detail.error?.detail ?? detail.error?.title ?? 'Something went wrong while reading it.'
-        }}
-        Another try often helps.
+      <KBanner v-if="status === 'failed'" :title="t('page.failedTitle')">
+        {{ detail.error?.detail ?? detail.error?.title ?? t('page.failed') }}
+        {{ t('page.anotherTry') }}
         <template #actions>
-          <KButton @click="reading.ask()">Re-transcribe</KButton>
+          <KButton @click="reading.ask()">{{ t('page.retranscribe') }}</KButton>
         </template>
       </KBanner>
 
       <KSegmented
         v-model="view"
-        label="Show"
+        :label="t('page.show')"
         class="md:hidden"
         :options="[
-          { value: 'photo', label: 'Photo' },
-          { value: 'text', label: 'Text' },
-          { value: 'both', label: 'Both' },
+          { value: 'photo', label: t('page.views.photo') },
+          { value: 'text', label: t('page.views.text') },
+          { value: 'both', label: t('page.views.both') },
         ]"
       />
 
@@ -349,21 +357,21 @@ onUnmounted(() => {
         <figure :class="['m-0', view === 'text' && 'max-md:hidden']">
           <KPhoto
             :src="photo"
-            :alt="`Photo of page ${detail.pageNumber}`"
+            :alt="t('page.photoAlt', { n: detail.pageNumber })"
             :width="detail.image.width"
             :height="detail.image.height"
             fit="contain"
-            loading-label="Loading the photo"
+            :loading-label="t('page.loadingPhoto')"
             class="rounded-field border-[1.5px] border-ink shadow-pin [--line:32px]"
           />
         </figure>
 
         <section
-          aria-label="Transcribed blocks"
+          :aria-label="t('page.blocks')"
           :class="['flex flex-col gap-3.5', view === 'photo' && 'max-md:hidden']"
         >
-          <KBanner v-if="busy" tone="info" title="Still reading this page" icon="book">
-            The text shows up here as soon as it’s done.
+          <KBanner v-if="busy" tone="info" :title="t('page.readingTitle')" icon="book">
+            {{ t('page.reading') }}
           </KBanner>
           <template v-else>
             <KBlockCard
@@ -386,8 +394,8 @@ onUnmounted(() => {
             />
             <KEmptyState
               v-if="detail.blocks.length === 0 && status === 'ready'"
-              title="Nothing written here"
-              text="This page came back without any text. Re-transcribe it if that looks wrong."
+              :title="t('page.emptyTitle')"
+              :text="t('page.empty')"
             />
           </template>
         </section>
@@ -403,26 +411,26 @@ onUnmounted(() => {
 
     <KConfirmDialog
       v-model:open="reading.open"
-      :title="`Read page ${detail?.pageNumber} again?`"
-      description="A fresh reading replaces the text, including any fixes you made."
-      confirm-label="Read it again"
+      :title="t('page.readAgainTitle', { n: detail?.pageNumber })"
+      :description="t('page.readAgain')"
+      :confirm-label="t('page.readAgainConfirm')"
       tone="main"
       :loading="reading.busy"
       @confirm="readAgain"
     />
     <KConfirmDialog
       v-model:open="deleting.open"
-      :title="`Delete page ${detail?.pageNumber}?`"
-      description="The photo and all its text go with it. This can’t be undone."
-      confirm-label="Delete page"
+      :title="t('page.deleteTitle', { n: detail?.pageNumber })"
+      :description="t('page.deleteNote')"
+      :confirm-label="t('page.delete')"
       :loading="deleting.busy"
       @confirm="deletePage"
     />
     <KConfirmDialog
       v-model:open="leaving.open"
-      title="Leave without saving?"
-      :description="`Your changes to ${plural(drafts.size, 'block')} will be lost.`"
-      confirm-label="Leave anyway"
+      :title="t('page.leaveTitle')"
+      :description="t('page.leave', { blocks: t('counts.blocks', drafts.size) })"
+      :confirm-label="t('page.leaveConfirm')"
       :loading="leaving.busy"
       @confirm="leave"
     />
