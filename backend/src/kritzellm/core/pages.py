@@ -9,7 +9,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy import ColumnElement, and_, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +37,17 @@ def decode_cursor(cursor: str) -> tuple[str, int]:
     return journal_id, int(number)
 
 
+def dated_within(date_from: date | None, date_to: date | None) -> ColumnElement[bool]:
+    """Whether a page has at least one entry date in the range (either end may be open)."""
+    day = func.unnest(db.Page.entry_dates).column_valued()
+    in_range = select(day)
+    if date_from is not None:
+        in_range = in_range.where(day >= date_from)
+    if date_to is not None:
+        in_range = in_range.where(day <= date_to)
+    return in_range.exists()
+
+
 async def list_pages(
     session: AsyncSession,
     *,
@@ -57,13 +68,7 @@ async def list_pages(
     if status is not None:
         query = query.where(db.Page.status == status)
     if date_from is not None or date_to is not None:
-        day = func.unnest(db.Page.entry_dates).column_valued()
-        in_range = select(day)
-        if date_from is not None:
-            in_range = in_range.where(day >= date_from)
-        if date_to is not None:
-            in_range = in_range.where(day <= date_to)
-        query = query.where(in_range.exists())
+        query = query.where(dated_within(date_from, date_to))
     if cursor is not None:
         after_journal, after_number = decode_cursor(cursor)
         query = query.where(

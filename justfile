@@ -52,6 +52,10 @@ web-check:
 smoke:
     python3 backend/scripts/smoke.py
 
+# Report search recall@5 per mode for your own questions (see backend/scripts/eval_search.py)
+eval-search file="data/eval-search.json":
+    python3 backend/scripts/eval_search.py -v "{{ file }}"
+
 # Delete the local database and data volumes (asks first)
 [confirm("This deletes all local database data and page images. Continue?")]
 db-reset:

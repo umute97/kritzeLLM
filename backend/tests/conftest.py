@@ -207,8 +207,16 @@ def data_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def db_client(database_url: str, data_dir: Path) -> Iterator[TestClient]:
-    """An API client backed by the test database. One event loop serves the whole test."""
-    settings = Settings(api_token=None, database_url=PostgresDsn(database_url), data_dir=data_dir)
+    """An API client backed by the test database. One event loop serves the whole test.
+
+    Searching embeds with the fake `test` model, like the worker, so it never calls OpenAI.
+    """
+    settings = Settings(
+        api_token=None,
+        database_url=PostgresDsn(database_url),
+        data_dir=data_dir,
+        embed_model="test",
+    )
     app = create_app(settings)
     with TestClient(app, base_url="http://test/api/v1") as client:
         yield client

@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.routing import Match
 
-from kritzellm.core.errors import ConflictError, NotFoundError
+from kritzellm.core.errors import ConflictError, NotFoundError, UpstreamError
 
 from .schemas.common import Problem, ProblemError
 
@@ -24,6 +24,7 @@ _DESCRIPTIONS = {
     413: "An uploaded file is too big.",
     415: "An uploaded file isn't a supported image type.",
     422: "Some values are invalid (including malformed IDs). Each one is listed in `errors`.",
+    502: "A service the server relies on (e.g. OpenAI) failed. Try again later.",
 }
 
 
@@ -63,7 +64,7 @@ def http_error(status: int, detail: str) -> NoReturn:
     raise StarletteHTTPException(status, detail)
 
 
-STATUSES: dict[type[Exception], int] = {NotFoundError: 404, ConflictError: 409}
+STATUSES: dict[type[Exception], int] = {NotFoundError: 404, ConflictError: 409, UpstreamError: 502}
 """The status each domain error answers with."""
 
 

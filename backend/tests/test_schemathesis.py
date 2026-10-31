@@ -18,7 +18,10 @@ TOKEN = "fuzz-token"
 @pytest.fixture
 def api_schema(database_url: str, data_dir: Path) -> schemathesis.BaseSchema:
     settings = Settings(
-        api_token=SecretStr(TOKEN), database_url=PostgresDsn(database_url), data_dir=data_dir
+        api_token=SecretStr(TOKEN),
+        database_url=PostgresDsn(database_url),
+        data_dir=data_dir,
+        embed_model="test",
     )
     app = create_app(settings)
     api_schema = schemathesis.openapi.from_asgi("/api/v1/openapi.json", app)

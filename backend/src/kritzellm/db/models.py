@@ -7,6 +7,7 @@ from typing import Any
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     CheckConstraint,
+    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -22,7 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import text as sql
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, column_property, mapped_column, relationship
 
 from kritzellm.api.schemas.blocks import BlockKind
@@ -138,6 +139,12 @@ class Block(Base):
         UniqueConstraint("page_id", "seq", deferrable=True, initially="DEFERRED"),
         CheckConstraint("seq >= 0", name="seq_not_negative"),
         _one_of("kind", BlockKind),
+        Index(
+            "ix_blocks_text_trgm",
+            "text",
+            postgresql_using="gin",
+            postgresql_ops={"text": "gin_trgm_ops"},
+        ),
     )
 
     id: Mapped[str] = _id(Prefix.BLOCK)
@@ -184,6 +191,10 @@ class Job(Base):
     finished_at: Mapped[datetime | None]
 
 
+TEXT_SEARCH_CONFIG = "simple"
+"""Postgres text search configuration for chunks: plain lowercased words, no stemming."""
+
+
 class Chunk(Base):
     """A run of a page's consecutive blocks, embedded for search. Rebuilt whenever the page is indexed."""
 
@@ -191,6 +202,13 @@ class Chunk(Base):
     __table_args__ = (
         PrimaryKeyConstraint("page_id", "seq"),
         CheckConstraint("seq >= 0", name="seq_not_negative"),
+        Index(
+            "ix_chunks_embedding",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+        Index("ix_chunks_tsv", "tsv", postgresql_using="gin"),
     )
 
     page_id: Mapped[str] = mapped_column(
@@ -204,3 +222,7 @@ class Chunk(Base):
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBED_DIMENSIONS))
     embed_model: Mapped[str]
     """Model that made `embedding`."""
+    tsv: Mapped[str] = mapped_column(
+        TSVECTOR, Computed(f"to_tsvector('{TEXT_SEARCH_CONFIG}', text)", persisted=True)
+    )
+    """The words of `text`, for full-text search."""
