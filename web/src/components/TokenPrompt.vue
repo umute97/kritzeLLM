@@ -1,36 +1,34 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { ApiError } from '@/api/errors'
 import { verifySession } from '@/utils/session'
 import { useAuth } from '@/stores/auth'
 import { KButton, KCard, KCheckbox, KPage, KTextField } from '@/ui'
 
+const { t } = useI18n()
 const auth = useAuth()
-
-const MISFIT = 'That token didn’t fit the lock. Check API_TOKEN in your .env.'
 
 const token = ref(auth.token ?? '')
 const remember = ref(auth.remembered)
 const busy = ref(false)
-const error = ref<string | undefined>(auth.rejected ? MISFIT : undefined)
+const error = ref<string | undefined>(auth.rejected ? t('token.misfit') : undefined)
 
 async function submit() {
   const value = token.value.trim()
   if (!value) {
-    error.value = 'Paste the token first'
+    error.value = t('token.empty')
     return
   }
   busy.value = true
   error.value = undefined
   auth.setToken(value, remember.value)
   try {
-    if (!(await verifySession())) error.value = MISFIT
+    if (!(await verifySession())) error.value = t('token.misfit')
   } catch (cause) {
     error.value =
-      cause instanceof ApiError && cause.offline
-        ? 'kritzeLLM can’t reach the API right now.'
-        : 'Something went wrong. Try again in a moment.'
+      cause instanceof ApiError && cause.offline ? t('token.offline') : t('errors.generic')
   } finally {
     busy.value = false
   }
@@ -47,21 +45,21 @@ async function submit() {
       novalidate
       @submit.prevent="submit"
     >
-      <h1 class="m-0 text-[28px] leading-tight">Knock knock</h1>
-      <p class="m-0 text-[15px] text-muted">
-        Paste the API token from your <code>.env</code> file to open the cottage door.
-      </p>
+      <h1 class="m-0 text-[28px] leading-tight">{{ t('token.title') }}</h1>
+      <i18n-t keypath="token.intro" tag="p" class="m-0 text-[15px] text-muted">
+        <template #file><code>.env</code></template>
+      </i18n-t>
       <KTextField
         v-model="token"
-        label="API token"
+        :label="t('token.label')"
         type="password"
         revealable
         autocomplete="off"
         spellcheck="false"
         :error="error"
       />
-      <KCheckbox v-model="remember" label="Remember this token on this device" />
-      <KButton type="submit" class="self-start" :loading="busy">Come in</KButton>
+      <KCheckbox v-model="remember" :label="t('token.remember')" />
+      <KButton type="submit" class="self-start" :loading="busy">{{ t('token.submit') }}</KButton>
     </KCard>
   </KPage>
 </template>

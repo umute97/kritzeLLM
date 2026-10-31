@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { RouterLink, RouterView } from 'vue-router'
 
+import LanguageSwitch from '@/components/LanguageSwitch.vue'
 import TokenPrompt from '@/components/TokenPrompt.vue'
 import { verifySession } from '@/utils/session'
 import { useAuth } from '@/stores/auth'
 import { useHealth } from '@/stores/health'
 import { KBanner, KButton, KLogo, KNavLink, KPage, KSpinner, KToastStack, KTopNav } from '@/ui'
 
+const { t } = useI18n()
 const auth = useAuth()
 const health = useHealth()
 
@@ -36,27 +39,28 @@ watch(
   <div class="min-h-screen">
     <KTopNav>
       <template #brand>
-        <RouterLink to="/" aria-label="kritzeLLM, your journals" class="no-underline">
+        <RouterLink to="/" :aria-label="t('app.home')" class="no-underline">
           <KLogo />
         </RouterLink>
       </template>
-      <KNavLink to="/" current>Pages</KNavLink>
-      <template #end><span class="font-hand text-xl text-bark">hi there</span></template>
+      <KNavLink to="/" current>{{ t('app.pages') }}</KNavLink>
+      <template #end>
+        <div class="flex items-center gap-4">
+          <span class="font-hand text-xl text-bark">{{ t('app.greeting') }}</span>
+          <LanguageSwitch />
+        </div>
+      </template>
     </KTopNav>
 
     <KPage v-if="health.offline || health.database !== 'ok'" as="div" bare class="pt-6">
-      <KBanner :title="health.offline ? 'The cottage door is shut' : 'The database is napping'">
-        <template v-if="health.offline">
-          kritzeLLM can’t reach the API. Is
-          <code>just up</code>
-          running?
-        </template>
-        <template v-else
-          >The API is up, but its database isn’t answering, so pages can’t load.</template
-        >
+      <KBanner :title="health.offline ? t('app.offlineTitle') : t('app.databaseTitle')">
+        <i18n-t v-if="health.offline" keypath="app.offline">
+          <template #command><code>just up</code></template>
+        </i18n-t>
+        <template v-else>{{ t('app.database') }}</template>
         <template #aside>
           <KButton variant="second" :loading="health.checking" @click="health.check()">
-            Knock again
+            {{ t('app.knockAgain') }}
           </KButton>
         </template>
       </KBanner>
@@ -69,7 +73,7 @@ watch(
       block
       variant="daisy"
       :size="56"
-      label="Opening the cottage door"
+      :label="t('app.opening')"
     />
 
     <KToastStack />

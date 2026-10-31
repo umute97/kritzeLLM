@@ -5,6 +5,7 @@ import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter, RouterLink, RouterView } from 'vue-router'
 
 import type { Block, Page, PageDetail } from '@/api/types'
+import { setLocale, uiMessages } from '@/i18n'
 import { json, makeBlock, makeJournal, makePage } from '@/test-utils'
 import { createCottage, useToasts } from '@/ui'
 import PageDetailView from '@/views/PageDetailView.vue'
@@ -26,6 +27,7 @@ afterEach(() => {
   useToasts().clear()
   vi.useRealTimers()
   vi.unstubAllGlobals()
+  setLocale('en')
 })
 
 function detailOf(page: Page, blocks: Block[] = []): PageDetail {
@@ -70,7 +72,7 @@ async function open(pageId: string) {
   await router.push(`/pages/${pageId}`)
   wrapper = mount(defineComponent({ render: () => h(RouterView) }), {
     attachTo: document.body,
-    global: { plugins: [pinia, router, createCottage({ link: RouterLink })] },
+    global: { plugins: [pinia, router, createCottage({ link: RouterLink, messages: uiMessages })] },
   })
   await flushPromises()
   return { wrapper, router }
@@ -99,6 +101,21 @@ describe('the page detail view', () => {
       'Sunday',
       'Picked wild garlic by the river.',
     ])
+  })
+
+  it('speaks German, the cottage library included, after switching', async () => {
+    const page = detailOf(makePage({ id: 'pg_a', pageNumber: 7 }), [
+      makeBlock({ seq: 0, uncertain: true }),
+    ])
+    serve([page])
+    const { wrapper } = await open('pg_a')
+
+    setLocale('de')
+    await flushPromises()
+
+    expect(wrapper.find('h1').text()).toBe('Seite 7')
+    expect(wrapper.text()).toContain('1 Block')
+    expect(button(wrapper, 'Passt so').exists()).toBe(true)
   })
 
   it('shows "This page wandered off" on a 404', async () => {

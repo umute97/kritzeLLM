@@ -6,6 +6,12 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
+  // vue-i18n's bundler flags: Composition API only, so the legacy API is left out of the build.
+  define: {
+    __VUE_I18N_FULL_INSTALL__: true,
+    __VUE_I18N_LEGACY_API__: false,
+    __INTLIFY_PROD_DEVTOOLS__: false,
+  },
   server: {
     // `just web-dev` talks to the API from `just backend-dev` or the compose stack.
     proxy: { '/api': `http://localhost:${process.env.API_PORT || 8000}` },

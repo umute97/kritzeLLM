@@ -1,4 +1,5 @@
 import { ApiError } from '@/api/errors'
+import { i18n } from '@/i18n'
 import { useToasts, type ToastOptions } from '@/ui'
 
 export interface ToastErrorOptions {
@@ -20,11 +21,12 @@ export function toastError(error: unknown, title: string, options: ToastErrorOpt
     return
   }
   const problem = error instanceof ApiError ? error.problem : undefined
+  const { t } = i18n.global
   useToasts().push({
     tone: 'error',
     title,
-    detail: problem?.detail ?? problem?.title ?? 'Something went wrong. Try again in a moment.',
+    detail: problem?.detail ?? problem?.title ?? t('errors.generic'),
     technical: problem ? `${problem.status} ${problem.title}` : undefined,
-    action: options.retry ? { label: 'Try again', run: options.retry } : undefined,
+    action: options.retry ? { label: t('errors.tryAgain'), run: options.retry } : undefined,
   })
 }

@@ -23,6 +23,7 @@ files and passes `/api` on to the `api` service.
 | `src/api/`            | The typed API client: generated `schema.d.ts`, `call()`, uploads with progress, images behind the token  |
 | `src/stores/`         | Pinia stores: the token, API health, the journal shelf, pages (with a poller for busy ones), uploads     |
 | `src/views/`          | The screens: library and upload, page detail                                                             |
+| `src/i18n/`           | vue-i18n: the English and German words, the cottage library in German, picking and switching languages   |
 | `src/components/`     | Screen parts: token prompt, new journal dialog, upload batch, page thumbnails                            |
 | `src/styles/main.css` | Tailwind, the palette and type as theme tokens, base styles                                              |
 | `Dockerfile`          | The built app on nginx (`nginx.conf`)                                                                    |

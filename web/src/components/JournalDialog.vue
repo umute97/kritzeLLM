@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { ApiError } from '@/api/errors'
 import type { Journal } from '@/api/types'
@@ -12,6 +13,7 @@ const props = defineProps<{ journal?: Journal }>()
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ created: [journal: Journal] }>()
 
+const { t } = useI18n()
 const journals = useJournals()
 const name = ref('')
 const description = ref('')
@@ -29,7 +31,7 @@ watch(open, (isOpen) => {
 
 async function save() {
   if (!name.value.trim()) {
-    nameError.value = 'Give it a name, even a tiny one'
+    nameError.value = t('journalDialog.nameMissing')
     return
   }
   busy.value = true
@@ -50,7 +52,10 @@ async function save() {
         : undefined
     if (fieldError) nameError.value = fieldError
     else
-      toastError(error, editing.value ? 'Couldn’t rename the journal' : 'Couldn’t make the journal')
+      toastError(
+        error,
+        editing.value ? t('journalDialog.renameFailed') : t('journalDialog.createFailed'),
+      )
   } finally {
     busy.value = false
   }
@@ -60,7 +65,7 @@ async function save() {
 <template>
   <KDialog
     v-model:open="open"
-    :title="editing ? 'Rename journal' : 'A new journal'"
+    :title="editing ? t('journalDialog.renameTitle') : t('journalDialog.newTitle')"
     size="md"
     form
     :dismissible="!busy"
@@ -70,23 +75,25 @@ async function save() {
     <div class="flex flex-col gap-3.5">
       <KTextField
         v-model="name"
-        label="Name"
-        placeholder="Summer sketchbook"
+        :label="t('journalDialog.name')"
+        :placeholder="t('journalDialog.namePlaceholder')"
         autocomplete="off"
         :error="nameError"
       />
       <KTextArea
         v-model="description"
-        label="Description"
+        :label="t('journalDialog.description')"
         optional
         :rows="2"
-        placeholder="What lives in this notebook?"
+        :placeholder="t('journalDialog.descriptionPlaceholder')"
       />
     </div>
     <template #footer>
-      <KButton variant="quiet" :disabled="busy" @click="open = false">Cancel</KButton>
+      <KButton variant="quiet" :disabled="busy" @click="open = false">
+        {{ t('journalDialog.cancel') }}
+      </KButton>
       <KButton type="submit" :loading="busy">
-        {{ editing ? 'Save' : 'Create journal' }}
+        {{ editing ? t('journalDialog.save') : t('journalDialog.create') }}
       </KButton>
     </template>
   </KDialog>
