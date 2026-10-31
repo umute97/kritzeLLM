@@ -16,11 +16,11 @@ from . import API_PREFIX
 from .auth import require_token
 from .deps import check_query_params
 from .errors import PROBLEM_JSON, install_problem_handlers
-from .routes import admin, blocks, docs, health, jobs, journals, pages
+from .routes import admin, blocks, docs, health, jobs, journals, pages, search
 
 DESCRIPTION = """\
-Upload photos of handwritten journal pages and review their transcriptions. Search and a chat agent
-that cites the exact page are coming. 🖍️
+Upload photos of handwritten journal pages, review their transcriptions and search them. A chat
+agent that cites the exact page is coming. 🖍️
 
 ## Conventions
 
@@ -46,6 +46,7 @@ TAGS = [
     {"name": "journals", "description": "Notebooks (or volumes) that pages belong to."},
     {"name": "pages", "description": "Uploaded page images and their transcriptions."},
     {"name": "blocks", "description": "Text on a page (paragraphs, lists, margin notes)."},
+    {"name": "search", "description": "Finding pages by meaning, by words, or exactly."},
     {"name": "jobs", "description": "Background work and its progress."},
     {"name": "admin", "description": "Upkeep of the whole library."},
 ]
@@ -79,7 +80,7 @@ def create_api(settings: Settings | None = None) -> FastAPI:
     api.include_router(docs.router)
     api.include_router(health.router)
     authed = [Depends(require_token)]
-    for module in (journals, pages, blocks, jobs, admin):
+    for module in (journals, pages, blocks, search, jobs, admin):
         api.include_router(module.router, dependencies=authed)
 
     def openapi() -> dict[str, Any]:

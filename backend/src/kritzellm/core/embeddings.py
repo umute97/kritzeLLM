@@ -10,9 +10,12 @@ from functools import cache
 
 from pydantic_ai.embeddings import Embedder, EmbeddingModel, TestEmbeddingModel
 from pydantic_ai.embeddings.openai import OpenAIEmbeddingModel
+from pydantic_ai.exceptions import ModelAPIError
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from kritzellm.config import Settings
+
+from .errors import UpstreamError
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +40,15 @@ def _embedder(name: str, api_key: str | None) -> Embedder:
     return Embedder(model, settings={"dimensions": EMBED_DIMENSIONS})
 
 
+def _configured(settings: Settings) -> Embedder:
+    api_key = settings.openai_api_key
+    return _embedder(settings.embed_model, api_key.get_secret_value() if api_key else None)
+
+
 async def embed(texts: Sequence[str], settings: Settings) -> list[list[float]]:
     """Embeds texts for storing, in order, with the configured model."""
     name = settings.embed_model
-    api_key = settings.openai_api_key
-    embedder = _embedder(name, api_key.get_secret_value() if api_key else None)
+    embedder = _configured(settings)
     vectors: list[list[float]] = []
     tokens = 0
     for start in range(0, len(texts), BATCH_SIZE):
@@ -51,3 +58,13 @@ async def embed(texts: Sequence[str], settings: Settings) -> list[list[float]]:
     if texts:
         logger.info("Embedded %d text(s) with %s: %d tokens", len(texts), name, tokens)
     return vectors
+
+
+async def embed_query(text: str, settings: Settings) -> list[float]:
+    """Embeds a search query with the configured model. Raises `UpstreamError` if the API fails."""
+    try:
+        result = await _configured(settings).embed_query(text)
+    except ModelAPIError as exc:
+        logger.warning("Embedding a search query failed: %s", exc)
+        raise UpstreamError("The embedding model couldn't be reached. Try again later.") from exc
+    return list(result.embeddings[0])

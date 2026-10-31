@@ -27,6 +27,10 @@ class PageNumberTakenError(ConflictError):
     """Another page of the journal already has the page number."""
 
 
+class UpstreamError(Exception):
+    """A service the request relies on (e.g. OpenAI) failed or couldn't be reached."""
+
+
 async def get_existing[T](session: AsyncSession, model: type[T], ident: str, **options: Any) -> T:
     """The `model` row with primary key `ident`. Raises `NotFoundError` if there's none."""
     row = await session.get(model, ident, **options)

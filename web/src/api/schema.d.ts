@@ -257,6 +257,31 @@ export interface paths {
         patch: operations["updateBlock"];
         trace?: never;
     };
+    "/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search pages
+         * @description Finds the pages best matching `q`, each with the blocks that matched.
+         *
+         *     `hybrid` (the default) finds text by meaning and by its words. `vector` and `keyword` do one of
+         *     each, for comparing. `exact` lists the pages with blocks containing `q` as written, ignoring case,
+         *     in journal and page order. The date filters keep pages with at least one entry dated within the
+         *     range. Returns `502` when the embedding model can't be reached; `keyword` and `exact` don't need it.
+         */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs": {
         parameters: {
             query?: never;
@@ -920,6 +945,51 @@ export interface components {
              * @description Name of the offending query, path or header parameter.
              */
             parameter?: string | null;
+        };
+        /**
+         * SearchHit
+         * @description A page that matches the search.
+         */
+        SearchHit: {
+            page: components["schemas"]["Page"];
+            /**
+             * Blocks
+             * @description The blocks that matched, in reading order: the page's best matching chunk, or for `exact` every block containing the query.
+             */
+            blocks: components["schemas"]["Block"][];
+            /**
+             * Score
+             * @description How well the page matches, higher is better. Only comparable within one search: the fused score for `hybrid`, cosine similarity for `vector`, `ts_rank_cd` for `keyword`, and the number of matching blocks for `exact`.
+             */
+            score: number;
+            /**
+             * Vectorrank
+             * @description Position of the hit's chunk among the vector matches, from 1; `null` if it isn't among them or vectors weren't searched.
+             */
+            vectorRank: number | null;
+            /**
+             * Keywordrank
+             * @description Position of the hit's chunk among the keyword matches, from 1; `null` if it isn't among them or keywords weren't searched.
+             */
+            keywordRank: number | null;
+        };
+        /**
+         * SearchMode
+         * @description How to search.
+         *
+         *     `hybrid` merges `vector` and `keyword` results with reciprocal rank fusion. `vector` finds text
+         *     by meaning, `keyword` by its words (`"quoted phrases"`, `or` and `-word` work). `exact` finds
+         *     blocks containing the query as written, ignoring case.
+         * @enum {string}
+         */
+        SearchMode: "hybrid" | "vector" | "keyword" | "exact";
+        /**
+         * SearchResult
+         * @description The best matching pages, best first.
+         */
+        SearchResult: {
+            /** Items */
+            items: components["schemas"]["SearchHit"][];
         };
         /**
          * UploadItem
@@ -1929,6 +1999,75 @@ export interface operations {
             };
             /** @description Some values are invalid (including malformed IDs). Each one is listed in `errors`. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                /** @description What to look for. */
+                q: string;
+                /** @description How to search. */
+                mode?: components["schemas"]["SearchMode"];
+                /** @description Only pages of this journal. */
+                journalId?: string | null;
+                /** @description Only entries dated on or after this day. */
+                dateFrom?: string | null;
+                /** @description Only entries dated on or before this day. */
+                dateTo?: string | null;
+                /** @description Maximum number of pages to return. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResult"];
+                };
+            };
+            /** @description The request couldn't be parsed (e.g. malformed JSON or multipart). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing or wrong bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Some values are invalid (including malformed IDs). Each one is listed in `errors`. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A service the server relies on (e.g. OpenAI) failed. Try again later. */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -25,13 +25,15 @@ Everything comes from environment variables (see [`.env.example`](../.env.exampl
 | `DATABASE_URL` | `postgresql+asyncpg://kritzellm:kritzellm@localhost:5432/kritzellm` | Postgres to use |
 | `API_TOKEN` | *(unset)* | When set, every request except `GET /health` needs `Authorization: Bearer <token>` |
 | `DATA_DIR` | `data` | Where page images are stored |
-| `TRANSCRIBE_MODEL` | `gpt-6-luna` | OpenAI model that reads the pages |
+| `OPENAI_API_KEY` | *(unset)* | Key for the OpenAI API; not needed when both models are `test` |
+| `TRANSCRIBE_MODEL` | `gpt-6-luna` | OpenAI model that reads the pages; `test` fakes it |
+| `EMBED_MODEL` | `text-embedding-3-small` | OpenAI model that embeds page text for search; `test` fakes it |
 
 Empty values count as unset.
 
 ## Database
 
-Postgres (the image ships [pgvector](https://github.com/pgvector/pgvector) for search, coming later). The tables are SQLAlchemy models in
+Postgres with [pgvector](https://github.com/pgvector/pgvector) for vector search and `pg_trgm` for exact lookups. The tables are SQLAlchemy models in
 [`src/kritzellm/db/models.py`](src/kritzellm/db/models.py), and the schema is managed with Alembic.
 Migrations live in [`src/kritzellm/db/migrations`](src/kritzellm/db/migrations), so they ship with the image.
 
@@ -53,6 +55,18 @@ which makes them fail instead. One of them fails when a model changed without a 
 [Schemathesis](https://schemathesis.readthedocs.io) fuzzes every endpoint against `api/openapi.json`
 ([`tests/test_schemathesis.py`](tests/test_schemathesis.py)), checking status codes, response bodies, auth
 and input validation.
+
+## Search
+
+`GET /search` finds pages by meaning (`vector`), by their words (`keyword`), or both (`hybrid`, the
+default), see [`src/kritzellm/core/search.py`](src/kritzellm/core/search.py). Each ranking takes the
+30 best chunks, they're merged with reciprocal rank fusion, and every page shows up once with its best
+chunk. `exact` finds blocks containing the query as written, ignoring case.
+
+To see how well it finds things, write a few questions about your own pages into
+`data/eval-search.json` (git-ignored; [`scripts/eval-search.example.json`](scripts/eval-search.example.json)
+shows the format) and run `just eval-search` against the running stack. It prints recall@5 for each
+mode and lists the misses.
 
 ## Background jobs
 
