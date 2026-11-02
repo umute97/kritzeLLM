@@ -13,7 +13,7 @@ COPY . .
 RUN npx vite build
 
 # --- Runtime: nginx serves the app and hands /api to the api service ---------------------
-FROM nginx:1.30.6-alpine3.24
+FROM nginx:1.31.7-alpine3.24
 
 ARG APP_VERSION=dev
 LABEL org.opencontainers.image.title="kritzellm-web" \
