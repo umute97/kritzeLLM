@@ -15,7 +15,7 @@ const route = useRoute()
 const auth = useAuth()
 
 const room = computed(() => {
-  if (route.name === 'search') return 'search'
+  if (route.name === 'search' || route.name === 'chat') return route.name
   return route.name === 'library' || route.name === 'journal' || route.name === 'page'
     ? 'pages'
     : undefined
@@ -55,6 +55,7 @@ watch(
       <KNavLink :to="{ name: 'search' }" :current="room === 'search'">{{
         t('app.search')
       }}</KNavLink>
+      <KNavLink :to="{ name: 'chat' }" :current="room === 'chat'">{{ t('app.chat') }}</KNavLink>
       <template #end>
         <div class="flex items-center gap-4">
           <span class="font-hand text-xl text-bark">{{ t('app.greeting') }}</span>

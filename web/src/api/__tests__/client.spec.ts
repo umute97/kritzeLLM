@@ -69,6 +69,17 @@ describe('call', () => {
     expect((error as ApiError).offline).toBe(true)
     expect(useHealth().offline).toBe(true)
   })
+
+  it('passes on a call that was called off, which says nothing about the API', async () => {
+    const aborted = new DOMException('The operation was aborted.', 'AbortError')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(aborted)),
+    )
+
+    await expect(call(api.GET('/journals'))).rejects.toBe(aborted)
+    expect(useHealth().offline).toBe(false)
+  })
 })
 
 describe('useAuth', () => {

@@ -30,6 +30,26 @@ export function formatEntryDates(days: string[], now = new Date()): string | und
   return sorted.length === 1 ? first : `${first} – ${formatDay(sorted.at(-1)!, now)}`
 }
 
+function localDay(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+/** When something last happened: "today", "yesterday", a weekday within the week, else a day. */
+export function formatRecent(timestamp: string, now = new Date()): string {
+  const date = new Date(timestamp)
+  const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const daysAgo = Math.round((midnight(now) - midnight(date)) / 86_400_000)
+  const locale = currentLocale()
+  if (daysAgo >= 0 && daysAgo <= 1) {
+    return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(-daysAgo, 'day')
+  }
+  if (daysAgo > 1 && daysAgo < 7) {
+    return new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(date)
+  }
+  return formatDay(localDay(date), now)
+}
+
 export function fileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
   const megabytes = new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: 1 })

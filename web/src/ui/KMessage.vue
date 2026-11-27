@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import KIcon from './KIcon.vue'
 import KIconBadge from './KIconBadge.vue'
+import KTypingDots from './KTypingDots.vue'
 
 // A chat message. Answers come as a bubble or as a letter on lined paper; `streaming` adds a
 // caret at the end, and `error` turns it into a "the answer stopped" note with room for a retry.
+// `typing` is an answer that hasn't started yet: dots, and the slot beside them. A `footer` sits
+// under a dashed line at the bottom of the bubble.
 withDefaults(
   defineProps<{
     author: 'user' | 'assistant'
     variant?: 'bubble' | 'letter'
     streaming?: boolean
     error?: boolean
+    typing?: boolean
   }>(),
   { variant: 'bubble' },
 )
@@ -25,7 +29,11 @@ withDefaults(
       <slot name="actions" />
     </div>
   </div>
-  <div v-else class="flex max-w-[90%] items-start gap-3" :role="error ? 'alert' : undefined">
+  <div
+    v-else
+    :class="['flex max-w-[90%] gap-3', typing ? 'items-center' : 'items-start']"
+    :role="error ? 'alert' : undefined"
+  >
     <KIconBadge :class="error ? 'bg-bark text-cream' : 'bg-lemon'">
       <KIcon v-if="error" name="alert" :size="16" />
       <svg v-else width="20" height="20" viewBox="0 0 32 32" fill="none">
@@ -37,7 +45,12 @@ withDefaults(
         />
       </svg>
     </KIconBadge>
+    <div v-if="typing" class="flex min-w-0 items-center gap-3 font-hand text-xl text-bark">
+      <KTypingDots class="shrink-0" />
+      <slot />
+    </div>
     <div
+      v-else
       :aria-live="streaming ? 'polite' : undefined"
       :class="[
         'flex flex-col gap-2 rounded-[6px_18px_18px_18px]',
@@ -57,6 +70,9 @@ withDefaults(
       </div>
       <div v-if="$slots.actions" class="flex flex-wrap gap-2">
         <slot name="actions" />
+      </div>
+      <div v-if="$slots.footer" class="-mb-1.5 border-t-[1.5px] border-dashed border-line pt-1">
+        <slot name="footer" />
       </div>
     </div>
   </div>

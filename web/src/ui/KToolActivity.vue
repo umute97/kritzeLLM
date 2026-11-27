@@ -1,36 +1,45 @@
 <script setup lang="ts">
-import KIcon from './KIcon.vue'
-import KSpinner from './KSpinner.vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 
-// What the chat helper is doing: a handwritten line while it works, folded up once it's done.
-withDefaults(
-  defineProps<{
-    state: 'working' | 'done'
-    icon?: 'search' | 'book'
-    /** Done lines can unfold the steps; leave undefined for a plain line. */
-    expanded?: boolean
-  }>(),
-  { icon: 'search', expanded: undefined },
+// What the chat helper is doing, one handwritten line beside the typing dots. Each new `text`
+// flips in like the next card in a box, and stays up at least `hold` ms, so a burst of steps
+// still flips through one by one.
+const props = withDefaults(defineProps<{ text: string; hold?: number }>(), { hold: 900 })
+
+const shown = ref(props.text)
+const waiting: string[] = []
+let timer: ReturnType<typeof setTimeout> | undefined
+
+function flip() {
+  timer = undefined
+  const text = waiting.shift()
+  if (text === undefined) return
+  shown.value = text
+  timer = setTimeout(flip, props.hold)
+}
+
+watch(
+  () => props.text,
+  (text) => {
+    if (text === (waiting.at(-1) ?? shown.value)) return
+    waiting.push(text)
+    if (!timer) flip()
+  },
 )
 
-const emit = defineEmits<{ toggle: [] }>()
+onBeforeUnmount(() => clearTimeout(timer))
 </script>
 
 <template>
-  <button
-    v-if="state === 'done' && expanded !== undefined"
-    type="button"
-    :aria-expanded="expanded"
-    class="flex cursor-pointer items-center gap-2 self-start py-1 font-hand text-xl text-bark"
-    @click="emit('toggle')"
-  >
-    <KIcon name="check" />
-    <slot />
-    <KIcon name="chevron-down" :size="14" :class="expanded && 'rotate-180'" />
-  </button>
-  <div v-else class="flex items-center gap-2 font-hand text-xl text-bark">
-    <KSpinner v-if="state === 'working' && icon === 'search'" />
-    <KIcon v-else :name="state === 'done' ? 'check' : icon" />
-    <slot />
-  </div>
+  <span aria-live="polite" class="block min-w-0 font-hand text-xl text-bark perspective-normal">
+    <Transition
+      mode="out-in"
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0 motion-safe:-rotate-x-90"
+      leave-active-class="transition duration-150 ease-in"
+      leave-to-class="opacity-0 motion-safe:rotate-x-90"
+    >
+      <span :key="shown" class="block truncate">{{ shown }}</span>
+    </Transition>
+  </span>
 </template>
