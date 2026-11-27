@@ -48,6 +48,7 @@ jobs:
             docker:
               - '**/Dockerfile'
               - '**/.dockerignore'
+              - 'web/nginx.conf'
               - 'docker-compose*.yml'
               - 'justfile'
               - '.env.example'
