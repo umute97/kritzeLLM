@@ -76,6 +76,18 @@ export const useJournals = defineStore('journals', () => {
     return journal
   }
 
+  async function all(): Promise<Journal[]> {
+    const found: Journal[] = []
+    let cursor: string | undefined
+    do {
+      const list = await call(api.GET('/journals', { params: { query: { limit: 100, cursor } } }))
+      list.items.forEach(remember)
+      found.push(...list.items)
+      cursor = list.nextCursor ?? undefined
+    } while (cursor)
+    return found
+  }
+
   /** Refreshes a journal, e.g. its page count after an upload. */
   async function refresh(id: string) {
     remember(await call(api.GET('/journals/{journalId}', { params: { path: { journalId: id } } })))
@@ -119,6 +131,7 @@ export const useJournals = defineStore('journals', () => {
     back,
     next,
     get,
+    all,
     refresh,
     create,
     update,

@@ -45,7 +45,11 @@ const ui = useUiMessages()
     <p
       class="paper-lines m-0 rounded border border-sand px-3 py-2.5 font-hand text-[19px] leading-[26px] [--line:26px]"
     >
-      <KHighlight :before="before" :hit="quote" :after="after" :soft="!selected" />
+      <KHighlight
+        :text="before + quote + after"
+        :marks="[[before.length, before.length + quote.length]]"
+        :soft="!selected"
+      />
     </p>
     <component
       :is="link"

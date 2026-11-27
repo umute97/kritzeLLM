@@ -1,6 +1,6 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter, RouterLink, RouterView } from 'vue-router'
 
@@ -60,7 +60,7 @@ function deferred<T>() {
 
 const Shelf = defineComponent({ render: () => h('p', 'The shelf') })
 
-async function open(pageId: string) {
+async function open(pageId: string, query = '') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -69,7 +69,7 @@ async function open(pageId: string) {
       { path: '/pages/:pageId', name: 'page', component: PageDetailView, props: true },
     ],
   })
-  await router.push(`/pages/${pageId}`)
+  await router.push(`/pages/${pageId}${query}`)
   wrapper = mount(defineComponent({ render: () => h(RouterView) }), {
     attachTo: document.body,
     global: { plugins: [pinia, router, createCottage({ link: RouterLink, messages: uiMessages })] },
@@ -101,6 +101,26 @@ describe('the page detail view', () => {
       'Sunday',
       'Picked wild garlic by the river.',
     ])
+  })
+
+  it('highlights the blocks a search hit points at, and scrolls to the first', async () => {
+    const blocks = [0, 1, 2].map((seq) => makeBlock({ seq, text: `Block ${seq}` }))
+    serve([detailOf(makePage({ id: 'pg_a' }), blocks)])
+    // jsdom doesn't scroll, so it has no scrollIntoView to watch.
+    const scrolled: string[] = []
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.dataset.blockId!)
+    }
+    onTestFinished(() => {
+      delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView
+    })
+    const { wrapper } = await open('pg_a', `?blocks=${blocks[1]!.id},${blocks[2]!.id}`)
+
+    const lit = wrapper
+      .findAll('[data-block-id]')
+      .map((card) => card.classes().includes('bg-accent/30'))
+    expect(lit).toEqual([false, true, true])
+    expect(scrolled).toEqual([blocks[1]!.id])
   })
 
   it('speaks German, the cottage library included, after switching', async () => {

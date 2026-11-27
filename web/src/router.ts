@@ -7,6 +7,7 @@ export const router = createRouter({
   routes: [
     { path: '/', name: 'library', component: LibraryView },
     { path: '/journals/:journalId', name: 'journal', component: LibraryView, props: true },
+    { path: '/search', name: 'search', component: () => import('@/views/SearchView.vue') },
     {
       path: '/pages/:pageId',
       name: 'page',
