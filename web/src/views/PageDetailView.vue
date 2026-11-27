@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   onBeforeRouteLeave,
   onBeforeRouteUpdate,
+  useRoute,
   useRouter,
   type RouteLocationNormalized,
 } from 'vue-router'
@@ -41,6 +42,7 @@ import {
 const props = defineProps<{ pageId: string }>()
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const journals = useJournals()
 const pages = usePages()
@@ -58,6 +60,8 @@ const saving = reactive(new Set<string>())
 const saved = reactive(new Set<string>())
 const savedTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const active = ref<string | null>(null)
+// Blocks a search hit or a source points at: `?blocks=blk_…,blk_…`.
+const highlighted = computed(() => new Set(String(route.query.blocks ?? '').split(',')))
 const view = ref<'photo' | 'text' | 'both'>('both')
 const reading = useConfirm()
 const deleting = useConfirm()
@@ -90,6 +94,7 @@ async function load() {
     detail.value = page
     drafts.clear()
     pages.put(page)
+    void nextTick(showHighlighted)
     void findNeighbours(page, mine)
     const owner = await journals.get(page.journalId)
     if (mine === latest) journal.value = owner
@@ -98,6 +103,14 @@ async function load() {
     if (error instanceof ApiError && error.status === 404) missing.value = true
     else toastError(error, t('page.openFailed'), { retry: load })
   }
+}
+
+function showHighlighted() {
+  const block = detail.value?.blocks.find((b) => highlighted.value.has(b.id))
+  if (!block) return
+  document
+    .querySelector(`[data-block-id="${block.id}"]`)
+    ?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
 }
 
 async function findNeighbours(page: PageDetail, mine: number) {
@@ -384,7 +397,8 @@ onUnmounted(() => {
               :dirty="drafts.has(block.id)"
               :saving="saving.has(block.id)"
               :saved="saved.has(block.id)"
-              :selected="active === block.id"
+              :selected="active === block.id || highlighted.has(block.id)"
+              :data-block-id="block.id"
               @update:model-value="setText(block, $event)"
               @save="save(block)"
               @undo="drafts.delete(block.id)"

@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest'
 
 import KCitationChip from '../KCitationChip.vue'
 import KComposer from '../KComposer.vue'
+import KHighlight from '../KHighlight.vue'
 import KMessage from '../KMessage.vue'
 import KSearchResult from '../KSearchResult.vue'
 import KSourceCard from '../KSourceCard.vue'
 import KToolActivity from '../KToolActivity.vue'
+import type { Quote } from '../types'
 
 describe('KComposer', () => {
   function composer(props: Record<string, unknown> = {}) {
@@ -118,26 +120,40 @@ describe('KCitationChip and KSourceCard', () => {
   })
 })
 
-describe('KSearchResult', () => {
-  it('shows scores only when given', async () => {
-    const wrapper = mount(KSearchResult, {
+describe('KHighlight', () => {
+  it('marks every stretch it is given', () => {
+    const wrapper = mount(KHighlight, {
       props: {
-        pageNumber: 12,
-        journal: 'Green notebook',
-        date: 'Mar 3',
-        kind: 'paragraph',
-        hit: 'sweet peas',
+        text: 'sweet peas, basil and more sweet peas',
+        marks: [
+          [0, 10],
+          [27, 37],
+        ],
       },
     })
+    expect(wrapper.text()).toBe('sweet peas, basil and more sweet peas')
+    expect(wrapper.findAll('mark').map((m) => m.text())).toEqual(['sweet peas', 'sweet peas'])
+  })
+})
+
+describe('KSearchResult', () => {
+  const quotes: Quote[] = [
+    { kind: 'heading', text: 'Saturday' },
+    { kind: 'paragraph', text: 'I finally planted the sweet peas.', marks: [[22, 32]] },
+  ]
+
+  it('quotes every matched block with its kind, and says how many more matched', async () => {
+    const wrapper = mount(KSearchResult, {
+      props: { pageNumber: 12, journal: 'Green notebook', date: 'Mar 3', quotes },
+    })
     expect(wrapper.text()).toContain('Green notebook · Mar 3')
-    expect(wrapper.find('[role="meter"]').exists()).toBe(false)
-    await wrapper.setProps({ scores: { words: 0.92, meaning: 0.81, blended: 0.87 } })
-    const meters = wrapper.findAll('[role="meter"]')
-    expect(meters.map((m) => m.attributes('aria-label'))).toEqual([
-      'Words score',
-      'Meaning score',
-      'Blended score',
-    ])
-    expect(wrapper.text()).toContain('0.87')
+    expect(wrapper.text()).toContain('Heading')
+    expect(wrapper.text()).toContain('Paragraph')
+    expect(wrapper.text()).toContain('Saturday')
+    expect(wrapper.get('mark').text()).toBe('sweet peas')
+    expect(wrapper.text()).not.toContain('more block')
+
+    await wrapper.setProps({ more: 2 })
+    expect(wrapper.text()).toContain('and 2 more blocks')
   })
 })

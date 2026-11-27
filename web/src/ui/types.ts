@@ -19,6 +19,17 @@ export type UploadStatus =
 
 export type StatusKind = 'page' | 'job' | 'upload'
 
+/** A stretch of text to mark, from `start` up to (not including) `end`, as `String.slice` counts. */
+export type Mark = [start: number, end: number]
+
+/** A block's words in a search result, with what matched marked. */
+export interface Quote {
+  kind: BlockKind
+  text: string
+  /** Sorted, and not overlapping. */
+  marks?: Mark[]
+}
+
 export interface Option<T extends string = string> {
   value: T
   label: string

@@ -48,9 +48,8 @@ export const uiGerman: UiMessages = {
   block: (seq, kind) => `Block ${seq}, ${kind}`,
   progress: (value, max) => `${value} von ${max}`,
   sending: (fileName) => `${fileName} wird gesendet`,
-  score: (label) => `${label}-Wert`,
+  moreBlocks: (n) => (n === 1 ? 'und 1 weiterer Block' : `und ${n} weitere Blöcke`),
   files: (n) => (n === 1 ? '1 Datei' : `${n} Dateien`),
-  scores: { words: 'Wörter', meaning: 'Bedeutung', blended: 'Gemischt' },
   flags: {
     unsure: 'nicht ganz sicher',
     duplicate: 'schon da',

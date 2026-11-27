@@ -36,9 +36,8 @@ export interface UiMessages {
   block: (seq: number, kind: string) => string
   progress: (value: number, max: number) => string
   sending: (fileName: string) => string
-  score: (label: string) => string
+  moreBlocks: (n: number) => string
   files: (n: number) => string
-  scores: { words: string; meaning: string; blended: string }
   flags: { unsure: string; duplicate: string; edited: string; saved: string }
   pageStatus: Record<PageStatus, string>
   jobStatus: Record<JobStatus, string>
@@ -102,9 +101,8 @@ export const englishMessages: UiMessages = {
   block: (seq, kind) => `Block ${seq}, ${kind}`,
   progress: (value, max) => `${value} of ${max}`,
   sending: (fileName) => `Sending ${fileName}`,
-  score: (label) => `${label} score`,
+  moreBlocks: (n) => (n === 1 ? 'and 1 more block' : `and ${n} more blocks`),
   files: (n) => (n === 1 ? '1 file' : `${n} files`),
-  scores: { words: 'Words', meaning: 'Meaning', blended: 'Blended' },
   flags: {
     unsure: 'not quite sure',
     duplicate: 'already here',
