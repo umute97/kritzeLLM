@@ -27,6 +27,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, column_property, mapped_column, relationship
 
 from kritzellm.api.schemas.blocks import BlockKind
+from kritzellm.api.schemas.conversations import MessageRole
 from kritzellm.api.schemas.jobs import JobKind, JobStatus
 from kritzellm.api.schemas.pages import PageStatus
 from kritzellm.core.embeddings import EMBED_DIMENSIONS
@@ -226,3 +227,33 @@ class Chunk(Base):
         TSVECTOR, Computed(f"to_tsvector('{TEXT_SEARCH_CONFIG}', text)", persisted=True)
     )
     """The words of `text`, for full-text search."""
+
+
+class Conversation(Timestamps, Base):
+    """A chat thread. `updated_at` is its last activity, which orders the list."""
+
+    __tablename__ = "conversations"
+    __table_args__ = (Index("ix_conversations_activity", "updated_at", "id"),)
+
+    id: Mapped[str] = _id(Prefix.CONVERSATION)
+    title: Mapped[str | None] = mapped_column(String(200))
+
+    messages: Mapped[list[Message]] = relationship(
+        back_populates="conversation", lazy="raise", passive_deletes=True, order_by="Message.id"
+    )
+
+
+class Message(Base):
+    __tablename__ = "messages"
+    __table_args__ = (_one_of("role", MessageRole),)
+
+    id: Mapped[str] = _id(Prefix.MESSAGE)
+    """UUIDv7, so ordering by ID is ordering by time, even within one transaction."""
+    conversation_id: Mapped[str] = mapped_column(
+        TypeId(Prefix.CONVERSATION), ForeignKey("conversations.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[MessageRole] = mapped_column(_enum(MessageRole))
+    content: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    conversation: Mapped[Conversation] = relationship(back_populates="messages", lazy="raise")

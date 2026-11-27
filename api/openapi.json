@@ -3,7 +3,7 @@
   "info": {
     "title": "kritzeLLM API",
     "summary": "Search and chat with a handwritten journal.",
-    "description": "Upload photos of handwritten journal pages, review their transcriptions and search them. A chat\nagent that cites the exact page is coming. 🖍️\n\n## Conventions\n\n- **Base path** `/api/v1`. JSON bodies use `camelCase`.\n- **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.\n- **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded\n  UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,\n  `job` job.\n- **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.\n  `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed\n  IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.\n- **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as\n  `cursor`. `nextCursor` is `null` on the last page. Treat cursors as opaque strings; they stay\n  valid even if the last item you got is deleted meanwhile.\n- **Long-running work** (transcribing, re-indexing) answers `202 Accepted` with a `Job`\n  and a `Location` header. Poll the job until it finishes.\n- **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`\n  needs `Authorization: Bearer <token>`.\n",
+    "description": "Upload photos of handwritten journal pages, review their transcriptions and search them. A chat\nagent that cites the exact page is coming. 🖍️\n\n## Conventions\n\n- **Base path** `/api/v1`. JSON bodies use `camelCase`.\n- **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.\n- **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded\n  UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,\n  `job` job, `cnv` conversation, `msg` message.\n- **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.\n  `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed\n  IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.\n- **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as\n  `cursor`. `nextCursor` is `null` on the last page. Treat cursors as opaque strings; they stay\n  valid even if the last item you got is deleted meanwhile.\n- **Long-running work** (transcribing, re-indexing) answers `202 Accepted` with a `Job`\n  and a `Location` header. Poll the job until it finishes.\n- **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`\n  needs `Authorization: Bearer <token>`.\n",
     "version": "0.5.1"
   },
   "servers": [
@@ -1656,6 +1656,414 @@
         }
       }
     },
+    "/conversations": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List conversations",
+        "description": "Lists all conversations, the most recently active first.",
+        "operationId": "listConversations",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum number of items to return.",
+              "default": 25,
+              "title": "Limit"
+            },
+            "description": "Maximum number of items to return."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^cnv_[0-7][0-9a-hjkmnp-tv-z]{25}\\.[0-9]{1,17}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `nextCursor` from the previous page. Omit for the first page.",
+              "title": "Cursor"
+            },
+            "description": "The `nextCursor` from the previous page. Omit for the first page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request couldn't be parsed (e.g. malformed JSON or multipart).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong bearer token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Some values are invalid (including malformed IDs). Each one is listed in `errors`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Start a conversation",
+        "description": "Starts an empty conversation to ask the journal things in.",
+        "operationId": "createConversation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "URL of the new conversation.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request couldn't be parsed (e.g. malformed JSON or multipart).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong bearer token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Some values are invalid (including malformed IDs). Each one is listed in `errors`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{conversationId}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get a conversation",
+        "description": "Returns a conversation with all of its messages, oldest first.\n\nA conversation takes up to 20 questions, so it holds at most 40 messages.",
+        "operationId": "getConversation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^cnv_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+              "description": "The conversation's ID.",
+              "title": "Conversationid"
+            },
+            "description": "The conversation's ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request couldn't be parsed (e.g. malformed JSON or multipart).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong bearer token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource doesn't exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Some values are invalid (including malformed IDs). Each one is listed in `errors`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Update a conversation",
+        "description": "Renames a conversation. Only the given fields change.",
+        "operationId": "updateConversation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^cnv_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+              "description": "The conversation's ID.",
+              "title": "Conversationid"
+            },
+            "description": "The conversation's ID."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request couldn't be parsed (e.g. malformed JSON or multipart).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong bearer token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource doesn't exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Some values are invalid (including malformed IDs). Each one is listed in `errors`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Delete a conversation",
+        "description": "Deletes a conversation with all of its messages.\n\nThis can't be undone.",
+        "operationId": "deleteConversation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^cnv_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+              "description": "The conversation's ID.",
+              "title": "Conversationid"
+            },
+            "description": "The conversation's ID."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "The request couldn't be parsed (e.g. malformed JSON or multipart).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong bearer token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource doesn't exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Some values are invalid (including malformed IDs). Each one is listed in `errors`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/jobs": {
       "get": {
         "tags": [
@@ -2140,6 +2548,180 @@
         "title": "ConfiguredModels",
         "description": "The OpenAI models the server is configured with."
       },
+      "Conversation": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^cnv_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+            "title": "Id",
+            "description": "TypeID of a conversation."
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Display name; `null` until it has one."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat",
+            "description": "RFC 3339 timestamp in UTC."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat",
+            "description": "RFC 3339 timestamp in UTC."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "Conversation",
+        "description": "A chat thread with the journal."
+      },
+      "ConversationCreate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[^\\x00]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Display name; leave it out to name the conversation later."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ConversationCreate",
+        "description": "A new, empty conversation."
+      },
+      "ConversationDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^cnv_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+            "title": "Id",
+            "description": "TypeID of a conversation."
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Display name; `null` until it has one."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat",
+            "description": "RFC 3339 timestamp in UTC."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat",
+            "description": "RFC 3339 timestamp in UTC."
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "type": "array",
+            "title": "Messages",
+            "description": "All of them, oldest first. A conversation takes up to 20 questions, each with its answer."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "createdAt",
+          "updatedAt",
+          "messages"
+        ],
+        "title": "ConversationDetail",
+        "description": "A conversation with its messages."
+      },
+      "ConversationList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Conversation"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^cnv_[0-7][0-9a-hjkmnp-tv-z]{25}\\.[0-9]{1,17}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor",
+            "description": "Pass as `cursor` to get the next page; `null` on the last page."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "title": "ConversationList",
+        "description": "A page of conversations."
+      },
+      "ConversationUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[^\\x00]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "New display name; `null` clears it."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ConversationUpdate",
+        "description": "Changes to a conversation. Only the given fields change."
+      },
       "DependencyStatus": {
         "type": "string",
         "enum": [
@@ -2550,6 +3132,47 @@
         "type": "object",
         "title": "JournalUpdate",
         "description": "Changes to a journal. Only the given fields change."
+      },
+      "Message": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^msg_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+            "title": "Id",
+            "description": "TypeID of a message."
+          },
+          "role": {
+            "$ref": "#/components/schemas/MessageRole"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat",
+            "description": "RFC 3339 timestamp in UTC."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "content",
+          "createdAt"
+        ],
+        "title": "Message",
+        "description": "One message in a conversation."
+      },
+      "MessageRole": {
+        "type": "string",
+        "enum": [
+          "user",
+          "assistant"
+        ],
+        "title": "MessageRole",
+        "description": "Who wrote a message: you (`user`) or the journal's helper (`assistant`)."
       },
       "Page": {
         "properties": {
@@ -3208,6 +3831,10 @@
     {
       "name": "search",
       "description": "Finding pages by meaning, by words, or exactly."
+    },
+    {
+      "name": "conversations",
+      "description": "Chat threads with the journal, and their messages."
     },
     {
       "name": "jobs",

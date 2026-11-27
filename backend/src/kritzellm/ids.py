@@ -19,6 +19,8 @@ class Prefix(StrEnum):
     PAGE = "pg"
     BLOCK = "blk"
     JOB = "job"
+    CONVERSATION = "cnv"
+    MESSAGE = "msg"
 
 
 def new_uuid() -> uuid.UUID:

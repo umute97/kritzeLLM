@@ -16,7 +16,7 @@ from . import API_PREFIX
 from .auth import require_token
 from .deps import check_query_params
 from .errors import PROBLEM_JSON, install_problem_handlers
-from .routes import admin, blocks, docs, health, jobs, journals, pages, search
+from .routes import admin, blocks, conversations, docs, health, jobs, journals, pages, search
 
 DESCRIPTION = """\
 Upload photos of handwritten journal pages, review their transcriptions and search them. A chat
@@ -28,7 +28,7 @@ agent that cites the exact page is coming. 🖍️
 - **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.
 - **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded
   UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,
-  `job` job.
+  `job` job, `cnv` conversation, `msg` message.
 - **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.
   `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed
   IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.
@@ -47,6 +47,7 @@ TAGS = [
     {"name": "pages", "description": "Uploaded page images and their transcriptions."},
     {"name": "blocks", "description": "Text on a page (paragraphs, lists, margin notes)."},
     {"name": "search", "description": "Finding pages by meaning, by words, or exactly."},
+    {"name": "conversations", "description": "Chat threads with the journal, and their messages."},
     {"name": "jobs", "description": "Background work and its progress."},
     {"name": "admin", "description": "Upkeep of the whole library."},
 ]
@@ -80,7 +81,7 @@ def create_api(settings: Settings | None = None) -> FastAPI:
     api.include_router(docs.router)
     api.include_router(health.router)
     authed = [Depends(require_token)]
-    for module in (journals, pages, blocks, search, jobs, admin):
+    for module in (journals, pages, blocks, search, conversations, jobs, admin):
         api.include_router(module.router, dependencies=authed)
 
     def openapi() -> dict[str, Any]:
