@@ -254,6 +254,10 @@ class Message(Base):
     )
     role: Mapped[MessageRole] = mapped_column(_enum(MessageRole))
     content: Mapped[str]
+    tool_calls: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default=sql("'[]'"))
+    """What the helper looked up for an answer, as the API's `ToolCall`s."""
+    sources: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default=sql("'[]'"))
+    """The blocks an answer cites, as the API's `Source`s, copied when the answer was written."""
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages", lazy="raise")

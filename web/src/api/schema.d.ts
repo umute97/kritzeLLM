@@ -338,6 +338,35 @@ export interface paths {
         patch: operations["updateConversation"];
         trace?: never;
     };
+    "/conversations/{conversationId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask a question
+         * @description Asks the journal a question and answers it, citing the blocks the answer rests on.
+         *
+         *     The helper searches and reads the journal first, then answers with `[n]` citations, one for
+         *     each of the answer's `sources`. It only cites blocks it actually read. The question and its
+         *     answer are saved together once the answer is done; if it fails or the stream is closed early,
+         *     nothing is saved.
+         *
+         *     With `Accept: text/event-stream` the answer streams as it's written, ending with `messageEnd`
+         *     (the same `Message` JSON mode returns) or `error`. A conversation takes up to 20 questions;
+         *     after that, this is a `409`. A `502` means the chat model failed.
+         */
+        post: operations["askQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs": {
         parameters: {
             query?: never;
@@ -512,6 +541,12 @@ export interface components {
             job: components["schemas"]["Job"];
         };
         /**
+         * ChatStreamEvent
+         * @description One server-sent event while an answer is written: `event` names its `type`, `data` is this
+         *     object as JSON. The stream ends with `messageEnd` or `error`.
+         */
+        ChatStreamEvent: components["schemas"]["MessageStartEvent"] | components["schemas"]["ToolCallEvent"] | components["schemas"]["ToolResultEvent"] | components["schemas"]["TextDeltaEvent"] | components["schemas"]["SourceEvent"] | components["schemas"]["MessageEndEvent"] | components["schemas"]["ErrorEvent"];
+        /**
          * ConfiguredModels
          * @description The OpenAI models the server is configured with.
          */
@@ -526,6 +561,11 @@ export interface components {
              * @description Model that embeds page text for search.
              */
             embed: string;
+            /**
+             * Chat
+             * @description Model that answers questions about the journal.
+             */
+            chat: string;
         };
         /**
          * Conversation
@@ -629,6 +669,18 @@ export interface components {
          * @enum {string}
          */
         DependencyStatus: "ok" | "unavailable";
+        /**
+         * ErrorEvent
+         * @description The answer failed partway; nothing was saved.
+         */
+        ErrorEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "error";
+            problem: components["schemas"]["Problem"];
+        };
         /**
          * Health
          * @description Service status.
@@ -843,8 +895,21 @@ export interface components {
              */
             id: string;
             role: components["schemas"]["MessageRole"];
-            /** Content */
+            /**
+             * Content
+             * @description The text. An answer cites its sources as `[n]`, the `ref` of one of its `sources`.
+             */
             content: string;
+            /**
+             * Toolcalls
+             * @description What the helper looked up for an answer, in order; empty for questions.
+             */
+            toolCalls: components["schemas"]["ToolCall"][];
+            /**
+             * Sources
+             * @description The blocks an answer cites, in the order it first cites them; empty for questions.
+             */
+            sources: components["schemas"]["Source"][];
             /**
              * Createdat
              * Format: date-time
@@ -853,11 +918,34 @@ export interface components {
             createdAt: string;
         };
         /**
+         * MessageEndEvent
+         * @description The saved answer, exactly as JSON mode returns it. Its `content` replaces the streamed text.
+         */
+        MessageEndEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "messageEnd";
+            message: components["schemas"]["Message"];
+        };
+        /**
          * MessageRole
          * @description Who wrote a message: you (`user`) or the journal's helper (`assistant`).
          * @enum {string}
          */
         MessageRole: "user" | "assistant";
+        /**
+         * MessageStartEvent
+         * @description The helper started on an answer.
+         */
+        MessageStartEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "messageStart";
+        };
         /**
          * Page
          * @description An uploaded page.
@@ -1125,6 +1213,14 @@ export interface components {
             parameter?: string | null;
         };
         /**
+         * Question
+         * @description A question for the journal.
+         */
+        Question: {
+            /** Content */
+            content: string;
+        };
+        /**
          * SearchHit
          * @description A page that matches the search.
          */
@@ -1168,6 +1264,131 @@ export interface components {
         SearchResult: {
             /** Items */
             items: components["schemas"]["SearchHit"][];
+        };
+        /**
+         * Source
+         * @description A block an answer cites, as it read when the answer was written.
+         */
+        Source: {
+            /**
+             * Ref
+             * @description The number the answer cites it with, as in `[3]`.
+             */
+            ref: number;
+            /**
+             * Blockid
+             * @description TypeID of a block.
+             */
+            blockId: string;
+            /**
+             * Pageid
+             * @description TypeID of a page.
+             */
+            pageId: string;
+            /**
+             * Journalid
+             * @description TypeID of a journal.
+             */
+            journalId: string;
+            /** Pagenumber */
+            pageNumber: number;
+            /** Entrydates */
+            entryDates: string[];
+            /**
+             * Quote
+             * @description The block's text.
+             */
+            quote: string;
+        };
+        /**
+         * SourceEvent
+         * @description A block the finished answer cites.
+         */
+        SourceEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "source";
+            source: components["schemas"]["Source"];
+        };
+        /**
+         * TextDeltaEvent
+         * @description More of the answer's text. Until `messageEnd`, it may still cite sources that get dropped.
+         */
+        TextDeltaEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "textDelta";
+            /** Text */
+            text: string;
+        };
+        /**
+         * ToolCall
+         * @description Something the helper looked up while answering.
+         */
+        ToolCall: {
+            /**
+             * Name
+             * @description The tool, e.g. `search_journal` or `read_page`.
+             */
+            name: string;
+            /**
+             * Args
+             * @description What it was called with.
+             */
+            args: {
+                [key: string]: unknown;
+            };
+            /**
+             * Pages
+             * @description How many pages it came back with.
+             */
+            pages: number;
+        };
+        /**
+         * ToolCallEvent
+         * @description The helper is looking something up.
+         */
+        ToolCallEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "toolCall";
+            /**
+             * Id
+             * @description Matches the `toolResult` that follows.
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Args */
+            args: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ToolResultEvent
+         * @description A lookup came back.
+         */
+        ToolResultEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "toolResult";
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Pages
+             * @description How many pages it came back with.
+             */
+            pages: number;
         };
         /**
          * UploadItem
@@ -2530,6 +2751,88 @@ export interface operations {
             };
             /** @description Some values are invalid (including malformed IDs). Each one is listed in `errors`. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    askQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The conversation's ID. */
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Question"];
+            };
+        };
+        responses: {
+            /** @description The saved answer, or with `Accept: text/event-stream` the answer as it's written: server-sent events, each a `ChatStreamEvent`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Message"];
+                    "text/event-stream": components["schemas"]["ChatStreamEvent"];
+                };
+            };
+            /** @description The request couldn't be parsed (e.g. malformed JSON or multipart). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing or wrong bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The resource doesn't exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The request conflicts with the current state (e.g. a job is still running). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Some values are invalid (including malformed IDs). Each one is listed in `errors`. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A service the server relies on (e.g. OpenAI) failed. Try again later. */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

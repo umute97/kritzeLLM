@@ -1,5 +1,6 @@
 """The ASGI app: the API lives under `/api/v1` (the web app will be served next to it)."""
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -25,4 +26,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
+def _show_app_logs() -> None:
+    """Uvicorn only sets up its own loggers, so the app's (e.g. token use) get a handler too."""
+    logger = logging.getLogger("kritzellm")
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s [%(name)s] %(message)s"))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+
+_show_app_logs()
 app = create_app()

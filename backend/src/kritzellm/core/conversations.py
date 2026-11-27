@@ -1,7 +1,7 @@
 """Conversations: chat threads with the journal, and the messages in them."""
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -9,7 +9,13 @@ from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from kritzellm.api.schemas.conversations import CONVERSATION_CURSOR, MAX_QUESTIONS, MessageRole
+from kritzellm.api.schemas.conversations import (
+    CONVERSATION_CURSOR,
+    MAX_QUESTIONS,
+    MessageRole,
+    Source,
+    ToolCall,
+)
 from kritzellm.db import models as db
 
 from .errors import ConflictError, NotFoundError, get_existing
@@ -105,8 +111,31 @@ async def delete_conversation(session: AsyncSession, conversation_id: str) -> No
         raise NotFoundError("Conversation")
 
 
+async def _questions(session: AsyncSession, conversation_id: str) -> int:
+    asked = await session.scalar(
+        select(func.count()).where(
+            db.Message.conversation_id == conversation_id, db.Message.role == MessageRole.USER
+        )
+    )
+    return asked or 0
+
+
+async def check_room(session: AsyncSession, conversation_id: str) -> db.Conversation:
+    """The conversation, if it takes another question. Raises `NotFoundError` or `ChatFullError`."""
+    conversation = await get_existing(session, db.Conversation, conversation_id)
+    if await _questions(session, conversation_id) >= MAX_QUESTIONS:
+        raise ChatFullError()
+    return conversation
+
+
 async def add_message(
-    session: AsyncSession, conversation_id: str, role: MessageRole, content: str
+    session: AsyncSession,
+    conversation_id: str,
+    role: MessageRole,
+    content: str,
+    *,
+    tool_calls: Sequence[ToolCall] = (),
+    sources: Sequence[Source] = (),
 ) -> db.Message:
     """Adds a message, which makes it the conversation's latest activity. The caller commits.
 
@@ -118,15 +147,15 @@ async def add_message(
     )
     if locked is None:
         raise NotFoundError("Conversation")
-    if role is MessageRole.USER:
-        asked = await session.scalar(
-            select(func.count()).where(
-                db.Message.conversation_id == conversation_id, db.Message.role == MessageRole.USER
-            )
-        )
-        if asked is not None and asked >= MAX_QUESTIONS:
-            raise ChatFullError()
-    message = db.Message(conversation_id=conversation_id, role=role, content=content)
+    if role is MessageRole.USER and await _questions(session, conversation_id) >= MAX_QUESTIONS:
+        raise ChatFullError()
+    message = db.Message(
+        conversation_id=conversation_id,
+        role=role,
+        content=content,
+        tool_calls=[call.model_dump(mode="json") for call in tool_calls],
+        sources=[source.model_dump(mode="json") for source in sources],
+    )
     session.add(message)
     await session.execute(
         update(db.Conversation)

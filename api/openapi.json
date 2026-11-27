@@ -3,7 +3,7 @@
   "info": {
     "title": "kritzeLLM API",
     "summary": "Search and chat with a handwritten journal.",
-    "description": "Upload photos of handwritten journal pages, review their transcriptions and search them. A chat\nagent that cites the exact page is coming. 🖍️\n\n## Conventions\n\n- **Base path** `/api/v1`. JSON bodies use `camelCase`.\n- **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.\n- **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded\n  UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,\n  `job` job, `cnv` conversation, `msg` message.\n- **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.\n  `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed\n  IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.\n- **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as\n  `cursor`. `nextCursor` is `null` on the last page. Treat cursors as opaque strings; they stay\n  valid even if the last item you got is deleted meanwhile.\n- **Long-running work** (transcribing, re-indexing) answers `202 Accepted` with a `Job`\n  and a `Location` header. Poll the job until it finishes.\n- **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`\n  needs `Authorization: Bearer <token>`.\n",
+    "description": "Upload photos of handwritten journal pages, review their transcriptions, search them, and ask\nthem questions: a chat agent answers and cites the exact blocks it read. 🖍️\n\n## Conventions\n\n- **Base path** `/api/v1`. JSON bodies use `camelCase`.\n- **Timestamps** are RFC 3339 (`2026-10-10T09:30:00Z`); journal dates are `YYYY-MM-DD`.\n- **IDs** are [TypeIDs](https://github.com/jetify-com/typeid): a type prefix plus a base32-encoded\n  UUIDv7, e.g. `pg_01k7c9a3b5d7e9f1g3h5j7k9m1`. Prefixes: `jrn` journal, `pg` page, `blk` block,\n  `job` job, `cnv` conversation, `msg` message.\n- **Errors** are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.\n  `400` means the request couldn't be parsed; `422` means a value is invalid (including malformed\n  IDs) and lists each problem in `errors`. A well-formed ID that doesn't exist is a `404`.\n- **Lists** use cursor pagination: pass `limit` and the previous response's `nextCursor` as\n  `cursor`. `nextCursor` is `null` on the last page. Treat cursors as opaque strings; they stay\n  valid even if the last item you got is deleted meanwhile.\n- **Long-running work** (transcribing, re-indexing) answers `202 Accepted` with a `Job`\n  and a `Location` header. Poll the job until it finishes.\n- **Streaming**: asking a question with `Accept: text/event-stream` answers with\n  [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html) as the\n  answer is written. Each event's `event` field names its type and its `data` is a JSON\n  `ChatStreamEvent`.\n- **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`\n  needs `Authorization: Bearer <token>`.\n",
     "version": "0.5.1"
   },
   "servers": [
@@ -2064,6 +2064,122 @@
         }
       }
     },
+    "/conversations/{conversationId}/messages": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Ask a question",
+        "description": "Asks the journal a question and answers it, citing the blocks the answer rests on.\n\nThe helper searches and reads the journal first, then answers with `[n]` citations, one for\neach of the answer's `sources`. It only cites blocks it actually read. The question and its\nanswer are saved together once the answer is done; if it fails or the stream is closed early,\nnothing is saved.\n\nWith `Accept: text/event-stream` the answer streams as it's written, ending with `messageEnd`\n(the same `Message` JSON mode returns) or `error`. A conversation takes up to 20 questions;\nafter that, this is a `409`. A `502` means the chat model failed.",
+        "operationId": "askQuestion",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^cnv_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+              "description": "The conversation's ID.",
+              "title": "Conversationid"
+            },
+            "description": "The conversation's ID."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Question"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The saved answer, or with `Accept: text/event-stream` the answer as it's written: server-sent events, each a `ChatStreamEvent`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatStreamEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request couldn't be parsed (e.g. malformed JSON or multipart).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong bearer token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource doesn't exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state (e.g. a job is still running).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Some values are invalid (including malformed IDs). Each one is listed in `errors`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "A service the server relies on (e.g. OpenAI) failed. Try again later.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/jobs": {
       "get": {
         "tags": [
@@ -2527,6 +2643,45 @@
         "title": "BlocksReplaceResult",
         "description": "A page's blocks after a replacement, plus the re-index job."
       },
+      "ChatStreamEvent": {
+        "description": "One server-sent event while an answer is written: `event` names its `type`, `data` is this\nobject as JSON. The stream ends with `messageEnd` or `error`.",
+        "discriminator": {
+          "mapping": {
+            "error": "#/components/schemas/ErrorEvent",
+            "messageEnd": "#/components/schemas/MessageEndEvent",
+            "messageStart": "#/components/schemas/MessageStartEvent",
+            "source": "#/components/schemas/SourceEvent",
+            "textDelta": "#/components/schemas/TextDeltaEvent",
+            "toolCall": "#/components/schemas/ToolCallEvent",
+            "toolResult": "#/components/schemas/ToolResultEvent"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/MessageStartEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ToolCallEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ToolResultEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TextDeltaEvent"
+          },
+          {
+            "$ref": "#/components/schemas/SourceEvent"
+          },
+          {
+            "$ref": "#/components/schemas/MessageEndEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorEvent"
+          }
+        ],
+        "title": "ChatStreamEvent"
+      },
       "ConfiguredModels": {
         "properties": {
           "transcribe": {
@@ -2538,12 +2693,18 @@
             "type": "string",
             "title": "Embed",
             "description": "Model that embeds page text for search."
+          },
+          "chat": {
+            "type": "string",
+            "title": "Chat",
+            "description": "Model that answers questions about the journal."
           }
         },
         "type": "object",
         "required": [
           "transcribe",
-          "embed"
+          "embed",
+          "chat"
         ],
         "title": "ConfiguredModels",
         "description": "The OpenAI models the server is configured with."
@@ -2730,6 +2891,26 @@
         ],
         "title": "DependencyStatus",
         "description": "Whether a dependency is reachable."
+      },
+      "ErrorEvent": {
+        "description": "The answer failed partway; nothing was saved.",
+        "properties": {
+          "type": {
+            "const": "error",
+            "default": "error",
+            "title": "Type",
+            "type": "string"
+          },
+          "problem": {
+            "$ref": "#/components/schemas/Problem"
+          }
+        },
+        "required": [
+          "type",
+          "problem"
+        ],
+        "title": "ErrorEvent",
+        "type": "object"
       },
       "Health": {
         "properties": {
@@ -3146,7 +3327,24 @@
           },
           "content": {
             "type": "string",
-            "title": "Content"
+            "title": "Content",
+            "description": "The text. An answer cites its sources as `[n]`, the `ref` of one of its `sources`."
+          },
+          "toolCalls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            },
+            "type": "array",
+            "title": "Toolcalls",
+            "description": "What the helper looked up for an answer, in order; empty for questions."
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "type": "array",
+            "title": "Sources",
+            "description": "The blocks an answer cites, in the order it first cites them; empty for questions."
           },
           "createdAt": {
             "type": "string",
@@ -3160,10 +3358,32 @@
           "id",
           "role",
           "content",
+          "toolCalls",
+          "sources",
           "createdAt"
         ],
         "title": "Message",
         "description": "One message in a conversation."
+      },
+      "MessageEndEvent": {
+        "description": "The saved answer, exactly as JSON mode returns it. Its `content` replaces the streamed text.",
+        "properties": {
+          "type": {
+            "const": "messageEnd",
+            "default": "messageEnd",
+            "title": "Type",
+            "type": "string"
+          },
+          "message": {
+            "$ref": "#/components/schemas/Message"
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "title": "MessageEndEvent",
+        "type": "object"
       },
       "MessageRole": {
         "type": "string",
@@ -3173,6 +3393,22 @@
         ],
         "title": "MessageRole",
         "description": "Who wrote a message: you (`user`) or the journal's helper (`assistant`)."
+      },
+      "MessageStartEvent": {
+        "description": "The helper started on an answer.",
+        "properties": {
+          "type": {
+            "const": "messageStart",
+            "default": "messageStart",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "MessageStartEvent",
+        "type": "object"
       },
       "Page": {
         "properties": {
@@ -3664,6 +3900,24 @@
         "title": "ProblemError",
         "description": "One invalid value in a request."
       },
+      "Question": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "pattern": "^[^\\x00]*[^\\x00\\s][^\\x00]*$",
+            "title": "Content"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "Question",
+        "description": "A question for the journal."
+      },
       "SearchHit": {
         "properties": {
           "page": {
@@ -3747,6 +4001,201 @@
         ],
         "title": "SearchResult",
         "description": "The best matching pages, best first."
+      },
+      "Source": {
+        "properties": {
+          "ref": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Ref",
+            "description": "The number the answer cites it with, as in `[3]`."
+          },
+          "blockId": {
+            "type": "string",
+            "pattern": "^blk_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+            "title": "Blockid",
+            "description": "TypeID of a block."
+          },
+          "pageId": {
+            "type": "string",
+            "pattern": "^pg_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+            "title": "Pageid",
+            "description": "TypeID of a page."
+          },
+          "journalId": {
+            "type": "string",
+            "pattern": "^jrn_[0-7][0-9a-hjkmnp-tv-z]{25}$",
+            "title": "Journalid",
+            "description": "TypeID of a journal."
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Pagenumber"
+          },
+          "entryDates": {
+            "items": {
+              "type": "string",
+              "format": "date",
+              "description": "A calendar day."
+            },
+            "type": "array",
+            "title": "Entrydates"
+          },
+          "quote": {
+            "type": "string",
+            "title": "Quote",
+            "description": "The block's text."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ref",
+          "blockId",
+          "pageId",
+          "journalId",
+          "pageNumber",
+          "entryDates",
+          "quote"
+        ],
+        "title": "Source",
+        "description": "A block an answer cites, as it read when the answer was written."
+      },
+      "SourceEvent": {
+        "description": "A block the finished answer cites.",
+        "properties": {
+          "type": {
+            "const": "source",
+            "default": "source",
+            "title": "Type",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          }
+        },
+        "required": [
+          "type",
+          "source"
+        ],
+        "title": "SourceEvent",
+        "type": "object"
+      },
+      "TextDeltaEvent": {
+        "description": "More of the answer's text. Until `messageEnd`, it may still cite sources that get dropped.",
+        "properties": {
+          "type": {
+            "const": "textDelta",
+            "default": "textDelta",
+            "title": "Type",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ],
+        "title": "TextDeltaEvent",
+        "type": "object"
+      },
+      "ToolCall": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The tool, e.g. `search_journal` or `read_page`."
+          },
+          "args": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Args",
+            "description": "What it was called with."
+          },
+          "pages": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Pages",
+            "description": "How many pages it came back with."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "args",
+          "pages"
+        ],
+        "title": "ToolCall",
+        "description": "Something the helper looked up while answering."
+      },
+      "ToolCallEvent": {
+        "description": "The helper is looking something up.",
+        "properties": {
+          "type": {
+            "const": "toolCall",
+            "default": "toolCall",
+            "title": "Type",
+            "type": "string"
+          },
+          "id": {
+            "description": "Matches the `toolResult` that follows.",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "args": {
+            "additionalProperties": true,
+            "title": "Args",
+            "type": "object"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name",
+          "args"
+        ],
+        "title": "ToolCallEvent",
+        "type": "object"
+      },
+      "ToolResultEvent": {
+        "description": "A lookup came back.",
+        "properties": {
+          "type": {
+            "const": "toolResult",
+            "default": "toolResult",
+            "title": "Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pages": {
+            "description": "How many pages it came back with.",
+            "minimum": 0,
+            "title": "Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "name",
+          "pages"
+        ],
+        "title": "ToolResultEvent",
+        "type": "object"
       },
       "UploadItem": {
         "properties": {

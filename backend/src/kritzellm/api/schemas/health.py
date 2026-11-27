@@ -26,6 +26,8 @@ class ConfiguredModels(ApiModel):
     """Model that reads page images."""
     embed: str
     """Model that embeds page text for search."""
+    chat: str
+    """Model that answers questions about the journal."""
 
 
 class Health(ApiModel):

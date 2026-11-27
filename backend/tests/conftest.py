@@ -1,7 +1,9 @@
 import asyncio
 import contextlib
 import io
+import json
 import os
+import re
 from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -12,12 +14,12 @@ from httpx2 import Response
 from PIL import ExifTags, Image
 from pydantic import PostgresDsn
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
-from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls, FunctionModel
 from sqlalchemy import Executable, make_url, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from kritzellm.config import Settings
-from kritzellm.core import transcribe
+from kritzellm.core import agent, transcribe
 from kritzellm.db import models as db
 from kritzellm.db.migrate import upgrade
 from kritzellm.main import create_app
@@ -160,6 +162,51 @@ def vision_model() -> Iterator[FakeVisionModel]:
         yield fake
 
 
+type ChatStep = str | dict[str, Any] | list[dict[str, Any]] | Exception
+"""One model request's answer: text, a tool call (`{"name": ..., "args": ...}`), several
+tool calls at once, or an exception to raise."""
+
+
+class ScriptedChatModel:
+    """Stands in for the chat model, answering each model request with the next step of `script`.
+
+    Text streams in word by word. Every request's messages land in `requests`.
+    """
+
+    def __init__(self) -> None:
+        self.script: list[ChatStep] = []
+        self.requests: list[list[ModelMessage]] = []
+
+    async def stream(
+        self, messages: list[ModelMessage], info: AgentInfo
+    ) -> AsyncIterator[str | DeltaToolCalls]:
+        self.requests.append(messages)
+        step = self.script.pop(0)
+        if isinstance(step, Exception):
+            raise step
+        if isinstance(step, str):
+            for word in re.findall(r"\S+\s*", step):
+                yield word
+            return
+        calls = step if isinstance(step, list) else [step]
+        yield {
+            index: DeltaToolCall(
+                name=call["name"],
+                json_args=json.dumps(call.get("args", {})),
+                tool_call_id=f"call-{len(self.requests)}-{index}",
+            )
+            for index, call in enumerate(calls)
+        }
+
+
+@pytest.fixture
+def chat_model() -> Iterator[ScriptedChatModel]:
+    """Replaces whatever model is configured for the chat."""
+    fake = ScriptedChatModel()
+    with agent.agent.override(model=FunctionModel(stream_function=fake.stream)):
+        yield fake
+
+
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
@@ -209,13 +256,15 @@ def data_dir(tmp_path: Path) -> Path:
 def db_client(database_url: str, data_dir: Path) -> Iterator[TestClient]:
     """An API client backed by the test database. One event loop serves the whole test.
 
-    Searching embeds with the fake `test` model, like the worker, so it never calls OpenAI.
+    Searching embeds with the fake `test` model, like the worker, and the chat answers with it
+    (unless a test swaps in `chat_model`), so it never calls OpenAI.
     """
     settings = Settings(
         api_token=None,
         database_url=PostgresDsn(database_url),
         data_dir=data_dir,
         embed_model="test",
+        chat_model="test",
     )
     app = create_app(settings)
     with TestClient(app, base_url="http://test/api/v1") as client:

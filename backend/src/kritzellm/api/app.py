@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
 from pydantic.alias_generators import to_camel
+from pydantic.json_schema import models_json_schema
 
 from kritzellm import __version__
 from kritzellm.config import Settings
@@ -17,10 +18,11 @@ from .auth import require_token
 from .deps import check_query_params
 from .errors import PROBLEM_JSON, install_problem_handlers
 from .routes import admin, blocks, conversations, docs, health, jobs, journals, pages, search
+from .schemas.conversations import ChatStreamEvent
 
 DESCRIPTION = """\
-Upload photos of handwritten journal pages, review their transcriptions and search them. A chat
-agent that cites the exact page is coming. 🖍️
+Upload photos of handwritten journal pages, review their transcriptions, search them, and ask
+them questions: a chat agent answers and cites the exact blocks it read. 🖍️
 
 ## Conventions
 
@@ -37,6 +39,10 @@ agent that cites the exact page is coming. 🖍️
   valid even if the last item you got is deleted meanwhile.
 - **Long-running work** (transcribing, re-indexing) answers `202 Accepted` with a `Job`
   and a `Location` header. Poll the job until it finishes.
+- **Streaming**: asking a question with `Accept: text/event-stream` answers with
+  [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html) as the
+  answer is written. Each event's `event` field names its type and its `data` is a JSON
+  `ChatStreamEvent`.
 - **Auth**: when the server has an `API_TOKEN` configured, every request except `GET /health`
   needs `Authorization: Bearer <token>`.
 """
@@ -122,6 +128,13 @@ def build_openapi(api: FastAPI) -> dict[str, Any]:
         separate_input_output_schemas=False,
     )
     schemas: dict[str, Any] = spec["components"]["schemas"]
+
+    # The chat stream's events, which FastAPI can't see behind `text/event-stream`.
+    _, streamed = models_json_schema(
+        [(ChatStreamEvent, "serialization")], ref_template="#/components/schemas/{model}"
+    )
+    for name, schema in streamed["$defs"].items():
+        schemas.setdefault(name, schema)
 
     # Errors are problem+json, and responses are listed by status code
     for operations in spec["paths"].values():

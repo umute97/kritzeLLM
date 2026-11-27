@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from conftest import FakeVisionModel, new_journal, ok, run_sql, upload
 from fastapi.testclient import TestClient
+from pydantic import PostgresDsn
 from pydantic_ai.embeddings import Embedder, EmbeddingResult, TestEmbeddingModel
 from pydantic_ai.exceptions import ModelHTTPError
 from sqlalchemy import update
@@ -17,6 +18,7 @@ from kritzellm.config import Settings
 from kritzellm.core import embeddings
 from kritzellm.core.embeddings import EMBED_DIMENSIONS
 from kritzellm.db import models as db
+from kritzellm.main import create_app
 
 pytestmark = pytest.mark.db
 
@@ -332,3 +334,16 @@ def test_an_unreachable_embedding_model_is_502_but_keywords_still_work(
         assert "overloaded" not in response.text
     for mode in ("keyword", "exact"):
         assert page_ids(search(db_client, rare, mode=mode, journalId=journal)) == [page["id"]]
+
+
+def test_a_missing_openai_key_is_502(database_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    settings = Settings(
+        api_token=None,
+        database_url=PostgresDsn(database_url),
+        embed_model="text-embedding-3-small",
+    )
+    with TestClient(create_app(settings), base_url="http://test/api/v1") as client:
+        response = client.get("/search", params={"q": "Regen"})
+    assert response.status_code == 502
+    assert response.json()["detail"] == "The embedding model isn't set up on the server."
