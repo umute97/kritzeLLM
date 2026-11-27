@@ -68,6 +68,14 @@ STATUSES: dict[type[Exception], int] = {NotFoundError: 404, ConflictError: 409, 
 """The status each domain error answers with."""
 
 
+def problem_for(exc: Exception, instance: str | None = None) -> Problem:
+    """The problem an error answers with, for when it can't be an HTTP response any more (e.g.
+    mid-stream). Errors that aren't domain errors are a `500` that says nothing more."""
+    status = next((status for error, status in STATUSES.items() if isinstance(exc, error)), 500)
+    detail = None if status == 500 else str(exc)
+    return Problem(title=HTTPStatus(status).phrase, status=status, detail=detail, instance=instance)
+
+
 def _validation_errors(exc: RequestValidationError) -> list[ProblemError]:
     errors = []
     for error in exc.errors():

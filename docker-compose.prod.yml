@@ -19,6 +19,7 @@ x-backend-env: &backend-env
   DATA_DIR: /data
   TRANSCRIBE_MODEL: ${TRANSCRIBE_MODEL:-}
   EMBED_MODEL: ${EMBED_MODEL:-}
+  CHAT_MODEL: ${CHAT_MODEL:-}
 
 services:
   db:
@@ -53,6 +54,7 @@ services:
     environment:
       <<: *backend-env
       API_TOKEN: ${API_TOKEN:?Set API_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     ports:
       - "${API_PORT:-8000}:8000"
 

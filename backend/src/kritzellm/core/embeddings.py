@@ -10,7 +10,7 @@ from functools import cache
 
 from pydantic_ai.embeddings import Embedder, EmbeddingModel, TestEmbeddingModel
 from pydantic_ai.embeddings.openai import OpenAIEmbeddingModel
-from pydantic_ai.exceptions import ModelAPIError
+from pydantic_ai.exceptions import ModelAPIError, UserError
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from kritzellm.config import Settings
@@ -61,9 +61,15 @@ async def embed(texts: Sequence[str], settings: Settings) -> list[list[float]]:
 
 
 async def embed_query(text: str, settings: Settings) -> list[float]:
-    """Embeds a search query with the configured model. Raises `UpstreamError` if the API fails."""
+    """Embeds a search query with the configured model.
+
+    Raises `UpstreamError` if the model isn't set up (no API key) or the API fails.
+    """
     try:
         result = await _configured(settings).embed_query(text)
+    except UserError as exc:
+        logger.error("The embedding model isn't set up: %s", exc)
+        raise UpstreamError("The embedding model isn't set up on the server.") from exc
     except ModelAPIError as exc:
         logger.warning("Embedding a search query failed: %s", exc)
         raise UpstreamError("The embedding model couldn't be reached. Try again later.") from exc
