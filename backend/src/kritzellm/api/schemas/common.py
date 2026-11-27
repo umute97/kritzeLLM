@@ -46,6 +46,10 @@ JournalId = Annotated[str, _type_id(Prefix.JOURNAL), Field(description="TypeID o
 PageId = Annotated[str, _type_id(Prefix.PAGE), Field(description="TypeID of a page.")]
 BlockId = Annotated[str, _type_id(Prefix.BLOCK), Field(description="TypeID of a block.")]
 JobId = Annotated[str, _type_id(Prefix.JOB), Field(description="TypeID of a job.")]
+ConversationId = Annotated[
+    str, _type_id(Prefix.CONVERSATION), Field(description="TypeID of a conversation.")
+]
+MessageId = Annotated[str, _type_id(Prefix.MESSAGE), Field(description="TypeID of a message.")]
 
 NO_NUL = r"^[^\x00]*$"
 """Pattern for free-text inputs: anything but NUL characters, which Postgres can't store."""

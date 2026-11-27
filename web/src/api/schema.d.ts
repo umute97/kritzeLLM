@@ -282,6 +282,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List conversations
+         * @description Lists all conversations, the most recently active first.
+         */
+        get: operations["listConversations"];
+        put?: never;
+        /**
+         * Start a conversation
+         * @description Starts an empty conversation to ask the journal things in.
+         */
+        post: operations["createConversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{conversationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a conversation
+         * @description Returns a conversation with all of its messages, oldest first.
+         *
+         *     A conversation takes up to 20 questions, so it holds at most 40 messages.
+         */
+        get: operations["getConversation"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a conversation
+         * @description Deletes a conversation with all of its messages.
+         *
+         *     This can't be undone.
+         */
+        delete: operations["deleteConversation"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a conversation
+         * @description Renames a conversation. Only the given fields change.
+         */
+        patch: operations["updateConversation"];
+        trace?: never;
+    };
     "/jobs": {
         parameters: {
             query?: never;
@@ -470,6 +526,102 @@ export interface components {
              * @description Model that embeds page text for search.
              */
             embed: string;
+        };
+        /**
+         * Conversation
+         * @description A chat thread with the journal.
+         */
+        Conversation: {
+            /**
+             * Id
+             * @description TypeID of a conversation.
+             */
+            id: string;
+            /**
+             * Title
+             * @description Display name; `null` until it has one.
+             */
+            title: string | null;
+            /**
+             * Createdat
+             * Format: date-time
+             * @description RFC 3339 timestamp in UTC.
+             */
+            createdAt: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             * @description RFC 3339 timestamp in UTC.
+             */
+            updatedAt: string;
+        };
+        /**
+         * ConversationCreate
+         * @description A new, empty conversation.
+         */
+        ConversationCreate: {
+            /**
+             * Title
+             * @description Display name; leave it out to name the conversation later.
+             */
+            title?: string | null;
+        };
+        /**
+         * ConversationDetail
+         * @description A conversation with its messages.
+         */
+        ConversationDetail: {
+            /**
+             * Id
+             * @description TypeID of a conversation.
+             */
+            id: string;
+            /**
+             * Title
+             * @description Display name; `null` until it has one.
+             */
+            title: string | null;
+            /**
+             * Createdat
+             * Format: date-time
+             * @description RFC 3339 timestamp in UTC.
+             */
+            createdAt: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             * @description RFC 3339 timestamp in UTC.
+             */
+            updatedAt: string;
+            /**
+             * Messages
+             * @description All of them, oldest first. A conversation takes up to 20 questions, each with its answer.
+             */
+            messages: components["schemas"]["Message"][];
+        };
+        /**
+         * ConversationList
+         * @description A page of conversations.
+         */
+        ConversationList: {
+            /** Items */
+            items: components["schemas"]["Conversation"][];
+            /**
+             * Nextcursor
+             * @description Pass as `cursor` to get the next page; `null` on the last page.
+             */
+            nextCursor: string | null;
+        };
+        /**
+         * ConversationUpdate
+         * @description Changes to a conversation. Only the given fields change.
+         */
+        ConversationUpdate: {
+            /**
+             * Title
+             * @description New display name; `null` clears it.
+             */
+            title?: string | null;
         };
         /**
          * DependencyStatus
@@ -680,6 +832,32 @@ export interface components {
              */
             description?: string | null;
         };
+        /**
+         * Message
+         * @description One message in a conversation.
+         */
+        Message: {
+            /**
+             * Id
+             * @description TypeID of a message.
+             */
+            id: string;
+            role: components["schemas"]["MessageRole"];
+            /** Content */
+            content: string;
+            /**
+             * Createdat
+             * Format: date-time
+             * @description RFC 3339 timestamp in UTC.
+             */
+            createdAt: string;
+        };
+        /**
+         * MessageRole
+         * @description Who wrote a message: you (`user`) or the journal's helper (`assistant`).
+         * @enum {string}
+         */
+        MessageRole: "user" | "assistant";
         /**
          * Page
          * @description An uploaded page.
@@ -2068,6 +2246,290 @@ export interface operations {
             };
             /** @description A service the server relies on (e.g. OpenAI) failed. Try again later. */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listConversations: {
+        parameters: {
+            query?: {
+                /** @description Maximum number of items to return. */
+                limit?: number;
+                /** @description The `nextCursor` from the previous page. Omit for the first page. */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationList"];
+                };
+            };
+            /** @description The request couldn't be parsed (e.g. malformed JSON or multipart). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing or wrong bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Some values are invalid (including malformed IDs). Each one is listed in `errors`. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    /** @description URL of the new conversation. */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversation"];
+                };
+            };
+            /** @description The request couldn't be parsed (e.g. malformed JSON or multipart). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing or wrong bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Some values are invalid (including malformed IDs). Each one is listed in `errors`. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The conversation's ID. */
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description The request couldn't be parsed (e.g. malformed JSON or multipart). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing or wrong bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The resource doesn't exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Some values are invalid (including malformed IDs). Each one is listed in `errors`. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The conversation's ID. */
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The request couldn't be parsed (e.g. malformed JSON or multipart). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing or wrong bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The resource doesn't exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Some values are invalid (including malformed IDs). Each one is listed in `errors`. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The conversation's ID. */
+                conversationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversation"];
+                };
+            };
+            /** @description The request couldn't be parsed (e.g. malformed JSON or multipart). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing or wrong bearer token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The resource doesn't exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Some values are invalid (including malformed IDs). Each one is listed in `errors`. */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
