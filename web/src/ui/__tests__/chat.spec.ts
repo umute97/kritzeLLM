@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import KCitationChip from '../KCitationChip.vue'
 import KComposer from '../KComposer.vue'
@@ -68,27 +68,47 @@ describe('KMessage', () => {
     const mine = mount(KMessage, { props: { author: 'user' }, slots: { default: 'Hi' } })
     expect(mine.classes()).toContain('self-end')
   })
+
+  it('puts a footer under a dashed line in the answer', () => {
+    const answer = mount(KMessage, {
+      props: { author: 'assistant' },
+      slots: { default: 'They bloomed.', footer: 'Searched twice' },
+    })
+    expect(answer.get('.border-dashed').text()).toBe('Searched twice')
+  })
+
+  it('shows dots and a little line before the answer starts', () => {
+    const typing = mount(KMessage, {
+      props: { author: 'assistant', typing: true },
+      slots: { default: 'flipping pages…' },
+    })
+    expect(typing.get('[role="status"]').attributes('aria-label')).toBe('Still writing')
+    expect(typing.text()).toBe('flipping pages…')
+    expect(typing.find('.animate-blink').exists()).toBe(false)
+  })
 })
 
 describe('KToolActivity', () => {
-  it('unfolds the steps once done', async () => {
-    const wrapper = mount(KToolActivity, {
-      props: { state: 'done', expanded: false },
-      slots: { default: 'searched twice, read 4 pages' },
-    })
-    const button = wrapper.get('button')
-    expect(button.attributes('aria-expanded')).toBe('false')
-    await button.trigger('click')
-    expect(wrapper.emitted('toggle')).toHaveLength(1)
-  })
+  it('flips to each new line, holding each long enough to read', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(KToolActivity, { props: { text: 'flipping pages…', hold: 900 } })
+    expect(wrapper.text()).toBe('flipping pages…')
 
-  it('is a plain line while working', () => {
-    const wrapper = mount(KToolActivity, {
-      props: { state: 'working', icon: 'book' },
-      slots: { default: 'reading page 14…' },
-    })
-    expect(wrapper.find('button').exists()).toBe(false)
-    expect(wrapper.text()).toBe('reading page 14…')
+    await wrapper.setProps({ text: 'looking for “sweet peas”…' })
+    expect(wrapper.text()).toBe('looking for “sweet peas”…')
+
+    // A burst: each still gets its turn, in order.
+    await wrapper.setProps({ text: 'found 2 pages' })
+    await wrapper.setProps({ text: 'reading a page…' })
+    expect(wrapper.text()).toBe('looking for “sweet peas”…')
+    await vi.advanceTimersByTimeAsync(900)
+    expect(wrapper.text()).toBe('found 2 pages')
+    await vi.advanceTimersByTimeAsync(900)
+    expect(wrapper.text()).toBe('reading a page…')
+    expect(wrapper.attributes('aria-live')).toBe('polite')
+
+    wrapper.unmount()
+    vi.useRealTimers()
   })
 })
 

@@ -65,7 +65,7 @@ becomes a router link.
 | Navigation         | `KTopNav`, `KNavLink`, `KBreadcrumb`, `KPager`, `KLoadMore`                                               | On phones the nav links fold behind a menu button. `KPager` puts two arrows around what its slot says ("12 of 48"), or after it (`text-first`)                                                                                                                                                                                                                                                                                    |
 | Progress           | `KProgressBar`, `KSpinner` (ring, daisy), `KTypingDots`, `KSkeleton`, `KEmptyState`                       | A bar when we know how long, a daisy when we don't. A `meter` bar shows a measure, like a score                                                                                                                                                                                                                                                                                                                                   |
 | Journals and pages | `KJournalCover`, `KAddTile`, `KPageCard`, `KPhoto`, `KDropTarget`, `KUploadRow`, `KBlockCard`             | See the screens below. `KPhoto` is lined paper until the photo is there. `KDropTarget` lets files be dropped anywhere on what it wraps, with a "let go" overlay; pair it with a `KFileButton`                                                                                                                                                                                                                                     |
-| Search and chat    | `KSearchResult`, `KHighlight`, `KMessage`, `KToolActivity`, `KCitationChip`, `KSourceCard`, `KComposer`   | A result quotes its matching blocks (`Quote`: kind, text, `marks`) and says how many more matched. `KHighlight` marks any number of stretches. The chat pieces are built ahead of their screen                                                                                                                                                                                                                                    |
+| Search and chat    | `KSearchResult`, `KHighlight`, `KMessage`, `KToolActivity`, `KCitationChip`, `KSourceCard`, `KComposer`   | A result quotes its matching blocks (`Quote`: kind, text, `marks`) and says how many more matched. `KHighlight` marks any number of stretches. `KMessage` is `typing` (dots) before an answer's first word and takes a dashed `footer`; `KToolActivity` flips to each new line it's given                                                                                                                                         |
 
 ### Writing a component
 
@@ -189,19 +189,30 @@ the nav when its backend exists.
   not just words.
 - With no results: "No pages mention “otters”", plus _Search all journals_ when a filter is set.
 
-### Chat (#19–#21): designed, waiting for the API
+### Chat (#21)
 
-- Three columns that stack on phones: conversations (with _New chat_), the thread, and Sources.
+- `/chat` is a fresh chat and `/chat/{id}` an earlier one. A chat only exists once its first
+  question is sent, and takes its title from it.
+- Three columns that stack on phones: earlier chats (with _New chat_, folded away on phones), the
+  thread, and Sources. The open chat's menu renames it or deletes it (asking first).
 - **Thread:**
-  - Your messages are accent bubbles on the right. Answers are `KMessage` bubbles, or a "letter"
-    on lined paper.
-  - While streaming there's a caret. `KTypingDots` and `KToolActivity` lines ("looking through
-    your journal for …", "reading page 14…") come from the `toolCall` events and fold into
-    "searched twice, read 4 pages" when the answer ends.
-  - A broken stream keeps what arrived and offers _Ask again_.
-- **Citations:** `KCitationChip`s ("p. 12") inside the answer. Clicking one picks its
-  `KSourceCard` in Sources (quote marked, _Open the page_), which opens Page detail with that
-  block highlighted.
+  - Your messages are accent bubbles on the right. Answers are `KMessage` bubbles in plain
+    sentences: the agent writes no Markdown.
+  - Before the first word there are `KTypingDots` with one handwritten `KToolActivity` line beside
+    them ("flipping pages…"). It flips, like the next card in a box, to each step the `toolCall`
+    and `toolResult` events bring ("looking through your journal for “sweet peas”…", "reading a
+    page…"), each up long enough to read.
+  - Once the answer is done, its steps are a footnote in the bubble, under a dashed line:
+    "Searched twice · read 4 pages", which unfolds into the list of steps. Saved answers keep it.
+  - While streaming there's a caret, and citations wait as dashed chips until the saved answer
+    brings its sources.
+  - Nothing is saved until an answer is done. A broken answer keeps what arrived and offers
+    _Ask again_; so does _Stop_, saying it wasn't kept. A full chat (`409`) offers _Ask in a new
+    chat_.
+- **Citations:** `KCitationChip`s ("p. 12") inside the answer, one per cited page (side-by-side
+  citations of one page share a chip). Clicking one picks its `KSourceCard`s in Sources (quote
+  marked, _Open the page_), which opens Page detail with that block highlighted
+  (`/pages/{id}?blocks=blk_…`). Without a pick, Sources shows the latest answer's.
 - **Writing box:** `KComposer`. Enter sends, Shift+Enter adds a line, and Send turns into Stop
   while an answer streams.
 - A fresh chat shows "Ask your journal anything" with three starter questions.

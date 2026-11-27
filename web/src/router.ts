@@ -9,6 +9,12 @@ export const router = createRouter({
     { path: '/journals/:journalId', name: 'journal', component: LibraryView, props: true },
     { path: '/search', name: 'search', component: () => import('@/views/SearchView.vue') },
     {
+      path: '/chat/:conversationId?',
+      name: 'chat',
+      component: () => import('@/views/ChatView.vue'),
+      props: true,
+    },
+    {
       path: '/pages/:pageId',
       name: 'page',
       component: () => import('@/views/PageDetailView.vue'),

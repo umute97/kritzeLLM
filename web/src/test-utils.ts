@@ -1,5 +1,5 @@
 // Small builders for tests: API objects with sensible defaults, and JSON responses.
-import type { Block, Journal, Page } from '@/api/types'
+import type { Block, ChatStreamEvent, Journal, Message, Page, Source } from '@/api/types'
 
 let counter = 0
 
@@ -56,6 +56,49 @@ export function makeBlock(overrides: Partial<Block> = {}): Block {
     text: 'Picked wild garlic by the river.',
     uncertain: false,
     ...overrides,
+  }
+}
+
+export function makeSource(overrides: Partial<Source> = {}): Source {
+  return {
+    ref: 1,
+    blockId: typeId('blk'),
+    pageId: typeId('pg'),
+    journalId: 'jrn_1',
+    pageNumber: 12,
+    entryDates: ['2026-03-03'],
+    quote: 'I finally planted the sweet peas by the fence.',
+    ...overrides,
+  }
+}
+
+export function makeMessage(overrides: Partial<Message> = {}): Message {
+  return {
+    id: typeId('msg'),
+    role: 'assistant',
+    content: 'You planted them by the fence [1].',
+    toolCalls: [],
+    sources: [],
+    createdAt: '2026-03-03T10:00:00Z',
+    ...overrides,
+  }
+}
+
+/** A server-sent events answer to feed by hand: `send` events, then `end` or `fail` it. */
+export function eventStream() {
+  const encoder = new TextEncoder()
+  let controller!: ReadableStreamDefaultController<Uint8Array>
+  const body = new ReadableStream<Uint8Array>({ start: (c) => (controller = c) })
+  return {
+    response: () => new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }),
+    send(...events: ChatStreamEvent[]) {
+      for (const event of events)
+        this.raw(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+    },
+    raw: (chunk: string | Uint8Array) =>
+      controller.enqueue(typeof chunk === 'string' ? encoder.encode(chunk) : chunk),
+    end: () => controller.close(),
+    fail: (error: unknown) => controller.error(error),
   }
 }
 

@@ -36,15 +36,20 @@ interface FetchResult<T> {
   response: Response
 }
 
+export function isAbort(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
+
 /**
  * Unwraps an openapi-fetch call: the data, or an `ApiError` with the server's problem.
- * A request that never gets an answer marks the API offline.
+ * A request that never gets an answer marks the API offline, unless it was called off.
  */
 export async function call<T>(request: Promise<FetchResult<T>>): Promise<T> {
   let result: FetchResult<T>
   try {
     result = await request
   } catch (cause) {
+    if (isAbort(cause)) throw cause
     useHealth().markOffline()
     throw new ApiError(offlineProblem, { cause })
   }
