@@ -2,7 +2,6 @@ import itertools
 import math
 import re
 import uuid
-import zlib
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -44,11 +43,16 @@ class WordsModel(TestEmbeddingModel):
         return result
 
 
+_slots: dict[str, int] = {}
+"""Each word's dimension, handed out as words come up, so no two words share one (a hash would
+now and then, and make unrelated texts score the same)."""
+
+
 def _words_vector(text: str) -> list[float]:
     vector = [0.0] * EMBED_DIMENSIONS
     vector[0] = 0.1  # so a text without words still has a direction
     for word in re.findall(r"\w+", text.lower()):
-        vector[1 + zlib.crc32(word.encode()) % (EMBED_DIMENSIONS - 1)] += 1.0
+        vector[_slots.setdefault(word, 1 + len(_slots) % (EMBED_DIMENSIONS - 1))] += 1.0
     length = math.sqrt(sum(value * value for value in vector))
     return [value / length for value in vector]
 
