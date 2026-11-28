@@ -50,8 +50,9 @@ export function formatRecent(timestamp: string, now = new Date()): string {
   return formatDay(localDay(date), now)
 }
 
+/** "3.1 MB", or "1 KB" for anything at all under a kilobyte. */
 export function fileSize(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  if (bytes < 1024 * 1024) return `${bytes && Math.max(1, Math.round(bytes / 1024))} KB`
   const megabytes = new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: 1 })
   return `${megabytes.format(bytes / (1024 * 1024))} MB`
 }

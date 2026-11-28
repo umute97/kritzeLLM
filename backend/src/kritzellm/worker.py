@@ -20,8 +20,6 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kritzellm.api.schemas.common import Problem
-from kritzellm.api.schemas.jobs import JobKind
-from kritzellm.api.schemas.pages import ImageVariant, PageStatus
 from kritzellm.config import Settings, get_settings
 from kritzellm.core import indexing, jobs
 from kritzellm.core import pages as core_pages
@@ -29,6 +27,7 @@ from kritzellm.core.storage import variant_path
 from kritzellm.core.transcribe import transcribe
 from kritzellm.db import create_engine, create_sessionmaker
 from kritzellm.db import models as db
+from kritzellm.domain import ImageVariant, JobKind, PageStatus
 
 # Named explicitly: under `python -m` this module is `__main__`.
 logger = logging.getLogger("kritzellm.worker")

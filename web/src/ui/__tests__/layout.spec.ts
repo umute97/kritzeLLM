@@ -63,8 +63,8 @@ describe('KPageHeader', () => {
 
 describe('KCardGrid', () => {
   it('stands in with skeletons of the right shape while loading', () => {
-    const covers = mount(KCardGrid, { props: { kind: 'covers', loading: true, skeletons: 3 } })
-    expect(covers.findAll('li')).toHaveLength(3)
+    const covers = mount(KCardGrid, { props: { kind: 'covers', loading: true } })
+    expect(covers.findAll('li')).toHaveLength(4)
     expect(covers.get('li span').classes()).toContain('h-[132px]')
     expect(covers.attributes('aria-busy')).toBe('true')
 

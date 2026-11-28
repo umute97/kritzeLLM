@@ -1,5 +1,5 @@
 import { api, call } from '@/api/client'
-import { ApiError } from '@/api/errors'
+import { hasStatus } from '@/api/errors'
 import { useAuth } from '@/stores/auth'
 
 /**
@@ -12,7 +12,7 @@ export async function verifySession(): Promise<boolean> {
     useAuth().accept()
     return true
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) return false
+    if (hasStatus(error, 401)) return false
     throw error
   }
 }

@@ -4,7 +4,7 @@ import KDoodle from './KDoodle.vue'
 // Daisy for whole-page waits, ring inside buttons and rows. With a `label` it announces itself.
 withDefaults(
   defineProps<{ variant?: 'ring' | 'daisy'; size?: number; label?: string; block?: boolean }>(),
-  { variant: 'ring', size: 18, label: undefined },
+  { variant: 'ring', size: 18 },
 )
 </script>
 

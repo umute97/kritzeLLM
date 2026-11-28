@@ -1,16 +1,8 @@
-import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { useJournals } from '@/stores/journals'
-import { calledUrl, json, makeJournal } from '@/test-utils'
-
-beforeEach(() => {
-  setActivePinia(createPinia())
-})
-
-afterEach(() => {
-  vi.unstubAllGlobals()
-})
+import { usePages } from '@/stores/pages'
+import { calledUrl, json, makeJournal, makePage } from '@/test-utils'
 
 describe('the shelf', () => {
   it('pages with the cursor and only knows whether there are more', async () => {
@@ -24,7 +16,7 @@ describe('the shelf', () => {
     const journals = useJournals()
 
     await journals.show(0)
-    expect(journals.range).toBe('Journals 1–4')
+    expect(journals.index).toBe(0)
     expect(journals.canBack).toBe(false)
     expect(journals.canNext).toBe(true)
     expect(calledUrl(fetch)).toBe('/api/v1/journals?limit=4')
@@ -32,7 +24,7 @@ describe('the shelf', () => {
     await journals.next()
     expect(calledUrl(fetch, 1)).toBe(`/api/v1/journals?limit=4&cursor=${first[3]!.id}`)
     expect(journals.shelf.map((j) => j.name)).toEqual(['Journal 5'])
-    expect(journals.range).toBe('Journals 5–5')
+    expect(journals.index).toBe(1)
     expect(journals.canNext).toBe(false)
 
     await journals.back()
@@ -93,6 +85,26 @@ describe('the shelf', () => {
     expect(journals.shelf[0]?.name).toBe('Blue notebook')
   })
 
+  it('fetches every journal once, and again after one is added', async () => {
+    const [garden, travel] = [makeJournal({ name: 'Garden' }), makeJournal({ name: 'Travel' })]
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(json({ items: [garden], nextCursor: garden.id }))
+      .mockResolvedValueOnce(json({ items: [travel], nextCursor: null }))
+      .mockResolvedValueOnce(json(makeJournal({ name: 'Recipes' }), 201))
+      .mockResolvedValueOnce(json({ items: [garden, travel], nextCursor: null }))
+    vi.stubGlobal('fetch', fetch)
+    const journals = useJournals()
+
+    await journals.loadAll()
+    await journals.loadAll()
+    expect(journals.all.map((j) => j.name)).toEqual(['Garden', 'Travel'])
+    expect(fetch).toHaveBeenCalledTimes(2)
+
+    await journals.create('Recipes', null)
+    expect(journals.all).toEqual([])
+  })
+
   it('deletes a journal and starts the shelf over without it', async () => {
     const [gone, kept] = [makeJournal(), makeJournal()]
     const fetch = vi
@@ -102,6 +114,8 @@ describe('the shelf', () => {
       .mockResolvedValueOnce(json({ items: [kept], nextCursor: null }))
     vi.stubGlobal('fetch', fetch)
     const journals = useJournals()
+    const pages = usePages()
+    pages.put(makePage({ journalId: gone!.id }))
     await journals.show(0)
     await journals.remove(gone!.id)
 
@@ -110,5 +124,6 @@ describe('the shelf', () => {
     expect(calledUrl(fetch, 1)).toBe(`/api/v1/journals/${gone!.id}`)
     expect(journals.shelf.map((j) => j.id)).toEqual([kept!.id])
     expect(journals.byId.has(gone!.id)).toBe(false)
+    expect(pages.byId.size).toBe(0)
   })
 })

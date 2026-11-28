@@ -18,7 +18,7 @@ const props = withDefaults(
     tone?: 'danger' | 'main'
     loading?: boolean
   }>(),
-  { description: undefined, cancelLabel: undefined, tone: 'danger' },
+  { tone: 'danger' },
 )
 
 const emit = defineEmits<{ confirm: [] }>()

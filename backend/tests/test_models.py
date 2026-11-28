@@ -5,9 +5,8 @@ from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kritzellm.api.schemas.blocks import BlockKind
-from kritzellm.api.schemas.pages import PageStatus
 from kritzellm.db.models import Block, Journal, Page
+from kritzellm.domain import BlockKind, PageStatus
 from kritzellm.ids import Prefix, decode, new_id
 
 pytestmark = [pytest.mark.db, pytest.mark.anyio]

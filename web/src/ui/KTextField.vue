@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useId } from 'vue'
+import { computed, ref } from 'vue'
 
 import { joinIds, useSplitAttrs } from './attrs'
 import KFieldShell from './KFieldShell.vue'
@@ -28,8 +28,6 @@ const props = withDefaults(
   { type: 'text' },
 )
 
-const autoId = useId()
-const fieldId = computed(() => props.id ?? autoId)
 const revealed = ref(false)
 const inputType = computed(() =>
   props.type === 'password' && revealed.value ? 'text' : props.type,
@@ -42,8 +40,8 @@ const ui = useUiMessages()
 <template>
   <KFieldShell
     v-bind="rootAttrs()"
-    :id="fieldId"
-    v-slot="{ describedby, invalid }"
+    :id="id"
+    v-slot="{ id: fieldId, describedby, invalid }"
     :label="label"
     :help="help"
     :error="error"

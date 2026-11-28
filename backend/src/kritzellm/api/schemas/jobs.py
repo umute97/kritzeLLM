@@ -5,28 +5,12 @@ from typing import TYPE_CHECKING, Self
 
 from pydantic import Field
 
+from kritzellm.domain import JobKind, JobStatus
+
 from .common import ApiModel, JobId, PageId, Problem, Timestamp
 
 if TYPE_CHECKING:
     from kritzellm.db import models as db
-
-
-class JobKind(StrEnum):
-    """What a job does."""
-
-    INGEST_PAGE = "ingestPage"
-    TRANSCRIBE_PAGE = "transcribePage"
-    REINDEX_PAGE = "reindexPage"
-    REINDEX_ALL = "reindexAll"
-
-
-class JobStatus(StrEnum):
-    """Lifecycle of a job."""
-
-    QUEUED = "queued"
-    RUNNING = "running"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
 
 
 class JobTargetType(StrEnum):
@@ -77,19 +61,7 @@ class Job(ApiModel):
             progress = {"done": job.progress_done, "total": job.progress_total}
         if job.page_id is not None:
             target = {"type": JobTargetType.PAGE, "id": job.page_id}
-        return cls.model_validate(
-            {
-                "id": job.id,
-                "kind": job.kind,
-                "status": job.status,
-                "target": target,
-                "progress": progress,
-                "error": job.error,
-                "created_at": job.created_at,
-                "started_at": job.started_at,
-                "finished_at": job.finished_at,
-            }
-        )
+        return cls.from_row(job, progress=progress, target=target)
 
 
 class JobList(ApiModel):

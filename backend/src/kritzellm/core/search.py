@@ -12,9 +12,9 @@ from sqlalchemy import ColumnElement, Select, func, literal_column, null, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kritzellm.api.schemas.search import SearchMode
 from kritzellm.config import Settings
 from kritzellm.db import models as db
+from kritzellm.domain import SearchMode
 
 from .embeddings import embed_query
 from .pages import dated_within

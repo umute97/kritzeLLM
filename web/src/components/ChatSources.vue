@@ -18,7 +18,7 @@ const list = useTemplateRef('list')
 const severalJournals = computed(() => journals.byId.size > 1)
 
 function title(source: Source): string {
-  const page = t('chat.sourcePage', { n: source.pageNumber })
+  const page = t('common.page', { n: source.pageNumber })
   const journal = journals.byId.get(source.journalId)?.name
   return severalJournals.value && journal ? `${page} · ${journal}` : page
 }

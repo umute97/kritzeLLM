@@ -2,7 +2,7 @@ import { computed, reactive } from 'vue'
 
 import type { IconName } from './icons'
 
-export type ToastTone = 'success' | 'info' | 'warning' | 'error' | 'loading'
+export type ToastTone = 'success' | 'info' | 'warning' | 'error'
 
 export interface ToastOptions {
   tone: ToastTone
@@ -12,7 +12,6 @@ export interface ToastOptions {
   technical?: string
   icon?: IconName
   action?: { label: string; run: () => void }
-  progress?: { value: number; max: number }
   /** Milliseconds until it leaves on its own; `null` stays until dismissed. */
   timeout?: number | null
 }
@@ -21,7 +20,7 @@ export interface Toast extends ToastOptions {
   id: number
 }
 
-/** Happy toasts float away; warnings, errors and progress wait for you. */
+/** Happy toasts float away; warnings and errors wait for you. */
 export const AUTO_DISMISS_MS = 5000
 
 const state = reactive({ items: [] as Toast[] })
@@ -50,17 +49,6 @@ function push(options: ToastOptions): number {
   return toast.id
 }
 
-/** Changes a toast in place, e.g. upload progress or a loading toast that finished. */
-function update(id: number, patch: Partial<ToastOptions>) {
-  const toast = state.items.find((t) => t.id === id)
-  if (!toast) return
-  Object.assign(toast, patch)
-  if ('tone' in patch || 'timeout' in patch) {
-    disarm(id)
-    arm(toast)
-  }
-}
-
 function dismiss(id: number) {
   disarm(id)
   state.items = state.items.filter((t) => t.id !== id)
@@ -85,7 +73,6 @@ export function useToasts() {
   return {
     items: computed(() => state.items),
     push,
-    update,
     dismiss,
     pause,
     resume,

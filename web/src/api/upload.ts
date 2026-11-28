@@ -1,7 +1,4 @@
-import { useAuth } from '@/stores/auth'
-import { useHealth } from '@/stores/health'
-
-import { API_BASE } from './client'
+import { API_BASE, authHeaders, reportOffline, reportUnauthorized } from './client'
 import { ApiError, offlineProblem, toProblem } from './errors'
 import type { UploadResult } from './types'
 
@@ -18,8 +15,7 @@ export function uploadPage(
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `${API_BASE}/journals/${encodeURIComponent(journalId)}/pages`)
     xhr.responseType = 'json'
-    const { token } = useAuth()
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    for (const [name, value] of Object.entries(authHeaders())) xhr.setRequestHeader(name, value)
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(event.loaded, event.total)
@@ -29,12 +25,12 @@ export function uploadPage(
         resolve(xhr.response as UploadResult)
         return
       }
-      if (xhr.status === 401) useAuth().reject()
+      if (xhr.status === 401) reportUnauthorized()
       const response = new Response(null, { status: xhr.status, statusText: xhr.statusText })
       reject(new ApiError(toProblem(xhr.response, response)))
     }
     xhr.onerror = () => {
-      useHealth().markOffline()
+      reportOffline()
       reject(new ApiError(offlineProblem))
     }
 

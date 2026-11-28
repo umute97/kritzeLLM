@@ -25,9 +25,10 @@ Everything comes from environment variables (see [`.env.example`](../.env.exampl
 | `DATABASE_URL` | `postgresql+asyncpg://kritzellm:kritzellm@localhost:5432/kritzellm` | Postgres to use |
 | `API_TOKEN` | *(unset)* | When set, every request except `GET /health` needs `Authorization: Bearer <token>` |
 | `DATA_DIR` | `data` | Where page images are stored |
-| `OPENAI_API_KEY` | *(unset)* | Key for the OpenAI API; not needed when both models are `test` |
+| `OPENAI_API_KEY` | *(unset)* | Key for the OpenAI API; not needed when every model is `test` |
 | `TRANSCRIBE_MODEL` | `gpt-6-luna` | OpenAI model that reads the pages; `test` fakes it |
 | `EMBED_MODEL` | `text-embedding-3-small` | OpenAI model that embeds page text for search; `test` fakes it |
+| `CHAT_MODEL` | `gpt-6-luna` | OpenAI model that answers questions about the journal; `test` fakes it |
 
 Empty values count as unset.
 

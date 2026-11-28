@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
 
 import KButton from '../KButton.vue'
+import KDisclosure from '../KDisclosure.vue'
 import KIconButton from '../KIconButton.vue'
 import { createCottage } from '../plugin'
 
@@ -119,5 +120,35 @@ describe('KIconButton', () => {
       props: { icon: 'close', label: 'Close', as: 'a', disabled: true },
     })
     expect(wrapper.get('a').attributes('aria-disabled')).toBe('true')
+  })
+})
+
+describe('KDisclosure', () => {
+  it('shows and hides what it controls, turning its arrow', async () => {
+    const wrapper = mount(KDisclosure, {
+      props: {
+        controls: 'steps',
+        open: false,
+        'onUpdate:open': (v: boolean) => wrapper.setProps({ open: v }),
+      },
+      slots: { default: 'Searched twice' },
+    })
+    const toggle = wrapper.get('button')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(toggle.attributes('aria-controls')).toBe('steps')
+    await toggle.trigger('click')
+    expect(wrapper.props('open')).toBe(true)
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(toggle.get('svg').classes()).toContain('rotate-180')
+  })
+
+  it('can be a quiet button whose words do the talking', () => {
+    const wrapper = mount(KDisclosure, {
+      props: { variant: 'quiet', open: true },
+      slots: { default: 'Hide each photo' },
+    })
+    expect(wrapper.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.classes()).toContain('underline')
+    expect(wrapper.find('svg').exists()).toBe(false)
   })
 })

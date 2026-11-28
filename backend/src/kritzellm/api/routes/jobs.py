@@ -1,20 +1,15 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Query
-from sqlalchemy import select
 
-from kritzellm.core.errors import get_existing
-from kritzellm.core.pagination import paginate
+from kritzellm.core import jobs as core
+from kritzellm.core.rows import get_existing
 from kritzellm.db import models as db
+from kritzellm.domain import JobKind, JobStatus
 
 from ..deps import Session
 from ..errors import problem_responses
-from ..schemas.jobs import (
-    Job,
-    JobKind,
-    JobList,
-    JobStatus,
-)
+from ..schemas.jobs import Job, JobList
 from .params import JobCursor, JobIdPath, Limit
 
 router = APIRouter(tags=["jobs"], responses=problem_responses(400, 401, 422))
@@ -34,15 +29,10 @@ async def list_jobs(
     cursor: JobCursor = None,
 ) -> JobList:
     """Lists background jobs, newest first."""
-    query = select(db.Job)
-    if job_status is not None:
-        query = query.where(db.Job.status == job_status)
-    if kind is not None:
-        query = query.where(db.Job.kind == kind)
-    rows, next_cursor = await paginate(
-        session, query, id_column=db.Job.id, limit=limit, cursor=cursor
+    jobs, next_cursor = await core.list_jobs(
+        session, status=job_status, kind=kind, limit=limit, cursor=cursor
     )
-    return JobList(items=[Job.from_db(job) for (job,) in rows], next_cursor=next_cursor)
+    return JobList(items=[Job.from_db(job) for job in jobs], next_cursor=next_cursor)
 
 
 @router.get(

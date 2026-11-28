@@ -5,7 +5,7 @@ import KIcon from './KIcon.vue'
 import type { IconName } from './icons'
 import KSpinner from './KSpinner.vue'
 import { usePolymorphic, type LinkTarget } from './polymorphic'
-import { disabledClass } from './styles'
+import { buttonLooks, disabledClass } from './styles'
 
 // One `main` button per view; everything beside it is `second` or `quiet`.
 // `danger` belongs in confirm dialogs only.
@@ -21,7 +21,7 @@ const props = withDefaults(
     type?: 'button' | 'submit' | 'reset'
     icon?: IconName
   }>(),
-  { variant: 'main', size: 'md', to: undefined, as: undefined, type: 'button', icon: undefined },
+  { variant: 'main', size: 'md', type: 'button' },
 )
 
 const inactive = computed(() => props.disabled || props.loading)
@@ -33,8 +33,8 @@ const element = usePolymorphic(() => ({
 }))
 
 const variants = {
-  main: 'border-[1.5px] border-ink bg-accent text-ink hover:-translate-y-0.5 hover:bg-accent-strong active:translate-y-[3px] active:shadow-none',
-  second: 'border-[1.5px] border-ink bg-paper text-ink hover:bg-cream',
+  main: [buttonLooks.main, 'hover:-translate-y-0.5 active:translate-y-[3px] active:shadow-none'],
+  second: buttonLooks.second,
   quiet: 'text-bark underline underline-offset-4 hover:text-ink',
   danger:
     'border-[1.5px] border-ink bg-bark text-cream hover:-translate-y-0.5 active:translate-y-[3px] active:shadow-none',

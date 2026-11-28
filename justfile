@@ -63,8 +63,8 @@ db-reset:
 
 # --- Quality ---------------------------------------------------------------------
 
-# Run every check (grows as components land)
-check: backend-lint backend-typecheck backend-test api-lint web-lint web-typecheck web-test
+# Run every check (pre-commit covers the backend's ruff)
+check: backend-typecheck backend-test api-lint web-lint web-typecheck web-test
     pre-commit run --all-files
 
 # --- Backend ---------------------------------------------------------------------

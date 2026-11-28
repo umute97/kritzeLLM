@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
-
 import { joinIds, useSplitAttrs } from './attrs'
 import KFieldShell from './KFieldShell.vue'
 import { fieldClass } from './styles'
@@ -9,7 +7,7 @@ defineOptions({ inheritAttrs: false })
 
 const model = defineModel<string>({ default: '' })
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     label: string
     rows?: number
@@ -24,16 +22,14 @@ const props = withDefaults(
   { rows: 3 },
 )
 
-const autoId = useId()
-const fieldId = computed(() => props.id ?? autoId)
 const { rootAttrs, controlAttrs } = useSplitAttrs()
 </script>
 
 <template>
   <KFieldShell
     v-bind="rootAttrs()"
-    :id="fieldId"
-    v-slot="{ describedby, invalid }"
+    :id="id"
+    v-slot="{ id: fieldId, describedby, invalid }"
     :label="label"
     :help="help"
     :error="error"

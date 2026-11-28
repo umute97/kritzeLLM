@@ -3,17 +3,14 @@ import KIconButton from './KIconButton.vue'
 
 // Two arrows and what they move through, e.g. "‹ 12 of 48 ›" between pages, or "Journals 1–4 ‹ ›"
 // on the shelf (`textFirst`).
-withDefaults(
-  defineProps<{
-    prevLabel: string
-    nextLabel: string
-    canPrev?: boolean
-    canNext?: boolean
-    textFirst?: boolean
-    label?: string
-  }>(),
-  { label: undefined },
-)
+defineProps<{
+  prevLabel: string
+  nextLabel: string
+  canPrev?: boolean
+  canNext?: boolean
+  textFirst?: boolean
+  label?: string
+}>()
 
 const emit = defineEmits<{ prev: []; next: [] }>()
 </script>

@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest'
 import KCheckbox from '../KCheckbox.vue'
 import KSearchField from '../KSearchField.vue'
 import KSelect from '../KSelect.vue'
-import KSwitch from '../KSwitch.vue'
 import KTextArea from '../KTextArea.vue'
 import KTextField from '../KTextField.vue'
 
@@ -168,34 +167,5 @@ describe('KCheckbox', () => {
     expect(input.classes()).not.toContain('mt-4')
     expect(wrapper.classes()).toContain('mt-4')
     expect(wrapper.attributes('name')).toBeUndefined()
-  })
-})
-
-describe('KSwitch', () => {
-  it('flips and says so', async () => {
-    const wrapper = mount(KSwitch, {
-      props: {
-        label: 'Show scores',
-        modelValue: false,
-        'onUpdate:modelValue': (v: boolean) => wrapper.setProps({ modelValue: v }),
-      },
-    })
-    const toggle = wrapper.get('[role="switch"]')
-    expect(toggle.attributes('aria-checked')).toBe('false')
-    await toggle.trigger('click')
-    expect(wrapper.props('modelValue')).toBe(true)
-    expect(toggle.attributes('aria-checked')).toBe('true')
-    const labelId = toggle.attributes('aria-labelledby')
-    expect(wrapper.get(`#${labelId}`).text()).toBe('Show scores')
-  })
-
-  it('gives attributes to the switch, not its wrapper', () => {
-    const wrapper = mount(KSwitch, {
-      props: { label: 'Show scores' },
-      attrs: { id: 'scores', class: 'ml-2' },
-    })
-    expect(wrapper.get('[role="switch"]').attributes('id')).toBe('scores')
-    expect(wrapper.classes()).toContain('ml-2')
-    expect(wrapper.attributes('id')).toBeUndefined()
   })
 })

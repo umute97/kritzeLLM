@@ -1,8 +1,8 @@
 from datetime import date
 
-from kritzellm.api.schemas.blocks import BlockKind
 from kritzellm.core.agent.citations import Citations, strip_citations
 from kritzellm.db import models as db
+from kritzellm.domain import BlockKind
 from kritzellm.ids import Prefix, new_id
 
 PAGE = db.Page(

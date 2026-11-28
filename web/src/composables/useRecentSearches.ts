@@ -1,12 +1,13 @@
 import { ref } from 'vue'
 
+import { readStored, writeStored } from '@/utils/storage'
+
 const KEY = 'kritzellm.recentSearches'
 const KEEP = 5
 
-// Private windows and blocked site data can throw on any access; then nothing is remembered.
 function read(): string[] {
   try {
-    const saved: unknown = JSON.parse(globalThis.localStorage.getItem(KEY) ?? '[]')
+    const saved: unknown = JSON.parse(readStored(KEY) ?? '[]')
     return Array.isArray(saved)
       ? saved.filter((item): item is string => typeof item === 'string').slice(0, KEEP)
       : []
@@ -25,11 +26,7 @@ export function useRecentSearches() {
       0,
       KEEP,
     )
-    try {
-      globalThis.localStorage.setItem(KEY, JSON.stringify(items.value))
-    } catch {
-      // Still listed for this visit.
-    }
+    writeStored(KEY, JSON.stringify(items.value))
   }
 
   return { items, add }

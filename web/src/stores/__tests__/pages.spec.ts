@@ -1,16 +1,10 @@
-import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PAGE_BATCH, usePages } from '@/stores/pages'
-import { calledUrl, json, makePage } from '@/test-utils'
-
-beforeEach(() => {
-  setActivePinia(createPinia())
-})
+import { calledUrl, json, makePage, problem } from '@/test-utils'
 
 afterEach(() => {
   vi.useRealTimers()
-  vi.unstubAllGlobals()
 })
 
 describe('the page list', () => {
@@ -143,12 +137,26 @@ describe('the page list', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
+  it('asks for all busy pages at once, and waits for their answers before asking again', async () => {
+    vi.useFakeTimers()
+    const fetch = vi.fn(() => new Promise<Response>(() => {}))
+    vi.stubGlobal('fetch', fetch)
+    const pages = usePages()
+
+    pages.put(makePage({ status: 'uploaded' }))
+    pages.put(makePage({ status: 'transcribing' }))
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
   it('forgets a page that was deleted elsewhere', async () => {
     vi.useFakeTimers()
     const page = makePage({ status: 'uploaded' })
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => json({ title: 'Not found', status: 404 }, 404)),
+      vi.fn(async () => json(problem(404, 'Not Found'), 404)),
     )
     const pages = usePages()
     pages.put(page)
@@ -184,5 +192,30 @@ describe('reading a page again', () => {
     await pages.retranscribe(page)
     expect(calledUrl(fetch)).toBe(`/api/v1/pages/${page.id}/transcribe`)
     expect(pages.byId.get(page.id)).toMatchObject({ status: 'uploaded', error: null })
+  })
+})
+
+describe('neighbours', () => {
+  it('steps through a journal from one index, fetched again once a page is added', async () => {
+    const [one, two, three] = [1, 2, 3].map((n) => makePage({ journalId: 'jrn_1', pageNumber: n }))
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(json({ items: [one, two], nextCursor: null }))
+      .mockResolvedValueOnce(json({ items: [one, two, three], nextCursor: null }))
+    vi.stubGlobal('fetch', fetch)
+    const pages = usePages()
+
+    expect(await pages.neighbours(one!)).toEqual({
+      next: { id: two!.id, pageNumber: 2 },
+    })
+    pages.put(two!)
+    expect(await pages.neighbours(two!)).toEqual({
+      prev: { id: one!.id, pageNumber: 1 },
+    })
+    expect(fetch).toHaveBeenCalledTimes(1)
+
+    pages.put(three!)
+    expect((await pages.neighbours(two!)).next).toEqual({ id: three!.id, pageNumber: 3 })
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 })

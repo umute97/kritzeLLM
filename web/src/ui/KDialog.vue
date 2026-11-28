@@ -17,12 +17,11 @@ const props = withDefaults(
     title: string
     description?: string
     size?: 'sm' | 'md'
-    headingLevel?: 2 | 3
     form?: boolean
     dismissible?: boolean
     doodle?: DoodleName
   }>(),
-  { description: undefined, size: 'sm', headingLevel: 2, dismissible: true, doodle: undefined },
+  { size: 'sm', dismissible: true },
 )
 
 const emit = defineEmits<{ submit: [] }>()
@@ -66,7 +65,7 @@ const ui = useUiMessages()
   <dialog
     ref="dialog"
     :aria-labelledby="titleId"
-    :aria-describedby="description || $slots.description ? descriptionId : undefined"
+    :aria-describedby="description ? descriptionId : undefined"
     :class="[
       'm-auto w-[calc(100%-2rem)] overflow-visible rounded-card border-[1.5px] border-ink bg-cream p-0 text-ink shadow-pop backdrop:bg-ink/50',
       size === 'sm' ? 'max-w-[420px]' : 'max-w-[460px]',
@@ -81,13 +80,9 @@ const ui = useUiMessages()
       class="relative flex flex-col gap-3 p-7"
       v-on="form ? { submit: onSubmit } : {}"
     >
-      <slot name="decoration">
-        <KDoodle v-if="doodle" :name="doodle" :size="46" class="absolute -top-5 right-7" />
-      </slot>
+      <KDoodle v-if="doodle" :name="doodle" :size="46" class="absolute -top-5 right-7" />
       <div class="flex items-start justify-between gap-3">
-        <component :is="`h${headingLevel}`" :id="titleId" class="m-0 text-[26px] leading-tight">
-          <slot name="title">{{ title }}</slot>
-        </component>
+        <h2 :id="titleId" class="m-0 text-[26px] leading-tight">{{ title }}</h2>
         <KIconButton
           icon="close"
           :label="ui.close"
@@ -98,9 +93,7 @@ const ui = useUiMessages()
           @click="dismiss"
         />
       </div>
-      <p v-if="description || $slots.description" :id="descriptionId" class="m-0">
-        <slot name="description">{{ description }}</slot>
-      </p>
+      <p v-if="description" :id="descriptionId" class="m-0">{{ description }}</p>
       <slot />
       <div v-if="$slots.footer" class="mt-2 flex flex-wrap justify-end gap-2.5">
         <slot name="footer" />

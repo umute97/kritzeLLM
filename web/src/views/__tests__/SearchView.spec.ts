@@ -1,32 +1,27 @@
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { createPinia, setActivePinia, type Pinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h } from 'vue'
-import { createMemoryHistory, createRouter, RouterLink, RouterView } from 'vue-router'
+import { flushPromises, type VueWrapper } from '@vue/test-utils'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { SearchHit } from '@/api/types'
-import { uiMessages } from '@/i18n'
-import { json, makeBlock, makeJournal, makePage } from '@/test-utils'
-import { createCottage, useToasts } from '@/ui'
+import {
+  button,
+  Elsewhere,
+  json,
+  makeBlock,
+  makeJournal,
+  makePage,
+  mountRoute,
+  notFound,
+  problem,
+  stubFetch,
+} from '@/test-utils'
+import { useToasts } from '@/ui'
 import SearchView from '@/views/SearchView.vue'
 
 const garden = makeJournal({ id: 'jrn_garden', name: 'Green notebook' })
 const travel = makeJournal({ id: 'jrn_travel', name: 'Travel journal' })
 
-let pinia: Pinia
-let wrapper: VueWrapper | undefined
-
 beforeEach(() => {
-  pinia = createPinia()
-  setActivePinia(pinia)
   localStorage.clear()
-})
-
-afterEach(() => {
-  wrapper?.unmount()
-  wrapper = undefined
-  useToasts().clear()
-  vi.unstubAllGlobals()
 })
 
 function hit(overrides: Partial<SearchHit> = {}): SearchHit {
@@ -46,18 +41,14 @@ function hit(overrides: Partial<SearchHit> = {}): SearchHit {
 
 /** Answers the journals list, and every search with `search(params)`. */
 function serve(search: (params: URLSearchParams) => Response = () => json({ items: [hit()] })) {
-  const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const request =
-      input instanceof Request ? input : new Request(new URL(String(input), location.origin), init)
+  return stubFetch((request) => {
     const url = new URL(request.url)
     if (url.pathname === '/api/v1/journals') {
       return json({ items: [garden, travel], nextCursor: null })
     }
     if (url.pathname === '/api/v1/search') return search(url.searchParams)
-    return json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+    return notFound()
   })
-  vi.stubGlobal('fetch', fetch)
-  return fetch
 }
 
 /** The query of every search asked so far. */
@@ -70,24 +61,15 @@ function searches(fetch: ReturnType<typeof serve>): Record<string, string>[] {
     .map((url) => Object.fromEntries(url.searchParams))
 }
 
-const Stub = defineComponent({ render: () => h('p', 'Somewhere else') })
-
-async function open(path = '/search') {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/', name: 'library', component: Stub },
+function open(path = '/search') {
+  return mountRoute(
+    [
+      { path: '/', name: 'library', component: Elsewhere },
       { path: '/search', name: 'search', component: SearchView },
-      { path: '/pages/:pageId', name: 'page', component: Stub },
+      { path: '/pages/:pageId', name: 'page', component: Elsewhere },
     ],
-  })
-  await router.push(path)
-  wrapper = mount(defineComponent({ render: () => h(RouterView) }), {
-    attachTo: document.body,
-    global: { plugins: [pinia, router, createCottage({ link: RouterLink, messages: uiMessages })] },
-  })
-  await flushPromises()
-  return { wrapper, router }
+    path,
+  )
 }
 
 async function searchFor(view: VueWrapper, text: string) {
@@ -100,12 +82,6 @@ function field(view: VueWrapper, label: string) {
   const found = view.findAll('label').find((l) => l.text() === label)
   if (!found) throw new Error(`No field "${label}"`)
   return view.get(`[id="${found.attributes('for')}"]`)
-}
-
-function button(view: VueWrapper, label: string) {
-  const found = view.findAll('button').find((b) => b.text() === label)
-  if (!found) throw new Error(`No button "${label}"`)
-  return found
 }
 
 describe('the search view', () => {
@@ -237,9 +213,8 @@ describe('the search view', () => {
   })
 
   it('says words still work when meaning search can’t reach its model', async () => {
-    const problem = { type: 'about:blank', title: 'Bad Gateway', status: 502 }
     const fetch = serve((params) =>
-      params.get('mode') === 'keyword' ? json({ items: [hit()] }) : json(problem, 502),
+      params.get('mode') === 'keyword' ? json({ items: [hit()] }) : json(problem(502), 502),
     )
     const { wrapper } = await open('/search?q=sweet+peas')
 

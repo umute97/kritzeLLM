@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia'
 import { computed, reactive, ref } from 'vue'
 
-import { api, call } from '@/api/client'
+import { api, call, fetchAll } from '@/api/client'
 import type { Journal } from '@/api/types'
-import { i18n } from '@/i18n'
+
+import { usePages } from './pages'
+import { useUploads } from './uploads'
 
 export const PER_SHELF = 4
 
@@ -18,6 +20,8 @@ export const useJournals = defineStore('journals', () => {
   const loading = ref(false)
   const loaded = ref(false)
   const byId = reactive(new Map<string, Journal>())
+  /** Every journal's id in the API's order, once `loadAll()` has fetched them. */
+  const allIds = ref<string[]>()
 
   // Through byId, so a refreshed journal (e.g. its page count after an upload) shows up here too.
   const shelf = computed(() =>
@@ -25,11 +29,8 @@ export const useJournals = defineStore('journals', () => {
   )
   const canBack = computed(() => index.value > 0)
   const canNext = computed(() => nextCursors.value[index.value] != null)
-  const range = computed(() => {
-    const first = index.value * PER_SHELF + 1
-    return i18n.global.t('library.range', { first, last: first + shelf.value.length - 1 })
-  })
   const empty = computed(() => loaded.value && shelves.value[0]?.length === 0)
+  const all = computed(() => allIds.value?.flatMap((id) => byId.get(id) ?? []) ?? [])
 
   function remember(journal: Journal) {
     byId.set(journal.id, journal)
@@ -60,15 +61,25 @@ export const useJournals = defineStore('journals', () => {
   async function reload() {
     shelves.value = []
     nextCursors.value = []
+    allIds.value = undefined
     await show(0)
   }
 
   const back = () => show(index.value - 1)
   const next = () => show(index.value + 1)
 
-  async function get(id: string): Promise<Journal> {
-    const known = byId.get(id)
-    if (known) return known
+  /** Fetches every journal into `all`, once; adding or deleting one fetches them again. */
+  async function loadAll() {
+    if (allIds.value) return
+    const found = await fetchAll((cursor) =>
+      call(api.GET('/journals', { params: { query: { limit: 100, cursor } } })),
+    )
+    found.forEach(remember)
+    allIds.value = found.map((journal) => journal.id)
+  }
+
+  /** Fetches a journal afresh, e.g. for its page count after an upload. */
+  async function refresh(id: string): Promise<Journal> {
     const journal = await call(
       api.GET('/journals/{journalId}', { params: { path: { journalId: id } } }),
     )
@@ -76,21 +87,8 @@ export const useJournals = defineStore('journals', () => {
     return journal
   }
 
-  async function all(): Promise<Journal[]> {
-    const found: Journal[] = []
-    let cursor: string | undefined
-    do {
-      const list = await call(api.GET('/journals', { params: { query: { limit: 100, cursor } } }))
-      list.items.forEach(remember)
-      found.push(...list.items)
-      cursor = list.nextCursor ?? undefined
-    } while (cursor)
-    return found
-  }
-
-  /** Refreshes a journal, e.g. its page count after an upload. */
-  async function refresh(id: string) {
-    remember(await call(api.GET('/journals/{journalId}', { params: { path: { journalId: id } } })))
+  async function get(id: string): Promise<Journal> {
+    return byId.get(id) ?? refresh(id)
   }
 
   async function create(name: string, description: string | null): Promise<Journal> {
@@ -109,10 +107,12 @@ export const useJournals = defineStore('journals', () => {
     return journal
   }
 
-  /** Deletes a journal with all of its pages, then starts the shelf over. */
+  /** Deletes a journal with its pages and its photos still waiting to go up. */
   async function remove(id: string) {
     await call(api.DELETE('/journals/{journalId}', { params: { path: { journalId: id } } }))
     byId.delete(id)
+    useUploads().forget(id)
+    usePages().forgetJournal(id)
     await reload()
   }
 
@@ -124,14 +124,14 @@ export const useJournals = defineStore('journals', () => {
     empty,
     canBack,
     canNext,
-    range,
+    all,
     byId,
     show,
     reload,
     back,
     next,
     get,
-    all,
+    loadAll,
     refresh,
     create,
     update,

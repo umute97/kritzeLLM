@@ -8,24 +8,28 @@ from sqlalchemy.orm import selectinload
 
 from kritzellm.core import blocks as core_blocks
 from kritzellm.core import pages as core
-from kritzellm.core.errors import NotFoundError, get_existing
+from kritzellm.core.errors import NotFoundError
+from kritzellm.core.rows import get_existing
 from kritzellm.core.storage import variant_path
 from kritzellm.db import models as db
+from kritzellm.domain import ImageVariant, PageStatus
 
 from ..deps import AppSettings, Session
 from ..errors import problem_responses
 from ..schemas.blocks import Block, BlocksReplace, BlocksReplaceResult
 from ..schemas.common import JournalId
 from ..schemas.jobs import Job
-from ..schemas.pages import (
-    ImageVariant,
-    Page,
-    PageDetail,
-    PageList,
-    PageStatus,
-    PageUpdate,
+from ..schemas.pages import Page, PageDetail, PageList, PageUpdate
+from .params import (
+    BINARY,
+    JOB_LOCATION,
+    DateFrom,
+    DateTo,
+    Limit,
+    PageCursor,
+    PageIdPath,
+    set_location,
 )
-from .params import BINARY, JOB_LOCATION, DateFrom, DateTo, Limit, PageCursor, PageIdPath
 
 router = APIRouter(tags=["pages"], responses=problem_responses(400, 401, 422))
 
@@ -74,7 +78,7 @@ async def list_pages(
 async def get_page(page_id: PageIdPath, session: Session) -> PageDetail:
     """Returns a page with all of its transcribed blocks, in reading order."""
     page = await get_existing(session, db.Page, page_id, options=[selectinload(db.Page.blocks)])
-    return PageDetail.from_db(page, blocks=page.blocks)
+    return PageDetail.from_db(page)
 
 
 @router.patch(
@@ -187,5 +191,5 @@ async def transcribe_page(
     """
     job = await core_blocks.request_transcription(session, page_id)
     await session.commit()
-    response.headers["Location"] = request.url_for("get_job", jobId=job.id).path
+    set_location(request, response, "get_job", jobId=job.id)
     return Job.from_db(job)

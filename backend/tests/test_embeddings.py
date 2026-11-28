@@ -7,8 +7,9 @@ from pydantic_ai.embeddings import EmbeddingResult, EmbeddingSettings, TestEmbed
 from pydantic_ai.embeddings.openai import OpenAIEmbeddingModel
 
 from kritzellm.config import Settings
-from kritzellm.core import embeddings
-from kritzellm.core.embeddings import EMBED_DIMENSIONS, embed
+from kritzellm.core import embeddings, llm
+from kritzellm.core.embeddings import embed
+from kritzellm.domain import EMBED_DIMENSIONS
 
 
 class RecordingModel(TestEmbeddingModel):
@@ -41,7 +42,7 @@ def test_the_test_model_needs_no_key() -> None:
 
 def test_openai_is_asked_for_full_size_vectors_in_batches(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(embeddings, "BATCH_SIZE", 2)
-    embedder = embeddings._embedder("text-embedding-3-small", "sk-test")
+    embedder = llm._embedder("text-embedding-3-small", "sk-test")
     assert isinstance(embedder.model, OpenAIEmbeddingModel)
     assert embedder.model.model_name == "text-embedding-3-small"
     fake = RecordingModel()
@@ -58,7 +59,7 @@ def test_openai_is_asked_for_full_size_vectors_in_batches(monkeypatch: pytest.Mo
 
 def test_nothing_to_embed_makes_no_request() -> None:
     fake = RecordingModel()
-    embedder = embeddings._embedder("text-embedding-3-small", "sk-test")
+    embedder = llm._embedder("text-embedding-3-small", "sk-test")
 
     with embedder.override(model=fake):
         assert asyncio.run(embed([], _settings())) == []

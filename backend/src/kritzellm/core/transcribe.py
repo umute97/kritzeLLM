@@ -2,26 +2,21 @@
 
 One structured-output call per page: the model gets the normalized JPEG and answers with a
 `PageTranscription`. Output that doesn't validate goes back to the model once, then the run fails.
-The model name `test` swaps in PydanticAI's fake model, so the stack runs without an OpenAI key.
 """
 
 import logging
-from functools import cache
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, BinaryContent
 from pydantic_ai.models import Model
-from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
-from pydantic_ai.providers.openai import OpenAIProvider
 
-from kritzellm.api.schemas.blocks import BlockKind
 from kritzellm.api.schemas.common import SortedDays
 from kritzellm.config import Settings
+from kritzellm.domain import PAGE_LABEL_LENGTH, BlockKind
+
+from . import llm
 
 logger = logging.getLogger(__name__)
-
-TEST_MODEL = "test"
-"""Model name for PydanticAI's fake model: made-up but valid output, no API calls."""
 
 INSTRUCTIONS = """\
 You transcribe one photographed page of a handwritten journal.
@@ -55,7 +50,7 @@ class TranscribedBlock(BaseModel):
 class PageTranscription(BaseModel):
     """Everything read from one page."""
 
-    page_label: str | None = Field(max_length=40)
+    page_label: str | None = Field(max_length=PAGE_LABEL_LENGTH)
     """Page number or label written on the page, if any."""
     entry_dates: SortedDays
     """Dates of the entries on the page, as written there."""
@@ -66,28 +61,15 @@ class PageTranscription(BaseModel):
 agent = Agent(output_type=PageTranscription, instructions=INSTRUCTIONS, retries={"output": 1})
 
 
-@cache
-def _openai_model(name: str, api_key: str | None) -> Model:
-    """One model (and HTTP client) per name and key, shared by all pages."""
-    return OpenAIResponsesModel(
-        name,
-        provider=OpenAIProvider(api_key=api_key),
-        settings=OpenAIResponsesModelSettings(openai_reasoning_effort="high"),
-    )
-
-
-def _model(name: str, settings: Settings) -> Model | str:
-    if name == TEST_MODEL:
-        return TEST_MODEL
-    api_key = settings.openai_api_key
-    return _openai_model(name, api_key.get_secret_value() if api_key else None)
+def _model(settings: Settings) -> Model | str:
+    return llm.model(settings.transcribe_model, settings, reasoning_effort="high")
 
 
 async def transcribe(image: bytes, settings: Settings) -> PageTranscription:
     """Reads a normalized page image (JPEG) with the configured model."""
     name = settings.transcribe_model
     page = BinaryContent(image, media_type="image/jpeg", vendor_metadata={"detail": "high"})
-    result = await agent.run(["Transcribe this page.", page], model=_model(name, settings))
+    result = await agent.run(["Transcribe this page.", page], model=_model(settings))
     usage = result.usage
     logger.info(
         "Transcribed a page with %s: %d input + %d output tokens in %d request(s)",

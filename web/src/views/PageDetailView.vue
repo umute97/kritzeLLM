@@ -1,25 +1,21 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  onBeforeRouteLeave,
-  onBeforeRouteUpdate,
-  useRoute,
-  useRouter,
-  type RouteLocationNormalized,
-} from 'vue-router'
+import { useRoute, useRouter, type RouteLocationNormalized } from 'vue-router'
 
-import { api, call } from '@/api/client'
-import { ApiError } from '@/api/errors'
+import { hasStatus } from '@/api/errors'
 import { downloadImage, useAuthedImage } from '@/api/images'
-import type { Block, Journal, PageDetail } from '@/api/types'
+import type { Journal, PageDetail } from '@/api/types'
 import LostState from '@/components/LostState.vue'
 import { useAction } from '@/composables/useAction'
+import { useBlockDrafts } from '@/composables/useBlockDrafts'
 import { useConfirm } from '@/composables/useConfirm'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { formatEntryDates } from '@/utils/format'
+import { newestWins } from '@/utils/newest'
 import { toastError } from '@/utils/notify'
 import { useJournals } from '@/stores/journals'
-import { isBusy, usePages } from '@/stores/pages'
+import { isBusy, usePages, type PageRef } from '@/stores/pages'
 import {
   KBanner,
   KBlockCard,
@@ -51,21 +47,12 @@ const toasts = useToasts()
 const detail = ref<PageDetail>()
 const journal = ref<Journal>()
 const missing = ref(false)
-const neighbours = ref<{ prev?: string; next?: string; prevNumber?: number; nextNumber?: number }>(
-  {},
-)
-
-const drafts = reactive(new Map<string, string>())
-const saving = reactive(new Set<string>())
-const saved = reactive(new Set<string>())
-const savedTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const neighbours = ref<{ prev?: PageRef; next?: PageRef }>({})
 const active = ref<string | null>(null)
 // Blocks a search hit or a source points at: `?blocks=blk_…,blk_…`.
 const highlighted = computed(() => new Set(String(route.query.blocks ?? '').split(',')))
 const view = ref<'photo' | 'text' | 'both'>('both')
-const reading = useConfirm()
-const deleting = useConfirm()
-const leaving = useConfirm<RouteLocationNormalized>()
+const { drafts, saving, saved, text, setText, save, looksRight } = useBlockDrafts(detail)
 
 // The poller in the pages store keeps the status fresh while the page is being read.
 const status = computed(() => pages.byId.get(props.pageId)?.status ?? detail.value?.status)
@@ -80,27 +67,23 @@ const meta = computed(() =>
     : undefined,
 )
 
-// Bumped by every load, so an answer for a page you've already paged past is dropped.
-let latest = 0
+const newest = newestWins()
 
 async function load() {
-  const mine = ++latest
+  const current = newest()
   missing.value = false
   try {
-    const page = await call(
-      api.GET('/pages/{pageId}', { params: { path: { pageId: props.pageId } } }),
-    )
-    if (mine !== latest) return
+    const page = await pages.fetchDetail(props.pageId)
+    if (!current()) return
     detail.value = page
     drafts.clear()
-    pages.put(page)
     void nextTick(showHighlighted)
-    void findNeighbours(page, mine)
+    void findNeighbours(page, current)
     const owner = await journals.get(page.journalId)
-    if (mine === latest) journal.value = owner
+    if (current()) journal.value = owner
   } catch (error) {
-    if (mine !== latest) return
-    if (error instanceof ApiError && error.status === 404) missing.value = true
+    if (!current()) return
+    if (hasStatus(error, 404)) missing.value = true
     else toastError(error, t('page.openFailed'), { retry: load })
   }
 }
@@ -113,21 +96,12 @@ function showHighlighted() {
     ?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
 }
 
-async function findNeighbours(page: PageDetail, mine: number) {
+async function findNeighbours(page: PageDetail, current: () => boolean) {
   try {
-    const all = await pages.journalIndex(page.journalId)
-    if (mine !== latest) return
-    const at = all.findIndex((p) => p.id === page.id)
-    const prev = all[at - 1]
-    const next = all[at + 1]
-    neighbours.value = {
-      prev: prev?.id,
-      next: next?.id,
-      prevNumber: prev?.pageNumber,
-      nextNumber: next?.pageNumber,
-    }
+    const found = await pages.neighbours(page)
+    if (current()) neighbours.value = found
   } catch {
-    if (mine === latest) neighbours.value = {}
+    if (current()) neighbours.value = {}
   }
 }
 
@@ -147,102 +121,42 @@ watch(status, (now, before) => {
   if (before && now && isBusy(before) && !isBusy(now)) void load()
 })
 
-function text(block: Block): string {
-  return drafts.get(block.id) ?? block.text
-}
+const reading = useConfirm(
+  async () => {
+    if (!detail.value) return
+    await pages.retranscribe(detail.value)
+    toasts.push({ tone: 'info', title: t('page.readingAgain', { n: detail.value.pageNumber }) })
+  },
+  () => ({
+    title: t('page.readFailed'),
+    byStatus: { 409: { title: t('page.alreadyTitle'), detail: t('page.already') } },
+  }),
+)
 
-function setText(block: Block, value: string) {
-  if (value === block.text) drafts.delete(block.id)
-  else drafts.set(block.id, value)
-}
+const deleting = useConfirm(
+  async () => {
+    if (!detail.value) return
+    const { pageNumber, journalId } = detail.value
+    await pages.remove(detail.value)
+    toasts.push({ tone: 'info', title: t('page.deleted', { n: pageNumber }) })
+    await router.push({ name: 'journal', params: { journalId } })
+  },
+  () => ({ title: t('page.deleteFailed') }),
+)
 
-function replaceBlock(updated: Block) {
-  if (!detail.value) return
-  detail.value = {
-    ...detail.value,
-    blocks: detail.value.blocks.map((b) => (b.id === updated.id ? updated : b)),
-  }
-}
+const leaving = useConfirm(
+  async (to: RouteLocationNormalized) => {
+    drafts.clear()
+    await router.push(to.fullPath)
+  },
+  () => ({ title: t('page.leaveFailed') }),
+)
 
-async function patchBlock(block: Block, body: { text?: string; uncertain?: boolean }) {
-  if (saving.has(block.id)) return
-  saving.add(block.id)
-  try {
-    const result = await call(
-      api.PATCH('/blocks/{blockId}', { params: { path: { blockId: block.id } }, body }),
-    )
-    replaceBlock(result.block)
-    // Whatever was typed while it saved stays a draft on top of the saved text.
-    if (drafts.get(block.id) === result.block.text) drafts.delete(block.id)
-    saved.add(block.id)
-    clearTimeout(savedTimers.get(block.id))
-    savedTimers.set(
-      block.id,
-      setTimeout(() => saved.delete(block.id), 2500),
-    )
-  } catch (error) {
-    toastError(error, t('page.saveFailed', { n: block.seq + 1 }), {
-      retry: () => void patchBlock(block, body),
-      byStatus: {
-        409: {
-          tone: 'warning',
-          detail: t('page.busy'),
-        },
-      },
-    })
-  } finally {
-    saving.delete(block.id)
-  }
-}
-
-function save(block: Block) {
-  const draft = drafts.get(block.id)
-  if (draft === undefined) return
-  if (!draft.trim()) {
-    toasts.push({
-      tone: 'info',
-      title: t('page.blockEmptyTitle'),
-      detail: t('page.blockEmpty'),
-    })
-    return
-  }
-  return patchBlock(block, { text: draft })
-}
-
-const looksRight = (block: Block) => patchBlock(block, { uncertain: false })
-
-function readAgain() {
-  return reading.run(
-    async () => {
-      if (!detail.value) return
-      await pages.retranscribe(detail.value)
-      toasts.push({ tone: 'info', title: t('page.readingAgain', { n: detail.value.pageNumber }) })
-    },
-    {
-      title: t('page.readFailed'),
-      byStatus: { 409: { title: t('page.alreadyTitle'), detail: t('page.already') } },
-    },
-  )
-}
-
-function deletePage() {
-  return deleting.run(
-    async () => {
-      if (!detail.value) return
-      const { pageNumber, journalId } = detail.value
-      await call(api.DELETE('/pages/{pageId}', { params: { path: { pageId: props.pageId } } }))
-      pages.remove(props.pageId)
-      void journals.refresh(journalId).catch(() => {})
-      toasts.push({ tone: 'info', title: t('page.deleted', { n: pageNumber }) })
-      await router.push({ name: 'journal', params: { journalId } })
-    },
-    { title: t('page.deleteFailed') },
-  )
-}
+useUnsavedGuard(() => drafts.size > 0, leaving.ask)
 
 const download = useAction(
   (page: PageDetail) => downloadImage(page.image.urls.original, `page-${page.pageNumber}`),
-  { title: () => t('page.downloadFailed') },
+  () => ({ title: t('page.downloadFailed') }),
 )
 
 const menu = computed<MenuItem[]>(() => [
@@ -262,39 +176,13 @@ const menu = computed<MenuItem[]>(() => [
   },
 ])
 
-function step(id?: string) {
-  if (id) void router.push({ name: 'page', params: { pageId: id } })
+function step(to?: PageRef) {
+  if (to) void router.push({ name: 'page', params: { pageId: to.id } })
 }
 
-function holdUnsaved(to: RouteLocationNormalized) {
-  if (drafts.size === 0) return true
-  leaving.ask(to)
-  return false
+function pageName(at: PageRef | undefined, fallback: string) {
+  return at ? t('common.page', { n: at.pageNumber }) : fallback
 }
-
-onBeforeRouteLeave(holdUnsaved)
-onBeforeRouteUpdate(holdUnsaved)
-
-function leave() {
-  return leaving.run(
-    async (to) => {
-      drafts.clear()
-      await router.push(to.fullPath)
-    },
-    { title: t('page.leaveFailed') },
-  )
-}
-
-function holdUnload(event: BeforeUnloadEvent) {
-  if (drafts.size > 0) event.preventDefault()
-}
-
-window.addEventListener('beforeunload', holdUnload)
-
-onUnmounted(() => {
-  window.removeEventListener('beforeunload', holdUnload)
-  savedTimers.forEach(clearTimeout)
-})
 </script>
 
 <template>
@@ -302,7 +190,7 @@ onUnmounted(() => {
     <LostState v-if="missing" :title="t('page.lostTitle')" :text="t('page.lost')" />
 
     <template v-else-if="detail">
-      <KPageHeader :title="t('page.title', { n: detail.pageNumber })" :meta="meta">
+      <KPageHeader :title="t('common.page', { n: detail.pageNumber })" :meta="meta">
         <template #eyebrow>
           <KBreadcrumb
             :items="[
@@ -311,7 +199,7 @@ onUnmounted(() => {
                 label: journal?.name ?? t('page.journal'),
                 to: { name: 'journal', params: { journalId: detail.journalId } },
               },
-              { label: t('page.title', { n: detail.pageNumber }) },
+              { label: t('common.page', { n: detail.pageNumber }) },
             ]"
           />
         </template>
@@ -320,14 +208,8 @@ onUnmounted(() => {
         </template>
         <template #actions>
           <KPager
-            :prev-label="
-              neighbours.prevNumber
-                ? t('page.title', { n: neighbours.prevNumber })
-                : t('page.previous')
-            "
-            :next-label="
-              neighbours.nextNumber ? t('page.title', { n: neighbours.nextNumber }) : t('page.next')
-            "
+            :prev-label="pageName(neighbours.prev, t('page.previous'))"
+            :next-label="pageName(neighbours.next, t('page.next'))"
             :can-prev="!!neighbours.prev"
             :can-next="!!neighbours.next"
             @prev="step(neighbours.prev)"
@@ -430,7 +312,7 @@ onUnmounted(() => {
       :confirm-label="t('page.readAgainConfirm')"
       tone="main"
       :loading="reading.busy"
-      @confirm="readAgain"
+      @confirm="reading.run()"
     />
     <KConfirmDialog
       v-model:open="deleting.open"
@@ -438,7 +320,7 @@ onUnmounted(() => {
       :description="t('page.deleteNote')"
       :confirm-label="t('page.delete')"
       :loading="deleting.busy"
-      @confirm="deletePage"
+      @confirm="deleting.run()"
     />
     <KConfirmDialog
       v-model:open="leaving.open"
@@ -446,7 +328,7 @@ onUnmounted(() => {
       :description="t('page.leave', { blocks: t('counts.blocks', drafts.size) })"
       :confirm-label="t('page.leaveConfirm')"
       :loading="leaving.busy"
-      @confirm="leave"
+      @confirm="leaving.run()"
     />
   </KPage>
 </template>

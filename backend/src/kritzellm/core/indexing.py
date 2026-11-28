@@ -7,9 +7,9 @@ worker only runs after this one, so the last word is always the page's latest te
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kritzellm.api.schemas.pages import PageStatus
 from kritzellm.config import Settings
 from kritzellm.db import models as db
+from kritzellm.domain import PageStatus
 
 from .chunking import chunk_blocks
 from .embeddings import embed

@@ -1,20 +1,10 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 
-import KBadge from './KBadge.vue'
 import { usePolymorphic, type LinkTarget } from './polymorphic'
 
 // The current room gets the accent pill.
-const props = withDefaults(
-  defineProps<{
-    to?: LinkTarget
-    as?: string | Component
-    current?: boolean
-    badge?: number
-    badgeLabel?: string
-  }>(),
-  { to: undefined, as: undefined, badge: undefined, badgeLabel: undefined },
-)
+const props = defineProps<{ to?: LinkTarget; as?: string | Component; current?: boolean }>()
 
 const element = usePolymorphic(() => ({ as: props.as, to: props.to }), 'a')
 </script>
@@ -30,6 +20,5 @@ const element = usePolymorphic(() => ({ as: props.as, to: props.to }), 'a')
     ]"
   >
     <slot />
-    <KBadge v-if="badge" :count="badge" :label="badgeLabel" />
   </component>
 </template>

@@ -12,7 +12,7 @@ withDefaults(
     headingLevel?: 2 | 3
     doodle?: DoodleName
   }>(),
-  { text: undefined, framed: true, headingLevel: 2, doodle: undefined },
+  { framed: true, headingLevel: 2 },
 )
 </script>
 

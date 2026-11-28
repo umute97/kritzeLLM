@@ -26,11 +26,17 @@ from sqlalchemy import text as sql
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, column_property, mapped_column, relationship
 
-from kritzellm.api.schemas.blocks import BlockKind
-from kritzellm.api.schemas.conversations import MessageRole
-from kritzellm.api.schemas.jobs import JobKind, JobStatus
-from kritzellm.api.schemas.pages import PageStatus
-from kritzellm.core.embeddings import EMBED_DIMENSIONS
+from kritzellm.domain import (
+    CONVERSATION_TITLE_LENGTH,
+    EMBED_DIMENSIONS,
+    JOURNAL_NAME_LENGTH,
+    PAGE_LABEL_LENGTH,
+    BlockKind,
+    JobKind,
+    JobStatus,
+    MessageRole,
+    PageStatus,
+)
 from kritzellm.ids import Prefix, new_id
 
 from .types import TypeId
@@ -90,7 +96,7 @@ class Page(Timestamps, Base):
         TypeId(Prefix.JOURNAL), ForeignKey("journals.id", ondelete="CASCADE")
     )
     page_number: Mapped[int]
-    page_label: Mapped[str | None] = mapped_column(String(40))
+    page_label: Mapped[str | None] = mapped_column(String(PAGE_LABEL_LENGTH))
     entry_dates: Mapped[list[date]] = mapped_column(ARRAY(Date), server_default=sql("'{}'"))
     status: Mapped[PageStatus] = mapped_column(
         _enum(PageStatus), server_default=PageStatus.UPLOADED.value
@@ -118,7 +124,7 @@ class Journal(Timestamps, Base):
     __tablename__ = "journals"
 
     id: Mapped[str] = _id(Prefix.JOURNAL)
-    name: Mapped[str] = mapped_column(String(120))
+    name: Mapped[str] = mapped_column(String(JOURNAL_NAME_LENGTH))
     description: Mapped[str | None]
 
     page_count: Mapped[int] = column_property(
@@ -236,7 +242,7 @@ class Conversation(Timestamps, Base):
     __table_args__ = (Index("ix_conversations_activity", "updated_at", "id"),)
 
     id: Mapped[str] = _id(Prefix.CONVERSATION)
-    title: Mapped[str | None] = mapped_column(String(200))
+    title: Mapped[str | None] = mapped_column(String(CONVERSATION_TITLE_LENGTH))
 
     messages: Mapped[list[Message]] = relationship(
         back_populates="conversation", lazy="raise", passive_deletes=True, order_by="Message.id"

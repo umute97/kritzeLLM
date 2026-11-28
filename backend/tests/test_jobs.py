@@ -12,12 +12,11 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from kritzellm import worker as worker_module
-from kritzellm.api.schemas.jobs import JobKind, JobStatus
 from kritzellm.config import Settings
 from kritzellm.core import indexing, jobs
-from kritzellm.core.embeddings import EMBED_DIMENSIONS
 from kritzellm.core.storage import Staging
 from kritzellm.db import models as db
+from kritzellm.domain import EMBED_DIMENSIONS, JobKind, JobStatus
 from kritzellm.ids import Prefix, new_id
 from kritzellm.worker import Worker
 

@@ -3,20 +3,15 @@ import KIcon from './KIcon.vue'
 import KIconBadge from './KIconBadge.vue'
 import KTypingDots from './KTypingDots.vue'
 
-// A chat message. Answers come as a bubble or as a letter on lined paper; `streaming` adds a
-// caret at the end, and `error` turns it into a "the answer stopped" note with room for a retry.
-// `typing` is an answer that hasn't started yet: dots, and the slot beside them. A `footer` sits
-// under a dashed line at the bottom of the bubble.
-withDefaults(
-  defineProps<{
-    author: 'user' | 'assistant'
-    variant?: 'bubble' | 'letter'
-    streaming?: boolean
-    error?: boolean
-    typing?: boolean
-  }>(),
-  { variant: 'bubble' },
-)
+// A chat message. `streaming` adds a caret at the end of an answer, and `error` turns it into a
+// "the answer stopped" note with room for a retry. `typing` is an answer that hasn't started yet:
+// dots, and the slot beside them. A `footer` sits under a dashed line at the bottom of the bubble.
+defineProps<{
+  author: 'user' | 'assistant'
+  streaming?: boolean
+  error?: boolean
+  typing?: boolean
+}>()
 </script>
 
 <template>
@@ -56,9 +51,7 @@ withDefaults(
         'flex flex-col gap-2 rounded-[6px_18px_18px_18px]',
         error
           ? 'border-2 border-bark bg-bark-soft px-4.5 py-3'
-          : variant === 'letter'
-            ? 'paper-lines border border-line px-5.5 pt-1 pb-2 font-hand text-[19px] leading-8 [--line:32px]'
-            : 'border-[1.5px] border-ink bg-paper px-4.5 py-3 leading-[1.7]',
+          : 'border-[1.5px] border-ink bg-paper px-4.5 py-3 leading-[1.7]',
       ]"
     >
       <div>

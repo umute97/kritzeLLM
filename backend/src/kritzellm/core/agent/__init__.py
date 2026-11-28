@@ -1,14 +1,12 @@
 """The journal's helper: a chat agent that looks things up in the journal and cites what it read.
 
 An answer is one agent run, streamed as events. The question and the answer are saved together
-once it's done, so a failed or stopped answer leaves nothing behind. The model name `test` swaps
-in PydanticAI's fake model, so the stack runs without an OpenAI key.
+once it's done, so a failed or stopped answer leaves nothing behind.
 """
 
 import logging
 from collections.abc import AsyncGenerator, Sequence
 from datetime import date
-from functools import cache
 
 from pydantic_ai import Agent, AgentRunResultEvent, RunContext, UsageLimits
 from pydantic_ai.exceptions import (
@@ -30,15 +28,12 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 from pydantic_ai.models import Model
-from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
-from pydantic_ai.providers.openai import OpenAIProvider
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from kritzellm.api.schemas.conversations import (
     Message,
     MessageEndEvent,
-    MessageRole,
     MessageStartEvent,
     SourceEvent,
     StreamEvent,
@@ -49,16 +44,15 @@ from kritzellm.api.schemas.conversations import (
 )
 from kritzellm.config import Settings
 from kritzellm.db import models as db
+from kritzellm.domain import MessageRole
 
+from .. import llm
 from ..conversations import add_message, get_conversation
 from ..errors import UpstreamError
 from .citations import strip_citations
 from .tools import TOOLS, Deps
 
 logger = logging.getLogger(__name__)
-
-TEST_MODEL = "test"
-"""Model name for PydanticAI's fake model: made-up answers, no API calls."""
 
 MAX_REQUESTS = 8
 """Model requests one answer may take, tool rounds included."""
@@ -99,23 +93,9 @@ def _today_and_journals(ctx: RunContext[Deps]) -> str:
     return f"Today is {date.today().isoformat()}.\n\nThe journals:\n{journals or '- none yet'}"
 
 
-@cache
-def _openai_model(name: str, api_key: str | None) -> Model:
-    """One model (and HTTP client) per name and key, shared by all answers."""
-    return OpenAIResponsesModel(
-        name,
-        provider=OpenAIProvider(api_key=api_key),
-        settings=OpenAIResponsesModelSettings(openai_reasoning_effort="low"),
-    )
-
-
 def _model(settings: Settings) -> Model | str:
-    name = settings.chat_model
-    if name == TEST_MODEL:
-        return TEST_MODEL
-    api_key = settings.openai_api_key
     try:
-        return _openai_model(name, api_key.get_secret_value() if api_key else None)
+        return llm.model(settings.chat_model, settings, reasoning_effort="low")
     except UserError as exc:
         logger.error("The chat model isn't set up: %s", exc)
         raise UpstreamError("The chat model isn't set up on the server.") from exc

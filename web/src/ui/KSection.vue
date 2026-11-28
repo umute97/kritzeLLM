@@ -13,7 +13,7 @@ withDefaults(
     align?: 'center' | 'end' | 'baseline'
     headingLevel?: 2 | 3
   }>(),
-  { description: undefined, size: 'md', align: 'center', headingLevel: 2 },
+  { size: 'md', align: 'center', headingLevel: 2 },
 )
 
 const titleId = useId()

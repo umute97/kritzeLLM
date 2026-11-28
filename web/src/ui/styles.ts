@@ -6,6 +6,12 @@ export const focusWithinRing = 'focus-within:ring-4 focus-within:ring-accent/55'
 export const disabledClass =
   'cursor-not-allowed border-[1.5px] border-dashed border-edge bg-mute text-muted'
 
+// The grounds buttons share, whether they carry words or an icon.
+export const buttonLooks = {
+  main: 'border-[1.5px] border-ink bg-accent text-ink hover:bg-accent-strong',
+  second: 'border-[1.5px] border-ink bg-paper text-ink hover:bg-cream',
+}
+
 export const coverShape = 'h-[132px] w-full rounded-[9px_18px_18px_9px]'
 
 export const pageWidth = 'mx-auto w-full max-w-[1200px] px-4 sm:px-6'
@@ -23,16 +29,11 @@ export function fieldClass(state: { invalid?: boolean; disabled?: boolean }) {
   ]
 }
 
-// A `framed` pill keeps its line when it's not picked; an unframed one sits on a track that draws it.
-export function pillClass(state: { on: boolean; framed?: boolean; disabled?: boolean }) {
+// A pill on a track that draws its line; the picked one takes the accent.
+export function pillClass(state: { on: boolean; disabled?: boolean }) {
   return [
     'inline-flex items-center gap-1.5 rounded-full border-[1.5px] font-bold text-ink',
     state.disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
-    state.on
-      ? 'border-ink bg-accent'
-      : [
-          state.framed ? 'border-ink bg-paper' : 'border-transparent',
-          !state.disabled && 'hover:bg-cream',
-        ],
+    state.on ? 'border-ink bg-accent' : ['border-transparent', !state.disabled && 'hover:bg-cream'],
   ]
 }

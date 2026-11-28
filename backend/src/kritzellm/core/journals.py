@@ -1,17 +1,15 @@
 """Journals: the notebooks (or volumes) that pages belong to."""
 
 import asyncio
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kritzellm.db import models as db
 
-from .errors import NotFoundError, get_existing
-from .pagination import paginate
+from .errors import NotFoundError
+from .pagination import newest_first, paginate
 from .storage import delete_page_files
 
 
@@ -19,33 +17,8 @@ async def list_journals(
     session: AsyncSession, *, limit: int, cursor: str | None = None
 ) -> tuple[list[db.Journal], str | None]:
     """One page of journals, newest first, plus the next cursor."""
-    rows, next_cursor = await paginate(
-        session, select(db.Journal), id_column=db.Journal.id, limit=limit, cursor=cursor
-    )
-    return [journal for (journal,) in rows], next_cursor
-
-
-async def create_journal(
-    session: AsyncSession, *, name: str, description: str | None = None
-) -> db.Journal:
-    """Adds an empty journal. The caller commits."""
-    journal = db.Journal(name=name, description=description)
-    session.add(journal)
-    await session.flush()
-    await session.refresh(journal)
-    return journal
-
-
-async def update_journal(
-    session: AsyncSession, journal_id: str, changes: Mapping[str, Any]
-) -> db.Journal:
-    """Applies `changes` (name, description) to a journal. The caller commits."""
-    journal = await get_existing(session, db.Journal, journal_id)
-    for field, value in changes.items():
-        setattr(journal, field, value)
-    await session.flush()
-    await session.refresh(journal)
-    return journal
+    query = newest_first(select(db.Journal), db.Journal.id, cursor)
+    return await paginate(session, query, limit=limit, cursor_of=lambda journal: journal.id)
 
 
 async def delete_journal(session: AsyncSession, data_dir: Path, journal_id: str) -> None:

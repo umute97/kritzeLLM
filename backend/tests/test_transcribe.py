@@ -8,7 +8,6 @@ from pydantic_ai.exceptions import UnexpectedModelBehavior, UserError
 from pydantic_ai.messages import BinaryContent, UserPromptPart
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from kritzellm.api.schemas.blocks import BlockKind
 from kritzellm.config import Settings
 from kritzellm.core import transcribe as transcribe_module
 from kritzellm.core.transcribe import (
@@ -17,6 +16,7 @@ from kritzellm.core.transcribe import (
     TranscribedBlock,
     transcribe,
 )
+from kritzellm.domain import BlockKind
 
 IMAGE = b"\xff\xd8 not really a JPEG"
 
@@ -84,8 +84,8 @@ def test_test_model_needs_no_key() -> None:
 
 
 def test_model_choice() -> None:
-    assert transcribe_module._model("test", _settings()) == "test"
-    model = transcribe_module._model("gpt-test", _settings())
+    assert transcribe_module._model(_settings(transcribe_model="test")) == "test"
+    model = transcribe_module._model(_settings())
     assert isinstance(model, OpenAIResponsesModel)
     assert model.model_name == "gpt-test"
     assert model.settings == {"openai_reasoning_effort": "high"}

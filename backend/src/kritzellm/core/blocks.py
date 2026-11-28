@@ -12,8 +12,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kritzellm.api.schemas.blocks import BlockInput
-from kritzellm.api.schemas.jobs import JobKind
 from kritzellm.db import models as db
+from kritzellm.domain import JobKind
 
 from .errors import NotFoundError, PageBusyError
 from .jobs import enqueue, enqueue_once, pending

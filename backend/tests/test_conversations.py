@@ -8,10 +8,10 @@ from pydantic import PostgresDsn
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from kritzellm.api.schemas.conversations import MAX_QUESTIONS, MessageRole
 from kritzellm.config import Settings
 from kritzellm.core.conversations import ChatFullError, add_message
 from kritzellm.db import models as db
+from kritzellm.domain import MAX_QUESTIONS, MessageRole
 from kritzellm.ids import Prefix, new_id
 from kritzellm.main import create_app
 

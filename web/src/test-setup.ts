@@ -1,6 +1,10 @@
 import { config } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { afterEach, beforeEach } from 'vitest'
 
+import { configureApi } from '@/api/client'
 import { i18n } from '@/i18n'
+import { useToasts } from '@/ui'
 
 // Tests read English, and a key missing from the catalogs fails loudly instead of showing as itself.
 i18n.global.locale.value = 'en'
@@ -20,3 +24,12 @@ if (!HTMLDialogElement.prototype.showModal) {
     this.dispatchEvent(new Event('close'))
   }
 }
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  configureApi({ token: () => null, onUnauthorized: () => {}, onOffline: () => {} })
+})
+
+afterEach(() => {
+  useToasts().clear()
+})

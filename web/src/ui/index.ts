@@ -2,12 +2,7 @@
 // in docs/design/README.md.
 
 export { createCottage, type CottageOptions } from './plugin'
-export {
-  englishMessages,
-  useUiMessages,
-  type UiMessages,
-  type UiMessagesOverride,
-} from './messages'
+export { englishMessages, useUiMessages, type UiMessages } from './messages'
 export type { LinkTarget } from './polymorphic'
 
 // Brand and icons
@@ -19,21 +14,19 @@ export { icons, type IconName } from './icons'
 // Buttons and fields
 export { default as KButton } from './KButton.vue'
 export { default as KCheckbox } from './KCheckbox.vue'
+export { default as KDisclosure } from './KDisclosure.vue'
 export { default as KFieldNote } from './KFieldNote.vue'
 export { default as KFieldShell } from './KFieldShell.vue'
 export { default as KFileButton } from './KFileButton.vue'
 export { default as KIconButton } from './KIconButton.vue'
 export { default as KSearchField } from './KSearchField.vue'
 export { default as KSelect } from './KSelect.vue'
-export { default as KSwitch } from './KSwitch.vue'
 export { default as KTextArea } from './KTextArea.vue'
 export { default as KTextField } from './KTextField.vue'
 
 // Chips, tags and pickers
-export { default as KBadge } from './KBadge.vue'
 export { default as KBlockKindTag } from './KBlockKindTag.vue'
 export { default as KChip } from './KChip.vue'
-export { default as KFilterChips } from './KFilterChips.vue'
 export { default as KFlag } from './KFlag.vue'
 export { default as KSegmented } from './KSegmented.vue'
 export { default as KStatusChip } from './KStatusChip.vue'
@@ -59,6 +52,7 @@ export { AUTO_DISMISS_MS, useToasts, type Toast, type ToastOptions, type ToastTo
 
 // Navigation
 export { default as KBreadcrumb } from './KBreadcrumb.vue'
+export { default as KListLink } from './KListLink.vue'
 export { default as KLoadMore } from './KLoadMore.vue'
 export { default as KNavLink } from './KNavLink.vue'
 export { default as KPager } from './KPager.vue'

@@ -2,7 +2,6 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
 import KBlockKindTag from '../KBlockKindTag.vue'
-import KFilterChips from '../KFilterChips.vue'
 import KFlag from '../KFlag.vue'
 import KSegmented from '../KSegmented.vue'
 import KStatusChip from '../KStatusChip.vue'
@@ -20,15 +19,13 @@ describe('KStatusChip', () => {
     expect(wrapper.classes()).toContain(ground)
   })
 
-  it('speaks job status too, and takes a custom label', () => {
-    expect(mount(KStatusChip, { props: { kind: 'job', status: 'queued' } }).text()).toBe('Waiting')
-    expect(mount(KStatusChip, { props: { kind: 'job', status: 'succeeded' } }).text()).toBe('Done')
+  it('takes a custom label', () => {
     expect(mount(KStatusChip, { props: { status: 'failed', label: 'Too big' } }).text()).toBe(
       'Too big',
     )
   })
 
-  it('speaks upload status, borrowing the page and job words', () => {
+  it('speaks upload status, borrowing the page words', () => {
     const chip = (status: 'queued' | 'duplicate' | 'ready') =>
       mount(KStatusChip, { props: { kind: 'upload' as const, status } })
     expect(chip('queued').text()).toBe('Waiting')
@@ -52,39 +49,8 @@ describe('KBlockKindTag and KFlag', () => {
   })
 })
 
-const filters = [
-  { value: 'all', label: 'All' },
-  { value: 'ready', label: 'Ready' },
-  { value: 'failed', label: 'Needs a hand' },
-] as const
-
-describe('KFilterChips', () => {
-  it('marks the picked chip with a tick and aria-pressed', async () => {
-    const wrapper = mount(KFilterChips, {
-      props: {
-        label: 'Filter pages',
-        options: [...filters],
-        modelValue: 'all',
-        'onUpdate:modelValue': (v: string) => wrapper.setProps({ modelValue: v }),
-      },
-    })
-    expect(wrapper.get('[role="group"]').attributes('aria-label')).toBe('Filter pages')
-    const buttons = wrapper.findAll('button')
-    expect(buttons.map((b) => b.attributes('aria-pressed'))).toEqual(['true', 'false', 'false'])
-    expect(buttons[0]!.find('svg').exists()).toBe(true)
-
-    await buttons[2]!.trigger('click')
-    expect(wrapper.props('modelValue')).toBe('failed')
-    expect(wrapper.findAll('button').map((b) => b.attributes('aria-pressed'))).toEqual([
-      'false',
-      'false',
-      'true',
-    ])
-  })
-})
-
 describe('KSegmented', () => {
-  it('switches views', async () => {
+  it('switches views and says which one is picked', async () => {
     const wrapper = mount(KSegmented, {
       props: {
         label: 'Show',
@@ -96,6 +62,11 @@ describe('KSegmented', () => {
         'onUpdate:modelValue': (v: string) => wrapper.setProps({ modelValue: v }),
       },
     })
+    expect(wrapper.get('[role="group"]').attributes('aria-label')).toBe('Show')
+    expect(wrapper.findAll('button').map((b) => b.attributes('aria-pressed'))).toEqual([
+      'false',
+      'true',
+    ])
     await wrapper.get('button').trigger('click')
     expect(wrapper.props('modelValue')).toBe('photo')
   })

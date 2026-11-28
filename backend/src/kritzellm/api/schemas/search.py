@@ -1,26 +1,10 @@
 """Search: finding pages by meaning, by words, or both."""
 
-from enum import StrEnum
-
 from pydantic import Field
 
 from .blocks import Block
 from .common import ApiModel
 from .pages import Page
-
-
-class SearchMode(StrEnum):
-    """How to search.
-
-    `hybrid` merges `vector` and `keyword` results with reciprocal rank fusion. `vector` finds text
-    by meaning, `keyword` by its words (`"quoted phrases"`, `or` and `-word` work). `exact` finds
-    blocks containing the query as written, ignoring case.
-    """
-
-    HYBRID = "hybrid"
-    VECTOR = "vector"
-    KEYWORD = "keyword"
-    EXACT = "exact"
 
 
 class SearchHit(ApiModel):

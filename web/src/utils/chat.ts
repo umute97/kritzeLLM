@@ -39,9 +39,12 @@ export function chips<S extends { ref: number; pageId: string }>(
   return [...byPage.values()]
 }
 
-/** One thing the helper did to answer: a tool call, and how many pages it found once done. */
+/**
+ * One thing the helper did to answer: a tool call, and how many pages it found once done. A saved
+ * answer's tool calls are steps already; only streamed ones carry the `id` their result matches.
+ */
 export interface Step {
-  id: string
+  id?: string
   name: string
   args: Record<string, unknown>
   pages?: number

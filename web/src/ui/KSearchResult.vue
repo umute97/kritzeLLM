@@ -22,13 +22,7 @@ const props = withDefaults(
     to?: LinkTarget
     as?: string | Component
   }>(),
-  {
-    date: undefined,
-    more: 0,
-    imageUrl: undefined,
-    to: undefined,
-    as: undefined,
-  },
+  { more: 0 },
 )
 
 const element = usePolymorphic(() => ({ as: props.as, to: props.to }), 'a')

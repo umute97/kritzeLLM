@@ -7,6 +7,8 @@ from fastapi.sse import EventSourceResponse, format_sse_event
 
 from kritzellm.core import conversations as core
 from kritzellm.core.agent import answer
+from kritzellm.core.rows import add_new, update_existing
+from kritzellm.db import models as db
 
 from ..deps import AppSettings, Session
 from ..errors import problem_for, problem_responses
@@ -22,7 +24,7 @@ from ..schemas.conversations import (
     Question,
     StreamEvent,
 )
-from .params import ConversationCursor, ConversationIdPath, Limit, location_header
+from .params import ConversationCursor, ConversationIdPath, Limit, location_header, set_location
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +58,9 @@ async def create_conversation(
     body: ConversationCreate, session: Session, request: Request, response: Response
 ) -> Conversation:
     """Starts an empty conversation to ask the journal things in."""
-    conversation = await core.create_conversation(session, title=body.title)
+    conversation = await add_new(session, db.Conversation(title=body.title))
     await session.commit()
-    response.headers["Location"] = request.url_for(
-        "get_conversation", conversationId=conversation.id
-    ).path
+    set_location(request, response, "get_conversation", conversationId=conversation.id)
     return Conversation.model_validate(conversation)
 
 
@@ -89,7 +89,7 @@ async def update_conversation(
 ) -> Conversation:
     """Renames a conversation. Only the given fields change."""
     changes = body.model_dump(exclude_unset=True, by_alias=False)
-    conversation = await core.update_conversation(session, conversation_id, changes)
+    conversation = await update_existing(session, db.Conversation, conversation_id, changes)
     await session.commit()
     return Conversation.model_validate(conversation)
 

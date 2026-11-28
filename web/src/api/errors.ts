@@ -27,6 +27,16 @@ export const offlineProblem: Problem = {
   detail: 'The API didn’t answer. Is the stack running?',
 }
 
+export function hasStatus(error: unknown, status: number): error is ApiError {
+  return error instanceof ApiError && error.status === status
+}
+
+/** What the server said about one field of a form it refused, e.g. `fieldError(error, '/name')`. */
+export function fieldError(error: unknown, pointer: string): string | undefined {
+  if (!(error instanceof ApiError)) return undefined
+  return error.problem.errors?.find((e) => e.pointer === pointer)?.detail
+}
+
 function isProblem(value: unknown): value is Problem {
   return typeof value === 'object' && value !== null && 'title' in value && 'status' in value
 }

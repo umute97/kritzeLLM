@@ -1,9 +1,6 @@
 <script setup lang="ts">
 // The top of a screen, with its one h1.
-withDefaults(defineProps<{ title: string; subtitle?: string; meta?: string }>(), {
-  subtitle: undefined,
-  meta: undefined,
-})
+defineProps<{ title: string; subtitle?: string; meta?: string }>()
 </script>
 
 <template>

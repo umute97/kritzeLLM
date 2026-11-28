@@ -1,29 +1,21 @@
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { createPinia, setActivePinia, type Pinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h } from 'vue'
-import { createMemoryHistory, createRouter, RouterLink, RouterView } from 'vue-router'
+import { flushPromises, type VueWrapper } from '@vue/test-utils'
+import { describe, expect, it } from 'vitest'
 
 import type { Conversation, ConversationDetail, Message } from '@/api/types'
-import { uiMessages } from '@/i18n'
-import { eventStream, json, makeJournal, makeMessage, makeSource, typeId } from '@/test-utils'
-import { createCottage, useToasts } from '@/ui'
+import {
+  button,
+  Elsewhere,
+  eventStream,
+  json,
+  makeJournal,
+  makeMessage,
+  makeSource,
+  mountRoute,
+  problem,
+  stubFetch,
+  typeId,
+} from '@/test-utils'
 import ChatView from '@/views/ChatView.vue'
-
-let pinia: Pinia
-let wrapper: VueWrapper | undefined
-
-beforeEach(() => {
-  pinia = createPinia()
-  setActivePinia(pinia)
-})
-
-afterEach(() => {
-  wrapper?.unmount()
-  wrapper = undefined
-  useToasts().clear()
-  vi.unstubAllGlobals()
-})
 
 function chat(overrides: Partial<ConversationDetail> = {}): ConversationDetail {
   const now = new Date().toISOString()
@@ -44,13 +36,6 @@ function summary({ id, title, createdAt, updatedAt }: ConversationDetail): Conve
 function question(content: string): Message {
   return makeMessage({ role: 'user', content, sources: [] })
 }
-
-const problem = (status: number, detail: string) => ({
-  type: 'about:blank',
-  title: 'Problem',
-  status,
-  detail,
-})
 
 type Answer = (request: Request) => Response
 
@@ -79,7 +64,7 @@ function serve() {
       return detail
     },
   }
-  const fetch = vi.fn(async (request: Request) => {
+  stubFetch(async (request) => {
     const url = new URL(request.url)
     const path = url.pathname.replace('/api/v1', '')
     if (path === '/journals') return json({ items: [makeJournal()], nextCursor: null })
@@ -93,7 +78,7 @@ function serve() {
     }
     const [, id, messages] = path.match(/^\/conversations\/([^/]+)(\/messages)?$/) ?? []
     const found = id ? server.chats.get(id) : undefined
-    if (!id || !found) return json(problem(404, 'No such chat.'), 404)
+    if (!id || !found) return json(problem(404, 'Not Found', 'No such chat.'), 404)
     if (messages) {
       server.asked.push({ id, content: ((await request.json()) as { content: string }).content })
       return server.answers.shift()!(request)
@@ -111,27 +96,17 @@ function serve() {
     }
     return json(found)
   })
-  vi.stubGlobal('fetch', fetch)
   return server
 }
 
-const Stub = defineComponent({ render: () => h('p', 'Somewhere else') })
-
-async function open(path: string) {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
+function open(path: string) {
+  return mountRoute(
+    [
       { path: '/chat/:conversationId?', name: 'chat', component: ChatView, props: true },
-      { path: '/pages/:pageId', name: 'page', component: Stub },
+      { path: '/pages/:pageId', name: 'page', component: Elsewhere },
     ],
-  })
-  await router.push(path)
-  wrapper = mount(defineComponent({ render: () => h(RouterView) }), {
-    attachTo: document.body,
-    global: { plugins: [pinia, router, createCottage({ link: RouterLink, messages: uiMessages })] },
-  })
-  await flushPromises()
-  return { wrapper, router }
+    path,
+  )
 }
 
 async function ask(view: VueWrapper, text: string) {
@@ -139,12 +114,6 @@ async function ask(view: VueWrapper, text: string) {
   await box.setValue(text)
   await box.trigger('keydown', { key: 'Enter' })
   await flushPromises()
-}
-
-function button(view: VueWrapper, label: string) {
-  const found = view.findAll('button').find((b) => b.text() === label)
-  if (!found) throw new Error(`No button "${label}"`)
-  return found
 }
 
 const chips = (view: VueWrapper) => view.findAll('button[aria-pressed]').map((chip) => chip.text())
@@ -316,7 +285,10 @@ describe('the chat view', () => {
     await ask(wrapper, 'Sweet peas?')
     failing.send(
       { type: 'textDelta', text: 'You planted' },
-      { type: 'error', problem: problem(502, 'The chat model couldn’t answer. Try again later.') },
+      {
+        type: 'error',
+        problem: problem(502, 'Bad Gateway', 'The chat model couldn’t answer. Try again later.'),
+      },
     )
     failing.end()
     await flushPromises()
@@ -336,7 +308,7 @@ describe('the chat view', () => {
     const full = server.add(chat({ title: 'Long chat' }))
     const stream = eventStream()
     server.answers.push(
-      () => json(problem(409, 'This conversation is full.'), 409),
+      () => json(problem(409, 'Conflict', 'This conversation is full.'), 409),
       streamed(stream),
     )
     const { wrapper, router } = await open(`/chat/${full.id}`)

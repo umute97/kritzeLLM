@@ -2,7 +2,7 @@
 import { computed, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { KIcon } from '@/ui'
+import { KDisclosure, KIcon } from '@/ui'
 import { lookedFor, stepKind, tally, type Step } from '@/utils/chat'
 
 // What the helper did for an answer, as a footnote in it: one line that unfolds into the steps.
@@ -34,19 +34,16 @@ function item(step: Step): string {
 
 <template>
   <div class="flex flex-col text-[13px] text-muted">
-    <button
-      type="button"
-      :aria-expanded="expanded"
-      :aria-controls="expanded ? listId : undefined"
-      class="flex min-h-8 cursor-pointer items-center gap-1.5 self-start font-semibold"
-      @click="expanded = !expanded"
+    <KDisclosure
+      v-model:open="expanded"
+      :controls="expanded ? listId : undefined"
+      class="min-h-8 self-start font-semibold"
     >
       <KIcon name="search" :size="15" />
       {{ summary }}
-      <KIcon name="chevron-down" :size="13" :class="expanded && 'rotate-180'" />
-    </button>
+    </KDisclosure>
     <ol v-if="expanded" :id="listId" class="mb-2 flex list-decimal flex-col gap-0.5 pl-5">
-      <li v-for="step in steps" :key="step.id">{{ item(step) }}</li>
+      <li v-for="(step, index) in steps" :key="index">{{ item(step) }}</li>
     </ol>
   </div>
 </template>
