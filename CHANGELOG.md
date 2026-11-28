@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/umute97/kritzeLLM/compare/v0.6.0...v0.7.0) (2026-11-28)
+
+
+### Features
+
+* **web:** tab through the unreadable [?] in a block ✨ ([#123](https://github.com/umute97/kritzeLLM/issues/123)) ([9723759](https://github.com/umute97/kritzeLLM/commit/972375993f4c5f86d5e293446d24a60adea4b18c))
+
 ## [0.6.0](https://github.com/umute97/kritzeLLM/compare/v0.5.1...v0.6.0) (2026-11-28)
 
 
