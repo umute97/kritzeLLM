@@ -4,7 +4,7 @@ import { ref } from 'vue'
 
 import KDialog from '../KDialog.vue'
 import KStatusChip from '../KStatusChip.vue'
-import { englishMessages, mergeMessages } from '../messages'
+import { englishMessages } from '../messages'
 import { createCottage } from '../plugin'
 
 describe('the message catalog', () => {
@@ -13,29 +13,35 @@ describe('the message catalog', () => {
     expect(wrapper.text()).toBe('Ready')
   })
 
-  it('takes other words from createCottage, one entry of a group at a time', () => {
+  it('takes other words from createCottage', () => {
+    const messages = {
+      ...englishMessages,
+      pageStatus: { ...englishMessages.pageStatus, ready: 'Fertig' },
+    }
     const wrapper = mount(KStatusChip, {
       props: { status: 'ready' },
-      global: { plugins: [createCottage({ messages: { pageStatus: { ready: 'Fertig' } } })] },
+      global: { plugins: [createCottage({ messages })] },
     })
     expect(wrapper.text()).toBe('Fertig')
   })
 
   it('follows a ref, so a language switch shows up right away', async () => {
-    const messages = ref({ close: 'Close' })
+    const messages = ref(englishMessages)
     const wrapper = mount(KDialog, {
       props: { title: 'Rename', open: true },
       global: { plugins: [createCottage({ messages })] },
     })
-    messages.value = { close: 'Schließen' }
+    messages.value = { ...englishMessages, close: 'Schließen' }
     await wrapper.vm.$nextTick()
     expect(wrapper.find('button[aria-label="Schließen"]').exists()).toBe(true)
     wrapper.unmount()
   })
 
-  it('keeps the rest of a group when one entry changes', () => {
-    const merged = mergeMessages(englishMessages, { jobStatus: { queued: 'Wartet' } })
-    expect(merged.jobStatus).toEqual({ ...englishMessages.jobStatus, queued: 'Wartet' })
-    expect(merged.close).toBe('Close')
+  it('falls back to English while the getter has nothing', () => {
+    const wrapper = mount(KStatusChip, {
+      props: { status: 'ready' },
+      global: { plugins: [createCottage({ messages: () => undefined })] },
+    })
+    expect(wrapper.text()).toBe('Ready')
   })
 })

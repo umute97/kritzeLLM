@@ -3,19 +3,17 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from kritzellm.core import search as core
+from kritzellm.domain import SearchMode
 
 from ..deps import AppSettings, Session
 from ..errors import problem_responses
 from ..schemas.blocks import Block
-from ..schemas.common import JournalId
+from ..schemas.common import NON_BLANK, JournalId
 from ..schemas.pages import Page
-from ..schemas.search import SearchHit, SearchMode, SearchResult
+from ..schemas.search import SearchHit, SearchResult
 from .params import DateFrom, DateTo
 
 router = APIRouter(tags=["search"], responses=problem_responses(400, 401, 422))
-
-QUERY_TEXT = r"^[^\x00]*[^\x00\s][^\x00]*$"
-"""Any text with something besides whitespace (and no NUL characters)."""
 
 
 @router.get(
@@ -28,7 +26,7 @@ async def search(
     settings: AppSettings,
     q: Annotated[
         str,
-        Query(min_length=1, max_length=500, pattern=QUERY_TEXT, description="What to look for."),
+        Query(min_length=1, max_length=500, pattern=NON_BLANK, description="What to look for."),
     ],
     mode: Annotated[SearchMode, Query(description="How to search.")] = SearchMode.HYBRID,
     journal_id: Annotated[

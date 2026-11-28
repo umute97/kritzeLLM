@@ -129,9 +129,7 @@ describe('KCitationChip and KSourceCard', () => {
       props: {
         title: 'Page 12',
         date: 'Mar 3',
-        before: 'and ',
         quote: 'I finally planted the sweet peas',
-        after: ' by the fence.',
         to: '/pages/pg_1',
       },
     })

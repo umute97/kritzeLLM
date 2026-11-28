@@ -9,7 +9,7 @@ import { intentLooks } from './tones'
 // a page couldn't be read, a form came back with errors.
 const props = withDefaults(
   defineProps<{ tone?: 'error' | 'warning' | 'info'; title: string; icon?: IconName }>(),
-  { tone: 'error', icon: undefined },
+  { tone: 'error' },
 )
 
 const look = computed(() => intentLooks[props.tone])

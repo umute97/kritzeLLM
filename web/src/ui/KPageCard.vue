@@ -10,7 +10,7 @@ import KSpinner from './KSpinner.vue'
 import KStatusChip from './KStatusChip.vue'
 import type { PageStatus } from './types'
 
-// A page pinned to the board. Without a photo yet it shows lined paper (and an excerpt if any).
+// A page pinned to the board. Without a photo yet it shows lined paper.
 // `class` and `style` place the tilted frame; other attributes go to the link.
 defineOptions({ inheritAttrs: false })
 
@@ -20,23 +20,13 @@ const props = withDefaults(
     status: PageStatus
     date?: string
     imageUrl?: string
-    excerpt?: string
     /** Degrees; see `tiltFor()`. */
     tilt?: number
-    selected?: boolean
     failedText?: string
     to?: LinkTarget
     as?: string | Component
   }>(),
-  {
-    date: undefined,
-    imageUrl: undefined,
-    excerpt: undefined,
-    tilt: 0,
-    failedText: undefined,
-    to: undefined,
-    as: undefined,
-  },
+  { tilt: 0 },
 )
 
 const element = usePolymorphic(() => ({ as: props.as, to: props.to }), 'a')
@@ -65,12 +55,7 @@ const failed = computed(() => props.status === 'failed')
     <component
       :is="element.is"
       v-bind="{ ...controlAttrs(), ...element.attrs }"
-      :class="[
-        'flex flex-col gap-2.5 rounded-field bg-paper p-3 pb-3.5 text-ink no-underline hover:text-ink',
-        selected
-          ? 'border-[2.5px] border-ink shadow-lift-lg'
-          : 'border border-line shadow-pin group-hover:border-ink group-hover:shadow-lift-lg',
-      ]"
+      class="flex flex-col gap-2.5 rounded-field border border-line bg-paper p-3 pb-3.5 text-ink no-underline shadow-pin group-hover:border-ink group-hover:shadow-lift-lg hover:text-ink"
     >
       <KPhoto
         :src="imageUrl"
@@ -78,7 +63,6 @@ const failed = computed(() => props.status === 'failed')
         :dimmed="!!(reading || failed)"
         class="h-[190px] rounded border border-sand"
       >
-        <span class="block p-3 font-hand text-[15px] leading-6">{{ excerpt }}</span>
         <template #overlay>
           <span
             v-if="reading"

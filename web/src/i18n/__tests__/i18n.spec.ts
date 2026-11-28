@@ -5,7 +5,6 @@ import { i18n, pickLocale, setLocale } from '@/i18n'
 afterEach(() => {
   setLocale('en')
   localStorage.clear()
-  vi.unstubAllGlobals()
 })
 
 function browserSpeaks(...languages: string[]) {

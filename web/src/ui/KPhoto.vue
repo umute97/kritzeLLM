@@ -14,14 +14,7 @@ withDefaults(
     dimmed?: boolean
     loadingLabel?: string
   }>(),
-  {
-    src: undefined,
-    alt: '',
-    width: undefined,
-    height: undefined,
-    fit: 'cover',
-    loadingLabel: undefined,
-  },
+  { alt: '', fit: 'cover' },
 )
 </script>
 

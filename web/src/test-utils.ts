@@ -1,5 +1,20 @@
-// Small builders for tests: API objects with sensible defaults, and JSON responses.
-import type { Block, ChatStreamEvent, Journal, Message, Page, Source } from '@/api/types'
+// Small builders and helpers for tests: API objects with sensible defaults, JSON responses, a
+// stand-in for `fetch`, and a screen mounted behind a router.
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { getActivePinia } from 'pinia'
+import { onTestFinished, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
+import {
+  createMemoryHistory,
+  createRouter,
+  RouterLink,
+  RouterView,
+  type RouteRecordRaw,
+} from 'vue-router'
+
+import type { Block, ChatStreamEvent, Journal, Message, Page, Problem, Source } from '@/api/types'
+import { uiMessages } from '@/i18n'
+import { createCottage } from '@/ui'
 
 let counter = 0
 
@@ -109,9 +124,54 @@ export function json(body: unknown, status = 200): Response {
   })
 }
 
+export function problem(status: number, title = 'Problem', detail?: string): Problem {
+  return { type: 'about:blank', title, status, detail }
+}
+
+export const notFound = () => json(problem(404, 'Not Found'), 404)
+
+/** Stubs `fetch` with `answer`, which gets every call as a `Request`, however it was made. */
+export function stubFetch(answer: (request: Request) => Response | Promise<Response>) {
+  const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+    answer(
+      input instanceof Request ? input : new Request(new URL(String(input), location.origin), init),
+    ),
+  )
+  vi.stubGlobal('fetch', fetch)
+  return fetch
+}
+
 /** The URL of the n-th call to a stubbed fetch, without the origin. */
 export function calledUrl(fetch: { mock: { calls: unknown[][] } }, n = 0): string {
   const request = fetch.mock.calls[n]?.[0]
   const url = request instanceof Request ? request.url : String(request)
   return url.replace(/^https?:\/\/[^/]+/, '')
+}
+
+/** A screen for routes a test only needs to arrive at. */
+export const Elsewhere = defineComponent({ render: () => h('p', 'Somewhere else') })
+
+/** Mounts `routes` at `path` with the app's plugins, and unmounts them once the test is done. */
+export async function mountRoute(routes: RouteRecordRaw[], path: string) {
+  const router = createRouter({ history: createMemoryHistory(), routes })
+  await router.push(path)
+  const wrapper = mount(RouterView, {
+    attachTo: document.body,
+    global: {
+      plugins: [
+        getActivePinia()!,
+        router,
+        createCottage({ link: RouterLink, messages: uiMessages }),
+      ],
+    },
+  })
+  onTestFinished(() => wrapper.unmount())
+  await flushPromises()
+  return { wrapper, router }
+}
+
+export function button(view: VueWrapper, label: string) {
+  const found = view.findAll('button').find((b) => b.text() === label)
+  if (!found) throw new Error(`No button "${label}"`)
+  return found
 }

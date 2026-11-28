@@ -1,32 +1,29 @@
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { createPinia, setActivePinia, type Pinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
-import { defineComponent, h } from 'vue'
-import { createMemoryHistory, createRouter, RouterLink, RouterView } from 'vue-router'
+import { flushPromises } from '@vue/test-utils'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 
 import type { Block, Page, PageDetail } from '@/api/types'
-import { setLocale, uiMessages } from '@/i18n'
-import { json, makeBlock, makeJournal, makePage } from '@/test-utils'
-import { createCottage, useToasts } from '@/ui'
+import { setLocale } from '@/i18n'
+import {
+  button,
+  Elsewhere,
+  json,
+  makeBlock,
+  makeJournal,
+  makePage,
+  mountRoute,
+  notFound,
+  problem,
+  stubFetch,
+} from '@/test-utils'
+import { useToasts } from '@/ui'
 import PageDetailView from '@/views/PageDetailView.vue'
 
 type Handler = (request: Request) => Response | Promise<Response>
 
 const journal = makeJournal({ id: 'jrn_1', pageCount: 3 })
-let pinia: Pinia
-let wrapper: VueWrapper | undefined
-
-beforeEach(() => {
-  pinia = createPinia()
-  setActivePinia(pinia)
-})
 
 afterEach(() => {
-  wrapper?.unmount()
-  wrapper = undefined
-  useToasts().clear()
   vi.useRealTimers()
-  vi.unstubAllGlobals()
   setLocale('en')
 })
 
@@ -36,9 +33,7 @@ function detailOf(page: Page, blocks: Block[] = []): PageDetail {
 
 /** Answers API calls by "METHOD /path"; the journal and its page list are always there. */
 function serve(pages: PageDetail[], handlers: Record<string, Handler> = {}) {
-  const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const request =
-      input instanceof Request ? input : new Request(new URL(String(input), location.origin), init)
+  return stubFetch((request) => {
     const key = `${request.method} ${new URL(request.url).pathname}`
     const handler = handlers[key]
     if (handler) return handler(request)
@@ -46,10 +41,8 @@ function serve(pages: PageDetail[], handlers: Record<string, Handler> = {}) {
     if (key === 'GET /api/v1/pages') return json({ items: pages, nextCursor: null })
     const page = pages.find((p) => key === `GET /api/v1/pages/${p.id}`)
     if (page) return json(page)
-    return json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+    return notFound()
   })
-  vi.stubGlobal('fetch', fetch)
-  return fetch
 }
 
 function deferred<T>() {
@@ -58,30 +51,15 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-const Shelf = defineComponent({ render: () => h('p', 'The shelf') })
-
-async function open(pageId: string, query = '') {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/', name: 'library', component: Shelf },
-      { path: '/journals/:journalId', name: 'journal', component: Shelf },
+function open(pageId: string, query = '') {
+  return mountRoute(
+    [
+      { path: '/', name: 'library', component: Elsewhere },
+      { path: '/journals/:journalId', name: 'journal', component: Elsewhere },
       { path: '/pages/:pageId', name: 'page', component: PageDetailView, props: true },
     ],
-  })
-  await router.push(`/pages/${pageId}${query}`)
-  wrapper = mount(defineComponent({ render: () => h(RouterView) }), {
-    attachTo: document.body,
-    global: { plugins: [pinia, router, createCottage({ link: RouterLink, messages: uiMessages })] },
-  })
-  await flushPromises()
-  return { wrapper, router }
-}
-
-function button(view: VueWrapper, label: string) {
-  const found = view.findAll('button').find((b) => b.text() === label)
-  if (!found) throw new Error(`No button "${label}"`)
-  return found
+    `/pages/${pageId}${query}`,
+  )
 }
 
 const toastTitles = () => useToasts().items.value.map((t) => t.title)
@@ -146,7 +124,7 @@ describe('the page detail view', () => {
   })
 
   it('shows the failed banner with the page’s error', async () => {
-    const error = { type: 'about:blank', title: 'Model error', status: 502, detail: 'Timed out.' }
+    const error = problem(502, 'Model error', 'Timed out.')
     serve([detailOf(makePage({ id: 'pg_a', status: 'failed', error }))])
     const { wrapper } = await open('pg_a')
 
@@ -155,7 +133,7 @@ describe('the page detail view', () => {
   })
 
   it('shows "Still reading" instead of blocks while transcribing', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval'] })
+    vi.useFakeTimers({ toFake: ['setTimeout'] })
     serve([detailOf(makePage({ id: 'pg_a', status: 'transcribing' }), [makeBlock()])])
     const { wrapper } = await open('pg_a')
 
@@ -207,8 +185,7 @@ describe('the page detail view', () => {
   it('warns when saving during a reading (409)', async () => {
     const block = makeBlock()
     serve([detailOf(makePage({ id: 'pg_a' }), [block])], {
-      [`PATCH /api/v1/blocks/${block.id}`]: () =>
-        json({ type: 'about:blank', title: 'Page busy', status: 409 }, 409),
+      [`PATCH /api/v1/blocks/${block.id}`]: () => json(problem(409, 'Page busy'), 409),
     })
     const { wrapper } = await open('pg_a')
 

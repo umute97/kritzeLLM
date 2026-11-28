@@ -29,7 +29,6 @@ const ui = useUiMessages()
       :technical="toast.technical"
       :icon="toast.icon"
       :action-label="toast.action?.label"
-      :progress="toast.progress"
       @mouseenter="pause(toast.id)"
       @mouseleave="resume(toast.id)"
       @focusin="pause(toast.id)"

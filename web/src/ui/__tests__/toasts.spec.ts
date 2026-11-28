@@ -13,7 +13,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  toasts.clear()
   vi.useRealTimers()
 })
 
@@ -43,15 +42,6 @@ describe('useToasts', () => {
     vi.advanceTimersByTime(AUTO_DISMISS_MS)
     expect(toasts.items.value).toHaveLength(0)
   })
-
-  it('turns a loading toast into a happy one that then leaves', () => {
-    const id = toasts.push({ tone: 'loading', title: 'Uploading', progress: { value: 1, max: 6 } })
-    vi.advanceTimersByTime(AUTO_DISMISS_MS * 2)
-    toasts.update(id, { tone: 'success', title: 'Pages tucked in', progress: undefined })
-    expect(toasts.items.value[0]?.title).toBe('Pages tucked in')
-    vi.advanceTimersByTime(AUTO_DISMISS_MS)
-    expect(toasts.items.value).toHaveLength(0)
-  })
 })
 
 describe('KToast', () => {
@@ -63,7 +53,7 @@ describe('KToast', () => {
     expect(wrapper.find('code').exists()).toBe(false)
     const toggle = wrapper.get('button[aria-expanded]')
     await toggle.trigger('click')
-    expect(wrapper.get('code').text()).toBe('409 Conflict')
+    expect(wrapper.get(`#${toggle.attributes('aria-controls')}`).text()).toBe('409 Conflict')
     expect(toggle.text()).toBe('Hide details')
   })
 
@@ -87,15 +77,6 @@ describe('KToast', () => {
       .trigger('click')
     expect(wrapper.emitted('dismiss')).toHaveLength(1)
     expect(wrapper.emitted('action')).toHaveLength(1)
-  })
-
-  it('can’t be dismissed while loading', () => {
-    const wrapper = mount(KToast, {
-      props: { tone: 'loading', title: 'Uploading', progress: { value: 4, max: 6 } },
-    })
-    expect(wrapper.find('button[aria-label="Dismiss"]').exists()).toBe(false)
-    expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('4')
-    expect(wrapper.text()).toContain('4 of 6')
   })
 })
 

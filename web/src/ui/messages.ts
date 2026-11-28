@@ -1,6 +1,6 @@
 import { computed, inject, type ComputedRef, type InjectionKey } from 'vue'
 
-import type { BlockKind, JobStatus, PageStatus, UploadStatus } from './types'
+import type { BlockKind, PageStatus, UploadStatus } from './types'
 
 // Every word the library says on its own. Screens pass their own copy as props; these are only
 // the defaults and the bits nobody passes (close buttons, status names, screen reader labels).
@@ -34,24 +34,13 @@ export interface UiMessages {
   hide: (label: string) => string
   page: (n: number) => string
   block: (seq: number, kind: string) => string
-  progress: (value: number, max: number) => string
   sending: (fileName: string) => string
   moreBlocks: (n: number) => string
   files: (n: number) => string
   flags: { unsure: string; duplicate: string; edited: string; saved: string }
   pageStatus: Record<PageStatus, string>
-  jobStatus: Record<JobStatus, string>
   uploadStatus: Record<UploadStatus, string>
   blockKind: Record<BlockKind, string>
-}
-
-/** Some messages to change; groups like `pageStatus` can be changed one entry at a time. */
-export type UiMessagesOverride = {
-  [K in keyof UiMessages]?: UiMessages[K] extends (...args: never[]) => string
-    ? UiMessages[K]
-    : UiMessages[K] extends object
-      ? Partial<UiMessages[K]>
-      : UiMessages[K]
 }
 
 const pageStatus: Record<PageStatus, string> = {
@@ -59,13 +48,6 @@ const pageStatus: Record<PageStatus, string> = {
   transcribing: 'Transcribing',
   indexing: 'Indexing',
   ready: 'Ready',
-  failed: 'Failed',
-}
-
-const jobStatus: Record<JobStatus, string> = {
-  queued: 'Waiting',
-  running: 'Working',
-  succeeded: 'Done',
   failed: 'Failed',
 }
 
@@ -99,7 +81,6 @@ export const englishMessages: UiMessages = {
   hide: (label) => `Hide ${label}`,
   page: (n) => `Page ${n}`,
   block: (seq, kind) => `Block ${seq}, ${kind}`,
-  progress: (value, max) => `${value} of ${max}`,
   sending: (fileName) => `Sending ${fileName}`,
   moreBlocks: (n) => (n === 1 ? 'and 1 more block' : `and ${n} more blocks`),
   files: (n) => (n === 1 ? '1 file' : `${n} files`),
@@ -110,11 +91,10 @@ export const englishMessages: UiMessages = {
     saved: 'saved',
   },
   pageStatus,
-  jobStatus,
-  // An upload follows its page's job, so it borrows their words, plus a few of its own.
+  // An upload follows its page, so it borrows the page's words, plus a few of its own.
   uploadStatus: {
     sending: 'Sending',
-    queued: jobStatus.queued,
+    queued: 'Waiting',
     transcribing: pageStatus.transcribing,
     indexing: pageStatus.indexing,
     ready: pageStatus.ready,
@@ -130,17 +110,6 @@ export const englishMessages: UiMessages = {
     drawing: 'Drawing',
     other: 'Other',
   },
-}
-
-export function mergeMessages(base: UiMessages, override: UiMessagesOverride = {}): UiMessages {
-  const merged: Record<string, unknown> = { ...base }
-  for (const [key, value] of Object.entries(override)) {
-    if (value === undefined) continue
-    const current = merged[key]
-    merged[key] =
-      typeof value === 'object' && typeof current === 'object' ? { ...current, ...value } : value
-  }
-  return merged as unknown as UiMessages
 }
 
 export const messagesKey: InjectionKey<ComputedRef<UiMessages>> = Symbol('cottage messages')

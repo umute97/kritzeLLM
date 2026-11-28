@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
-import { ApiError } from '@/api/errors'
+import { hasStatus } from '@/api/errors'
 import type { Journal, Page } from '@/api/types'
 import JournalDialog from '@/components/JournalDialog.vue'
 import PageThumb from '@/components/PageThumb.vue'
@@ -11,7 +11,9 @@ import UploadBatch from '@/components/UploadBatch.vue'
 import { useAction } from '@/composables/useAction'
 import { useConfirm } from '@/composables/useConfirm'
 import { coverColor } from '@/utils/covers'
+import { fileSize } from '@/utils/format'
 import { toastError } from '@/utils/notify'
+import { MAX_BYTES, PHOTO_ACCEPT } from '@/utils/photos'
 import { PER_SHELF, useJournals } from '@/stores/journals'
 import { usePages } from '@/stores/pages'
 import { useUploads } from '@/stores/uploads'
@@ -55,13 +57,16 @@ const filters = computed(() =>
 const filter = ref<Filter>('all')
 const newJournal = ref(false)
 const renaming = ref(false)
-const deleting = useConfirm<Journal>()
 
 const journal = computed(() => (props.journalId ? journals.byId.get(props.journalId) : undefined))
 const batch = computed(() => (journal.value ? uploads.batch(journal.value.id) : undefined))
 const roomOnShelf = computed(
   () => journals.loaded && !journals.canNext && journals.shelf.length < PER_SHELF,
 )
+const range = computed(() => {
+  const first = journals.index * PER_SHELF + 1
+  return t('library.range', { first, last: first + journals.shelf.length - 1 })
+})
 
 async function openShelf() {
   try {
@@ -80,7 +85,7 @@ async function loadPages() {
     await journals.get(props.journalId)
     await pages.load(props.journalId, filter.value === 'all' ? undefined : filter.value)
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
+    if (hasStatus(error, 404)) {
       toasts.push({ tone: 'info', title: t('library.goneTitle'), detail: t('library.gone') })
       await router.replace({ name: 'library' })
       return
@@ -92,24 +97,32 @@ async function loadPages() {
 onMounted(openShelf)
 watch([() => props.journalId, filter], loadPages, { immediate: true })
 
-const shelfStep = useAction((step: 'back' | 'next') => journals[step](), {
-  title: () => t('library.turnFailed'),
-})
-const retry = useAction((page: Page) => pages.retranscribe(page), {
-  title: (page) => t('library.retryFailed', { n: page.pageNumber }),
-})
-const more = useAction(() => pages.more(), { title: () => t('library.moreFailed') })
+const shelfStep = useAction(
+  (step: 'back' | 'next') => journals[step](),
+  () => ({ title: t('library.turnFailed') }),
+)
+const retry = useAction(
+  (page: Page) => pages.retranscribe(page),
+  (page) => ({ title: t('library.retryFailed', { n: page.pageNumber }) }),
+)
+const more = useAction(
+  () => pages.more(),
+  () => ({ title: t('library.moreFailed') }),
+)
 
 function onFiles(files: File[]) {
   if (!journal.value) return
-  const rejected = uploads.add(journal.value.id, files)
-  if (rejected) {
-    toasts.push({
-      tone: 'error',
-      title: rejected,
-      detail: t('library.rejected'),
-    })
-  }
+  const refused = uploads.add(journal.value.id, files)
+  if (!refused) return
+  const { file, reason } = refused
+  toasts.push({
+    tone: 'error',
+    title: t(reason === 'size' ? 'uploads.isTooBig' : 'uploads.isNotPhoto', { name: file.name }),
+    detail: t('library.rejected', {
+      photosOnly: t('uploads.notPhotoNote'),
+      limit: fileSize(MAX_BYTES),
+    }),
+  })
 }
 
 function onCreated(created: Journal) {
@@ -124,28 +137,24 @@ function onCreated(created: Journal) {
 // Photos still going up would land in a journal that's gone.
 const canDelete = computed(() => !batch.value?.active)
 
+const deleting = useConfirm(
+  async (gone: Journal) => {
+    await journals.remove(gone.id)
+    toasts.push({ tone: 'info', title: t('library.deleted', { name: gone.name }) })
+    const first = journals.shelf[0]
+    await router.replace(
+      first ? { name: 'journal', params: { journalId: first.id } } : { name: 'library' },
+    )
+  },
+  () => ({ title: t('library.deleteFailed') }),
+)
+
 const deleteNote = computed(() => {
   const count = deleting.subject?.pageCount ?? 0
   return count
     ? t('library.deletePages', { pages: t('counts.pages', count) })
     : t('library.deleteEmpty')
 })
-
-function deleteJournal() {
-  return deleting.run(
-    async (gone) => {
-      await journals.remove(gone.id)
-      uploads.forget(gone.id)
-      pages.forgetJournal(gone.id)
-      toasts.push({ tone: 'info', title: t('library.deleted', { name: gone.name }) })
-      const first = journals.shelf[0]
-      await router.replace(
-        first ? { name: 'journal', params: { journalId: first.id } } : { name: 'library' },
-      )
-    },
-    { title: t('library.deleteFailed') },
-  )
-}
 
 // The list on screen can trail the picked filter while the new one loads; words follow the list.
 const shownFilter = computed(() => pages.view?.status ?? 'all')
@@ -173,7 +182,7 @@ const summary = computed(() => {
           @prev="shelfStep.run('back')"
           @next="shelfStep.run('next')"
         >
-          <span class="text-sm text-muted">{{ journals.range }}</span>
+          <span class="text-sm text-muted">{{ range }}</span>
         </KPager>
         <KButton variant="second" icon="plus" @click="newJournal = true">
           {{ t('library.newJournal') }}
@@ -240,14 +249,17 @@ const summary = computed(() => {
           </template>
           <template #aside>
             <KSelect v-model="filter" :label="t('library.show')" label-hidden :options="filters" />
-            <KFileButton @files="onFiles">{{ t('library.addPhotos') }}</KFileButton>
+            <KFileButton :accept="PHOTO_ACCEPT" @files="onFiles">
+              {{ t('library.addPhotos') }}
+            </KFileButton>
           </template>
 
           <UploadBatch
             v-if="batch?.rows.length"
             :key="journal.id"
-            :journal-id="journal.id"
+            :batch="batch"
             :journal-name="journal.name"
+            @clear="uploads.clear(journal.id)"
           />
           <KCardGrid
             kind="pages"
@@ -296,7 +308,7 @@ const summary = computed(() => {
       :description="deleteNote"
       :confirm-label="t('library.delete')"
       :loading="deleting.busy"
-      @confirm="deleteJournal"
+      @confirm="deleting.run()"
     />
   </KPage>
 </template>

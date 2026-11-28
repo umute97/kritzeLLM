@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Iterable
 from pathlib import Path
 
-from kritzellm.api.schemas.pages import ImageVariant
+from kritzellm.domain import ImageVariant
 
 from .images import EXTENSIONS, NormalizedImage
 

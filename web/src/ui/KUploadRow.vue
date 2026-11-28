@@ -19,7 +19,7 @@ withDefaults(
     progress?: number
     as?: string | Component
   }>(),
-  { note: undefined, statusLabel: undefined, progress: undefined, as: 'li' },
+  { as: 'li' },
 )
 
 const ui = useUiMessages()

@@ -4,7 +4,7 @@ import { computed, type Component } from 'vue'
 import type { IconName } from './icons'
 import KIcon from './KIcon.vue'
 import { usePolymorphic, type LinkTarget } from './polymorphic'
-import { disabledClass } from './styles'
+import { buttonLooks, disabledClass } from './styles'
 
 // Icon-only buttons always carry a label for screen readers.
 const props = withDefaults(
@@ -19,14 +19,8 @@ const props = withDefaults(
     as?: string | Component
     type?: 'button' | 'submit' | 'reset'
   }>(),
-  {
-    variant: 'second',
-    size: 'md',
-    pressed: undefined,
-    to: undefined,
-    as: undefined,
-    type: 'button',
-  },
+  // Without the `undefined`, Vue would make a missing `pressed` false and say aria-pressed.
+  { variant: 'second', size: 'md', pressed: undefined, type: 'button' },
 )
 
 const element = usePolymorphic(() => ({
@@ -45,11 +39,8 @@ const classes = computed(() => [
         'cursor-pointer',
         props.variant === 'quiet' && 'hover:bg-ink/5',
         props.variant === 'second' &&
-          (props.pressed
-            ? 'border-[1.5px] border-ink bg-accent'
-            : 'border-[1.5px] border-ink bg-paper hover:bg-cream'),
-        props.variant === 'main' &&
-          'border-[1.5px] border-ink bg-accent shadow-press hover:bg-accent-strong',
+          (props.pressed ? 'border-[1.5px] border-ink bg-accent' : buttonLooks.second),
+        props.variant === 'main' && [buttonLooks.main, 'shadow-press'],
       ],
 ])
 </script>

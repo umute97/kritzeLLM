@@ -1,22 +1,15 @@
 """Blocks: pieces of text on a page (paragraphs, lists, margin notes, ...)."""
 
-from enum import StrEnum
+from typing import Annotated
 
 from pydantic import MISSING, Field
+
+from kritzellm.domain import BlockKind
 
 from .common import NO_NUL, ApiModel, BlockId, InputModel, PageId
 from .jobs import Job
 
-
-class BlockKind(StrEnum):
-    """What kind of thing a block is on the page. Drawings are described in words, in brackets."""
-
-    HEADING = "heading"
-    PARAGRAPH = "paragraph"
-    LIST = "list"
-    MARGIN_NOTE = "marginNote"
-    DRAWING = "drawing"
-    OTHER = "other"
+TextInput = Annotated[str, Field(min_length=1, max_length=20_000, pattern=NO_NUL)]
 
 
 class Block(ApiModel):
@@ -39,7 +32,7 @@ class BlockInput(InputModel):
     id: BlockId | None = None
     """Set to update an existing block in place; omit to create a new one."""
     kind: BlockKind
-    text: str = Field(min_length=1, max_length=20_000, pattern=NO_NUL)
+    text: TextInput
     """The block's text."""
     uncertain: bool = False
     """Whether parts of the text are still unsure."""
@@ -63,7 +56,7 @@ class BlockUpdate(InputModel):
     """Corrections to a single block. Only the given fields change."""
 
     kind: BlockKind | MISSING = MISSING
-    text: str | MISSING = Field(default=MISSING, min_length=1, max_length=20_000, pattern=NO_NUL)
+    text: TextInput | MISSING = MISSING
     """Corrected text."""
     uncertain: bool | MISSING = MISSING
     """Whether parts of the text are still unsure."""

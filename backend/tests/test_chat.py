@@ -19,11 +19,11 @@ from pydantic_ai.messages import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from kritzellm.api.schemas.conversations import MAX_QUESTIONS, MessageRole
 from kritzellm.config import Settings
-from kritzellm.core import embeddings
+from kritzellm.core import llm
 from kritzellm.core.agent import title_from
 from kritzellm.core.conversations import add_message
+from kritzellm.domain import MAX_QUESTIONS, MessageRole
 from kritzellm.ids import Prefix, new_id
 from kritzellm.main import create_app
 
@@ -307,7 +307,7 @@ def test_searching_falls_back_to_words_without_embeddings(
     def not_set_up(name: str, api_key: str | None) -> None:
         raise UserError("Set the `OPENAI_API_KEY` environment variable.")
 
-    monkeypatch.setattr(embeddings, "_embedder", not_set_up)
+    monkeypatch.setattr(llm, "_embedder", not_set_up)
     chat_model.script = [{"name": "search_journal", "args": {"query": rare}}, "It bloomed [1]."]
 
     message = ok(ask(db_client, new_conversation(db_client), "Did it bloom?"))

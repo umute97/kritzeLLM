@@ -12,11 +12,31 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kritzellm.api.schemas.jobs import JobKind, JobStatus
 from kritzellm.db import models as db
+from kritzellm.domain import JobKind, JobStatus
+
+from .pagination import newest_first, paginate
 
 CHANNEL = "kritzellm_jobs"
 """Postgres `NOTIFY` channel that wakes the worker when jobs are queued."""
+
+
+async def list_jobs(
+    session: AsyncSession,
+    *,
+    status: JobStatus | None = None,
+    kind: JobKind | None = None,
+    limit: int,
+    cursor: str | None = None,
+) -> tuple[list[db.Job], str | None]:
+    """One page of jobs, newest first, plus the next cursor."""
+    query = select(db.Job)
+    if status is not None:
+        query = query.where(db.Job.status == status)
+    if kind is not None:
+        query = query.where(db.Job.kind == kind)
+    query = newest_first(query, db.Job.id, cursor)
+    return await paginate(session, query, limit=limit, cursor_of=lambda job: job.id)
 
 
 async def enqueue(session: AsyncSession, kind: JobKind, *, page_id: str | None = None) -> db.Job:

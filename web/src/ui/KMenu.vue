@@ -1,33 +1,33 @@
-<script setup lang="ts" generic="Id extends string">
+<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useId, useTemplateRef } from 'vue'
 
 import KIcon from './KIcon.vue'
 import KIconButton from './KIconButton.vue'
 import type { MenuItem } from './types'
 
-const props = withDefaults(
-  defineProps<{ label: string; items: MenuItem<Id>[]; align?: 'start' | 'end' }>(),
-  { align: 'end' },
-)
-
-const emit = defineEmits<{ select: [id: Id] }>()
+const props = defineProps<{ label: string; items: MenuItem[] }>()
 
 const open = ref(false)
 const root = useTemplateRef('root')
 const menuId = useId()
 
-// Spread on a custom `#trigger` too, so it's announced as a menu button and gets focus back.
-const triggerProps = computed(() => ({
-  'aria-haspopup': 'menu' as const,
-  'aria-expanded': open.value,
-  'aria-controls': open.value ? menuId : undefined,
-}))
-
 const itemClass =
   'flex min-h-[42px] cursor-pointer items-center gap-2.5 rounded-lg px-3 py-1.5 text-left focus:outline-none disabled:cursor-not-allowed disabled:text-muted disabled:hover:bg-transparent'
 
-const safe = computed(() => props.items.filter((item) => !item.danger))
-const danger = computed(() => props.items.filter((item) => item.danger))
+const groups = computed(() =>
+  [
+    {
+      items: props.items.filter((item) => !item.danger),
+      look: 'font-semibold text-ink hover:bg-accent/40 focus:bg-accent/40',
+      icon: 'text-bark',
+    },
+    {
+      items: props.items.filter((item) => item.danger),
+      look: 'font-bold text-bark hover:bg-bark-soft focus:bg-bark-soft',
+      icon: '',
+    },
+  ].filter((group) => group.items.length > 0),
+)
 
 function menuItems(): HTMLButtonElement[] {
   return Array.from(root.value?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])
@@ -67,10 +67,9 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
-function choose(item: MenuItem<Id>) {
+function choose(item: MenuItem) {
   hide()
   item.run?.()
-  emit('select', item.id)
 }
 
 onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside))
@@ -78,70 +77,37 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside))
 
 <template>
   <div ref="root" class="relative inline-block">
-    <slot
-      name="trigger"
-      :toggle="() => (open ? hide() : show())"
-      :open="open"
-      :trigger-props="triggerProps"
-    >
-      <KIconButton
-        v-bind="triggerProps"
-        icon="dots"
-        :label="label"
-        :class="open ? 'bg-accent!' : ''"
-        @click="open ? hide() : show()"
-      />
-    </slot>
+    <KIconButton
+      icon="dots"
+      :label="label"
+      aria-haspopup="menu"
+      :aria-expanded="open"
+      :aria-controls="open ? menuId : undefined"
+      :class="open ? 'bg-accent!' : ''"
+      @click="open ? hide() : show()"
+    />
     <div
       v-if="open"
       :id="menuId"
       role="menu"
       :aria-label="label"
-      :class="[
-        'absolute z-40 mt-2 flex w-60 flex-col rounded-field border-[1.5px] border-ink bg-paper p-1.5 shadow-soft',
-        align === 'end' ? 'right-0' : 'left-0',
-      ]"
+      class="absolute right-0 z-40 mt-2 flex w-60 flex-col rounded-field border-[1.5px] border-ink bg-paper p-1.5 shadow-soft"
       @keydown="onKeydown"
     >
-      <button
-        v-for="item in safe"
-        :key="item.id"
-        type="button"
-        role="menuitem"
-        :disabled="item.disabled"
-        :class="[itemClass, 'font-semibold text-ink hover:bg-accent/40 focus:bg-accent/40']"
-        @click="choose(item)"
-      >
-        <KIcon v-if="item.icon" :name="item.icon" class="text-bark" />
-        <span class="flex flex-col">
-          <span class="flex flex-col">
-            {{ item.label }}
-            <span v-if="item.disabled && item.hint" class="text-xs font-normal">{{
-              item.hint
-            }}</span>
-          </span>
-          <span v-if="item.disabled && item.hint" class="text-xs font-normal">{{ item.hint }}</span>
-        </span>
-      </button>
-      <template v-if="danger.length">
-        <span v-if="safe.length" aria-hidden="true" class="mx-2 my-1.5 h-px bg-line" />
+      <template v-for="(group, at) in groups" :key="at">
+        <span v-if="at > 0" aria-hidden="true" class="mx-2 my-1.5 h-px bg-line" />
         <button
-          v-for="item in danger"
+          v-for="item in group.items"
           :key="item.id"
           type="button"
           role="menuitem"
           :disabled="item.disabled"
-          :class="[itemClass, 'font-bold text-bark hover:bg-bark-soft focus:bg-bark-soft']"
+          :class="[itemClass, group.look]"
           @click="choose(item)"
         >
-          <KIcon v-if="item.icon" :name="item.icon" />
+          <KIcon v-if="item.icon" :name="item.icon" :class="group.icon" />
           <span class="flex flex-col">
-            <span class="flex flex-col">
-              {{ item.label }}
-              <span v-if="item.disabled && item.hint" class="text-xs font-normal">{{
-                item.hint
-              }}</span>
-            </span>
+            {{ item.label }}
             <span v-if="item.disabled && item.hint" class="text-xs font-normal">{{
               item.hint
             }}</span>

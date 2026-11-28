@@ -177,12 +177,9 @@ jobs:
           working-directory: backend
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
+      # Ruff runs with pre-commit in "Repo hygiene".
       - name: Install
         run: uv sync --locked
-      - name: Lint
-        run: uv run ruff check .
-      - name: Format
-        run: uv run ruff format --check .
       - name: Typecheck
         run: uv run pyright
       - name: Test (incl. "is api/openapi.json up to date?" and "do migrations match the models?")

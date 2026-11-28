@@ -1,5 +1,7 @@
 import { createI18n } from 'vue-i18n'
 
+import { readStored, writeStored } from '@/utils/storage'
+
 import { de } from './de'
 import { en, type Messages } from './en'
 import { uiGerman } from './ui.de'
@@ -18,18 +20,9 @@ function isLocale(value: unknown): value is Locale {
   return locales.includes(value as Locale)
 }
 
-function storage(): Storage | null {
-  try {
-    return globalThis.localStorage
-  } catch {
-    // Private windows and blocked site data can throw on access.
-    return null
-  }
-}
-
 /** The language picked before, else the browser's first one we speak, else English. */
 export function pickLocale(): Locale {
-  const saved = storage()?.getItem(KEY)
+  const saved = readStored(KEY)
   if (isLocale(saved)) return saved
   for (const tag of globalThis.navigator?.languages ?? []) {
     const language = tag.toLowerCase().split('-')[0]
@@ -53,11 +46,7 @@ export function currentLocale(): Locale {
 export function setLocale(locale: Locale) {
   i18n.global.locale.value = locale
   document.documentElement.lang = locale
-  try {
-    storage()?.setItem(KEY, locale)
-  } catch {
-    // Not remembered, but the switch still holds for this visit.
-  }
+  writeStored(KEY, locale)
 }
 
 /** The cottage library's words for the current language; English is its own default. */

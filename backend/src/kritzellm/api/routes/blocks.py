@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from kritzellm.core import blocks as core
-from kritzellm.core.errors import get_existing
+from kritzellm.core.rows import get_existing
 from kritzellm.db import models as db
 
 from ..deps import Session

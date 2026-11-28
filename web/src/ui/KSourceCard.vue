@@ -6,25 +6,13 @@ import { linkAttrs, type LinkTarget } from './polymorphic'
 import { useUiMessages } from './messages'
 
 // A cited page in the Sources panel. The picked one lifts and its quote takes the accent.
-withDefaults(
-  defineProps<{
-    title: string
-    date?: string
-    before?: string
-    quote: string
-    after?: string
-    selected?: boolean
-    to?: LinkTarget
-    linkLabel?: string
-  }>(),
-  {
-    date: undefined,
-    before: '',
-    after: '',
-    to: undefined,
-    linkLabel: undefined,
-  },
-)
+defineProps<{
+  title: string
+  date?: string
+  quote: string
+  selected?: boolean
+  to?: LinkTarget
+}>()
 
 const link = useLinkComponent()
 
@@ -45,11 +33,7 @@ const ui = useUiMessages()
     <p
       class="paper-lines m-0 rounded border border-sand px-3 py-2.5 font-hand text-[19px] leading-[26px] [--line:26px]"
     >
-      <KHighlight
-        :text="before + quote + after"
-        :marks="[[before.length, before.length + quote.length]]"
-        :soft="!selected"
-      />
+      <KHighlight :text="quote" :marks="[[0, quote.length]]" :soft="!selected" />
     </p>
     <component
       :is="link"
@@ -57,7 +41,7 @@ const ui = useUiMessages()
       v-bind="linkAttrs(link, to)"
       class="inline-flex items-center gap-1.5 self-start text-sm font-bold"
     >
-      {{ linkLabel ?? ui.openPage }}
+      {{ ui.openPage }}
       <KIcon name="chevron-right" :size="16" />
     </component>
   </div>

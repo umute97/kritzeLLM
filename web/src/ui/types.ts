@@ -3,7 +3,6 @@ import type { IconName } from './icons'
 // The API's vocabulary, as far as the components need it. Structural, so the generated client
 // types fit in without a mapping.
 export type PageStatus = 'uploaded' | 'transcribing' | 'indexing' | 'ready' | 'failed'
-export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
 export type BlockKind = 'heading' | 'paragraph' | 'list' | 'marginNote' | 'drawing' | 'other'
 
 /** Soft colour families for chips. Each pairs a pale ground with readable ink. */
@@ -17,7 +16,7 @@ export type CoverColor = 'herb' | 'clay' | 'orchid' | 'lemon'
 export type UploadStatus =
   'sending' | 'queued' | 'transcribing' | 'indexing' | 'ready' | 'duplicate' | 'failed' | 'deleted'
 
-export type StatusKind = 'page' | 'job' | 'upload'
+export type StatusKind = 'page' | 'upload'
 
 /** A stretch of text to mark, from `start` up to (not including) `end`, as `String.slice` counts. */
 export type Mark = [start: number, end: number]
@@ -41,8 +40,8 @@ export interface Crumb {
   to?: string | Record<string, unknown>
 }
 
-export interface MenuItem<Id extends string = string> {
-  id: Id
+export interface MenuItem {
+  id: string
   label: string
   icon?: IconName
   /** Danger items sit alone at the bottom, under a line. */
@@ -61,17 +60,10 @@ export const pageStatusTones: Record<PageStatus, Tone> = {
   failed: 'bark',
 }
 
-export const jobStatusTones: Record<JobStatus, Tone> = {
-  queued: 'plain',
-  running: 'lemon',
-  succeeded: 'herb',
-  failed: 'bark',
-}
-
-// An upload follows its page's job, so it borrows their colours, plus a few of its own.
+// An upload follows its page, so it borrows the page's colours, plus a few of its own.
 export const uploadStatusTones: Record<UploadStatus, Tone> = {
   sending: 'plain',
-  queued: jobStatusTones.queued,
+  queued: 'plain',
   transcribing: pageStatusTones.transcribing,
   indexing: pageStatusTones.indexing,
   ready: pageStatusTones.ready,

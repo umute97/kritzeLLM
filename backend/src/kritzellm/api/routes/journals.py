@@ -5,10 +5,10 @@ from fastapi import APIRouter, File, Form, Request, Response, UploadFile, status
 from pydantic import WithJsonSchema
 
 from kritzellm.core import journals as core
-from kritzellm.core.errors import get_existing
 from kritzellm.core.images import ImageTooLargeError, UnsupportedImageError
-from kritzellm.core.pages import StagedUpload, add_pages, stage_upload
+from kritzellm.core.rows import add_new, get_existing, update_existing
 from kritzellm.core.storage import Staging
+from kritzellm.core.uploads import StagedUpload, add_pages, stage_upload
 from kritzellm.db import models as db
 
 from ..deps import AppSettings, Session
@@ -16,7 +16,7 @@ from ..errors import http_error, problem_responses
 from ..schemas.jobs import Job
 from ..schemas.journals import Journal, JournalCreate, JournalList, JournalUpdate
 from ..schemas.pages import MAX_PAGE_NUMBER, Page, UploadItem, UploadResult
-from .params import JournalCursor, JournalIdPath, Limit, location_header
+from .params import JournalCursor, JournalIdPath, Limit, location_header, set_location
 
 router = APIRouter(tags=["journals"], responses=problem_responses(400, 401, 422))
 
@@ -50,9 +50,9 @@ async def create_journal(
     body: JournalCreate, session: Session, request: Request, response: Response
 ) -> Journal:
     """Creates an empty journal to upload pages into."""
-    journal = await core.create_journal(session, **body.model_dump(by_alias=False))
+    journal = await add_new(session, db.Journal(**body.model_dump(by_alias=False)))
     await session.commit()
-    response.headers["Location"] = request.url_for("get_journal", journalId=journal.id).path
+    set_location(request, response, "get_journal", journalId=journal.id)
     return Journal.model_validate(journal)
 
 
@@ -76,7 +76,7 @@ async def update_journal(
 ) -> Journal:
     """Renames a journal or changes its description. Only the given fields change."""
     changes = body.model_dump(exclude_unset=True, by_alias=False)
-    journal = await core.update_journal(session, journal_id, changes)
+    journal = await update_existing(session, db.Journal, journal_id, changes)
     await session.commit()
     return Journal.model_validate(journal)
 

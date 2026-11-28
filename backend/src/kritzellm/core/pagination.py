@@ -1,26 +1,42 @@
-"""Cursor pagination"""
+"""Cursor pagination: each page picks up right after the last row of the one before."""
 
-from sqlalchemy import Row, Select
+import re
+from collections.abc import Callable
+
+from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
 
-async def paginate[*Ts](
-    session: AsyncSession,
-    query: Select[*Ts],
-    *,
-    id_column: InstrumentedAttribute[str],
-    limit: int,
-    cursor: str | None,
-) -> tuple[list[Row[*Ts]], str | None]:
+async def paginate[T](
+    session: AsyncSession, query: Select[T], *, limit: int, cursor_of: Callable[[T], str]
+) -> tuple[list[T], str | None]:
     """One page of `query`'s rows, plus the cursor for the next page (`None` on the last one).
 
-    `id_column` must be a `TypeId` column of the rows' first entity.
+    `query` comes ordered and already narrowed to the rows after the current cursor.
     """
+    rows = list((await session.scalars(query.limit(limit + 1))).all())
+    if len(rows) <= limit:
+        return rows, None
+    return rows[:limit], cursor_of(rows[limit - 1])
+
+
+def newest_first[T](
+    query: Select[T], id_column: InstrumentedAttribute[str], cursor: str | None
+) -> Select[T]:
+    """`query` ordered by its UUIDv7 IDs, newest first, from right after the ID in `cursor`."""
     if cursor is not None:
         query = query.where(id_column < cursor)
-    rows = (await session.execute(query.order_by(id_column.desc()).limit(limit + 1))).all()
-    page = list(rows[:limit])
-    if len(rows) <= limit:
-        return page, None
-    return page, getattr(page[-1][0], id_column.key)
+    return query.order_by(id_column.desc())
+
+
+def join_cursor(key: str, number: int) -> str:
+    return f"{key}.{number}"
+
+
+def split_cursor(cursor: str, pattern: str) -> tuple[str, int]:
+    """The key and number in a `key.number` cursor. Raises `ValueError` unless it fits `pattern`."""
+    if not re.fullmatch(pattern, cursor):
+        raise ValueError(f"Malformed cursor {cursor!r}")
+    key, _, number = cursor.partition(".")
+    return key, int(number)

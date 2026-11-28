@@ -1,21 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+import { readStored, writeStored } from '@/utils/storage'
+
 const KEY = 'kritzellm.token'
 
-function storage(kind: 'local' | 'session'): Storage | null {
-  try {
-    return kind === 'local' ? globalThis.localStorage : globalThis.sessionStorage
-  } catch {
-    // Private windows and blocked site data can throw on access.
-    return null
-  }
-}
-
 function read(): { token: string | null; remembered: boolean } {
-  const local = storage('local')?.getItem(KEY)
+  const local = readStored(KEY)
   if (local) return { token: local, remembered: true }
-  return { token: storage('session')?.getItem(KEY) ?? null, remembered: false }
+  return { token: readStored(KEY, 'session'), remembered: false }
 }
 
 /**
@@ -33,13 +26,8 @@ export const useAuth = defineStore('auth', () => {
   function setToken(value: string, remember: boolean) {
     token.value = value
     remembered.value = remember
-    try {
-      storage('local')?.removeItem(KEY)
-      storage('session')?.removeItem(KEY)
-      storage(remember ? 'local' : 'session')?.setItem(KEY, value)
-    } catch {
-      // Not saving it only means asking again next time.
-    }
+    writeStored(KEY, remember ? value : null)
+    writeStored(KEY, remember ? null : value, 'session')
   }
 
   function reject() {

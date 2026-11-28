@@ -42,6 +42,7 @@ describe('format', () => {
     expect(fileSize(3_250_586)).toBe('3.1 MB')
     expect(fileSize(25 * 1024 * 1024)).toBe('25 MB')
     expect(fileSize(200)).toBe('1 KB')
+    expect(fileSize(0)).toBe('0 KB')
     setLocale('de')
     expect(fileSize(3_250_586)).toBe('3,1 MB')
   })

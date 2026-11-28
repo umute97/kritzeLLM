@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends string = string">
-import { computed, useId } from 'vue'
+import { computed } from 'vue'
 
 import { joinIds, useSplitAttrs } from './attrs'
 import KFieldShell from './KFieldShell.vue'
@@ -22,8 +22,6 @@ const props = defineProps<{
   id?: string
 }>()
 
-const autoId = useId()
-const fieldId = computed(() => props.id ?? autoId)
 const items = computed(() =>
   props.options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o)),
 )
@@ -33,8 +31,8 @@ const { rootAttrs, controlAttrs } = useSplitAttrs()
 <template>
   <KFieldShell
     v-bind="rootAttrs()"
-    :id="fieldId"
-    v-slot="{ describedby, invalid }"
+    :id="id"
+    v-slot="{ id: fieldId, describedby, invalid }"
     :label="label"
     :help="help"
     :error="error"

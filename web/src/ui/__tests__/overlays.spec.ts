@@ -34,15 +34,6 @@ describe('KDialog', () => {
     wrapper.unmount()
   })
 
-  it('can take a richer title at another heading level', () => {
-    const wrapper = mount(KDialog, {
-      props: { title: 'Rename', open: true, headingLevel: 3 },
-      slots: { title: 'Rename <em>Green notebook</em>' },
-    })
-    expect(wrapper.get('h3 em').text()).toBe('Green notebook')
-    wrapper.unmount()
-  })
-
   it('closes when the backdrop is clicked', async () => {
     const wrapper = mount(KDialog, {
       attachTo: document.body,
@@ -120,23 +111,30 @@ const items = [
 ]
 
 describe('KMenu', () => {
-  it('opens, focuses the first item and picks one', async () => {
+  it('opens, focuses the first item and runs the one picked', async () => {
+    let picked = ''
     const wrapper = mount(KMenu, {
       attachTo: document.body,
-      props: { label: 'Page actions', items },
+      props: {
+        label: 'Page actions',
+        items: items.map((item) => ({ ...item, run: () => (picked = item.id) })),
+      },
     })
     const trigger = wrapper.get('button[aria-haspopup="menu"]')
     expect(trigger.attributes('aria-expanded')).toBe('false')
 
     await trigger.trigger('click')
     await nextTick()
+    const menu = wrapper.get('[role="menu"]')
+    expect(trigger.attributes('aria-expanded')).toBe('true')
+    expect(trigger.attributes('aria-controls')).toBe(menu.attributes('id'))
     const menuitems = wrapper.findAll('[role="menuitem"]')
     expect(menuitems.map((m) => m.text())).toEqual(['Open page', 'Re-transcribe', 'Delete page'])
     expect(document.activeElement).toBe(menuitems[0]!.element)
     expect(wrapper.find('[aria-hidden="true"].h-px').exists()).toBe(true)
 
     await menuitems[1]!.trigger('click')
-    expect(wrapper.emitted('select')).toEqual([['retranscribe']])
+    expect(picked).toBe('retranscribe')
     expect(wrapper.find('[role="menu"]').exists()).toBe(false)
     wrapper.unmount()
   })
@@ -158,33 +156,6 @@ describe('KMenu', () => {
   })
 })
 
-describe('KMenu with its own trigger', () => {
-  it('hands the trigger its menu-button wiring and gives focus back', async () => {
-    const wrapper = mount(KMenu, {
-      attachTo: document.body,
-      props: { label: 'Journal actions', items },
-      slots: {
-        trigger: `<template #trigger="{ toggle, triggerProps }">
-          <button v-bind="triggerProps" @click="toggle">Journal</button>
-        </template>`,
-      },
-    })
-    const trigger = wrapper.get('button[aria-haspopup="menu"]')
-    expect(trigger.text()).toBe('Journal')
-    expect(trigger.attributes('aria-expanded')).toBe('false')
-
-    await trigger.trigger('click')
-    await nextTick()
-    const menu = wrapper.get('[role="menu"]')
-    expect(trigger.attributes('aria-expanded')).toBe('true')
-    expect(trigger.attributes('aria-controls')).toBe(menu.attributes('id'))
-
-    await menu.trigger('keydown', { key: 'Escape' })
-    expect(document.activeElement).toBe(trigger.element)
-    wrapper.unmount()
-  })
-})
-
 describe('KMenu items', () => {
   it('run their own action and explain why they are off', async () => {
     let renamed = false
@@ -200,10 +171,11 @@ describe('KMenu items', () => {
     })
     await wrapper.get('button[aria-haspopup="menu"]').trigger('click')
     await nextTick()
-    expect(wrapper.text()).toContain('Busy')
-    await wrapper.findAll('[role="menuitem"]')[0]!.trigger('click')
+    const [rename, remove] = wrapper.findAll('[role="menuitem"]')
+    expect(remove!.text()).toContain('Delete journal')
+    expect(remove!.text().match(/Busy/g)).toHaveLength(1)
+    await rename!.trigger('click')
     expect(renamed).toBe(true)
-    expect(wrapper.emitted('select')).toEqual([['rename']])
     wrapper.unmount()
   })
 })

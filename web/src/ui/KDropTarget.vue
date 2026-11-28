@@ -6,13 +6,7 @@ import { useUiMessages } from './messages'
 
 // Lets files be dropped anywhere on its content. The overlay is only a hint: pair it with a
 // KFileButton so there's a way in without dragging.
-const props = withDefaults(
-  defineProps<{
-    countLabel?: (count: number) => string
-    disabled?: boolean
-  }>(),
-  { countLabel: undefined },
-)
+const props = defineProps<{ countLabel?: (count: number) => string; disabled?: boolean }>()
 
 const emit = defineEmits<{ files: [files: File[]] }>()
 

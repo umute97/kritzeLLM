@@ -1,11 +1,10 @@
 """Pages: uploaded page images and their transcriptions."""
 
-from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Self
 
 from pydantic import MISSING, Field, StringConstraints
 
-from kritzellm.ids import SUFFIX_PATTERN, Prefix
+from kritzellm.domain import PAGE_CURSOR, PAGE_LABEL_LENGTH, ImageVariant, PageStatus
 
 from .. import API_PREFIX
 from .blocks import Block
@@ -27,31 +26,6 @@ if TYPE_CHECKING:
 
 MAX_PAGE_NUMBER = 1_000_000
 """Highest page number a client may ask for."""
-
-PAGE_CURSOR = rf"^{Prefix.JOURNAL}_{SUFFIX_PATTERN}\.[1-9][0-9]{{0,6}}$"
-"""A `GET /pages` cursor: the journal and page number to continue after, e.g. `jrn_01k7….12`."""
-
-
-class PageStatus(StrEnum):
-    """Where a page is in processing.
-
-    `uploaded` (waiting for the worker) → `transcribing` → `indexing` → `ready`.
-    `failed` means a step failed; see `error` and re-transcribe to retry.
-    """
-
-    UPLOADED = "uploaded"
-    TRANSCRIBING = "transcribing"
-    INDEXING = "indexing"
-    READY = "ready"
-    FAILED = "failed"
-
-
-class ImageVariant(StrEnum):
-    """Which version of a page image to return."""
-
-    NORMALIZED = "normalized"
-    ORIGINAL = "original"
-    THUMBNAIL = "thumbnail"
 
 
 class PageImageUrls(ApiModel):
@@ -82,7 +56,7 @@ class Page(ApiModel):
     journal_id: JournalId
     page_number: int = Field(ge=1)
     """Position of the page in its journal."""
-    page_label: str | None = Field(max_length=40)
+    page_label: str | None = Field(max_length=PAGE_LABEL_LENGTH)
     """Page number or label as written on the page itself, if any."""
     entry_dates: list[Day]
     """Dates of the entries on this page, as read from the page or set by hand."""
@@ -96,28 +70,13 @@ class Page(ApiModel):
     updated_at: Timestamp
 
     @classmethod
-    def from_db(cls, page: db.Page, **extra: object) -> Self:
-        """The API view of a stored page. `extra` fills fields a subclass adds."""
+    def from_db(cls, page: db.Page) -> Self:
+        """The API view of a stored page (with its blocks, for a `PageDetail`)."""
         urls = {
             variant.value: f"{API_PREFIX}/pages/{page.id}/image?variant={variant.value}"
             for variant in ImageVariant
         }
-        return cls.model_validate(
-            {
-                "id": page.id,
-                "journal_id": page.journal_id,
-                "page_number": page.page_number,
-                "page_label": page.page_label,
-                "entry_dates": page.entry_dates,
-                "status": page.status,
-                "error": page.error,
-                "image": {"width": page.width, "height": page.height, "urls": urls},
-                "transcription_model": page.transcription_model,
-                "created_at": page.created_at,
-                "updated_at": page.updated_at,
-                **extra,
-            }
-        )
+        return cls.from_row(page, image={"width": page.width, "height": page.height, "urls": urls})
 
 
 class PageDetail(Page):
@@ -134,7 +93,7 @@ class PageUpdate(InputModel):
     """Move the page to this journal. Without a `pageNumber` it goes after the journal's last page."""
     page_number: int | MISSING = Field(default=MISSING, ge=1, le=MAX_PAGE_NUMBER)
     """New position in the journal. Must not be taken by another page."""
-    page_label: str | None = Field(default=None, max_length=40, pattern=NO_NUL)
+    page_label: str | None = Field(default=None, max_length=PAGE_LABEL_LENGTH, pattern=NO_NUL)
     """Label as written on the page; `null` clears it."""
     entry_dates: SortedDays | MISSING = Field(default=MISSING, max_length=100)
     """Corrected entry dates; `[]` clears them. Stored sorted, without repeats."""

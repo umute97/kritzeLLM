@@ -5,7 +5,6 @@ import KIcon from './KIcon.vue'
 // A round badge holding an icon, or whatever the slot brings (a spinner, a number). Colour it
 // with classes, e.g. `class="bg-lemon text-ink"`.
 withDefaults(defineProps<{ icon?: IconName; size?: 'xs' | 'sm' | 'md' | 'lg' }>(), {
-  icon: undefined,
   size: 'md',
 })
 

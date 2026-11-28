@@ -1,9 +1,5 @@
 """What can go wrong in the domain. Messages are written for the client; the API picks the status."""
 
-from typing import Any
-
-from sqlalchemy.ext.asyncio import AsyncSession
-
 
 class NotFoundError(Exception):
     """Something doesn't exist (any more)."""
@@ -29,11 +25,3 @@ class PageNumberTakenError(ConflictError):
 
 class UpstreamError(Exception):
     """A service the request relies on (e.g. OpenAI) failed or couldn't be reached."""
-
-
-async def get_existing[T](session: AsyncSession, model: type[T], ident: str, **options: Any) -> T:
-    """The `model` row with primary key `ident`. Raises `NotFoundError` if there's none."""
-    row = await session.get(model, ident, **options)
-    if row is None:
-        raise NotFoundError(model.__name__)
-    return row

@@ -2,11 +2,11 @@
 
 from typing import Annotated, Any
 
-from fastapi import Path, Query
+from fastapi import Path, Query, Request, Response
+
+from kritzellm.domain import CONVERSATION_CURSOR, PAGE_CURSOR
 
 from ..schemas.common import BlockId, ConversationId, Day, JobId, JournalId, PageId
-from ..schemas.conversations import CONVERSATION_CURSOR
-from ..schemas.pages import PAGE_CURSOR
 
 JournalIdPath = Annotated[JournalId, Path(alias="journalId", description="The journal's ID.")]
 PageIdPath = Annotated[PageId, Path(alias="pageId", description="The page's ID.")]
@@ -38,6 +38,11 @@ def location_header(description: str) -> dict[str, Any]:
             "schema": {"type": "string", "format": "uri-reference"},
         }
     }
+
+
+def set_location(request: Request, response: Response, route: str, **path_params: str) -> None:
+    """Points the `Location` header at another route, as a path."""
+    response.headers["Location"] = request.url_for(route, **path_params).path
 
 
 JOB_LOCATION = location_header("URL of the job to poll.")

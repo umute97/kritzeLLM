@@ -2,7 +2,7 @@
 
 import re
 from datetime import date, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Self
 
 from pydantic import (
     AfterValidator,
@@ -31,6 +31,12 @@ class ApiModel(BaseModel):
         from_attributes=True,
     )
 
+    @classmethod
+    def from_row(cls, row: object, **derived: object) -> Self:
+        """A database row's attributes, plus `derived` for the fields the row doesn't have."""
+        fields = {name: getattr(row, name) for name in cls.model_fields if name not in derived}
+        return cls.model_validate(fields | derived)
+
 
 class InputModel(ApiModel):
     """Base for request bodies: unknown fields are rejected."""
@@ -53,6 +59,8 @@ MessageId = Annotated[str, _type_id(Prefix.MESSAGE), Field(description="TypeID o
 
 NO_NUL = r"^[^\x00]*$"
 """Pattern for free-text inputs: anything but NUL characters, which Postgres can't store."""
+NON_BLANK = r"^[^\x00]*[^\x00\s][^\x00]*$"
+"""Any text with something besides whitespace (and no NUL characters)."""
 
 Timestamp = Annotated[datetime, Field(description="RFC 3339 timestamp in UTC.")]
 _ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")

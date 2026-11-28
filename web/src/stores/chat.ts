@@ -3,7 +3,7 @@ import { markRaw, reactive, ref } from 'vue'
 
 import { streamAnswer } from '@/api/chat'
 import { api, call, isAbort } from '@/api/client'
-import { ApiError } from '@/api/errors'
+import { ApiError, hasStatus } from '@/api/errors'
 import type {
   ChatStreamEvent,
   Conversation,
@@ -156,7 +156,7 @@ export const useChat = defineStore('chat', () => {
       void fetchThread(id).catch(() => {})
     } catch (error) {
       if (isAbort(error)) asking.state = 'stopped'
-      else if (error instanceof ApiError && error.status === 409) asking.state = 'full'
+      else if (hasStatus(error, 409)) asking.state = 'full'
       else asking.state = 'failed'
       if (error instanceof ApiError) asking.problem = error.problem
     }

@@ -14,13 +14,7 @@ withDefaults(
     size?: 'md' | 'sm'
     icon?: IconName
   }>(),
-  {
-    accept: 'image/jpeg,image/png,image/heic,image/heif,image/webp,.heic,.heif',
-    multiple: true,
-    variant: 'main',
-    size: 'md',
-    icon: 'upload',
-  },
+  { multiple: true, variant: 'main', size: 'md', icon: 'upload' },
 )
 
 const { rootAttrs, controlAttrs } = useSplitAttrs()

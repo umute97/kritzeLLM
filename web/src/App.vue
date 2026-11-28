@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 
@@ -13,13 +13,6 @@ import { KBanner, KButton, KLogo, KNavLink, KPage, KSpinner, KToastStack, KTopNa
 const { t } = useI18n()
 const route = useRoute()
 const auth = useAuth()
-
-const room = computed(() => {
-  if (route.name === 'search' || route.name === 'chat') return route.name
-  return route.name === 'library' || route.name === 'journal' || route.name === 'page'
-    ? 'pages'
-    : undefined
-})
 const health = useHealth()
 
 async function start() {
@@ -51,11 +44,13 @@ watch(
           <KLogo />
         </RouterLink>
       </template>
-      <KNavLink to="/" :current="room === 'pages'">{{ t('app.pages') }}</KNavLink>
-      <KNavLink :to="{ name: 'search' }" :current="room === 'search'">{{
+      <KNavLink to="/" :current="route.meta.room === 'pages'">{{ t('app.pages') }}</KNavLink>
+      <KNavLink :to="{ name: 'search' }" :current="route.meta.room === 'search'">{{
         t('app.search')
       }}</KNavLink>
-      <KNavLink :to="{ name: 'chat' }" :current="room === 'chat'">{{ t('app.chat') }}</KNavLink>
+      <KNavLink :to="{ name: 'chat' }" :current="route.meta.room === 'chat'">{{
+        t('app.chat')
+      }}</KNavLink>
       <template #end>
         <div class="flex items-center gap-4">
           <span class="font-hand text-xl text-bark">{{ t('app.greeting') }}</span>

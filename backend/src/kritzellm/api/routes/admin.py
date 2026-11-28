@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Request, Response, status
 
 from kritzellm.core import jobs
+from kritzellm.domain import JobKind
 
 from ..deps import Session
 from ..errors import problem_responses
-from ..schemas.jobs import Job, JobKind
-from .params import JOB_LOCATION
+from ..schemas.jobs import Job
+from .params import JOB_LOCATION, set_location
 
 router = APIRouter(tags=["admin"], responses=problem_responses(400, 401, 422))
 
@@ -24,5 +25,5 @@ async def reindex_all(session: Session, request: Request, response: Response) ->
     """
     job = await jobs.enqueue_once(session, JobKind.REINDEX_ALL)
     await session.commit()
-    response.headers["Location"] = request.url_for("get_job", jobId=job.id).path
+    set_location(request, response, "get_job", jobId=job.id)
     return Job.from_db(job)

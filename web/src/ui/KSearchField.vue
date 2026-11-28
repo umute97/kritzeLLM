@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, useId, useTemplateRef } from 'vue'
+import { useTemplateRef } from 'vue'
 
 import { joinIds, useSplitAttrs } from './attrs'
 import KFieldShell from './KFieldShell.vue'
@@ -14,15 +14,13 @@ defineOptions({ inheritAttrs: false })
 
 const model = defineModel<string>({ default: '' })
 
-const props = withDefaults(
+withDefaults(
   defineProps<{ label: string; placeholder?: string; size?: 'md' | 'lg'; id?: string }>(),
-  { placeholder: undefined, size: 'md', id: undefined },
+  { size: 'md' },
 )
 
 const emit = defineEmits<{ search: [query: string] }>()
 
-const autoId = useId()
-const fieldId = computed(() => props.id ?? autoId)
 const input = useTemplateRef('input')
 const { rootAttrs, controlAttrs } = useSplitAttrs()
 
@@ -36,7 +34,7 @@ const ui = useUiMessages()
 
 <template>
   <form v-bind="rootAttrs()" role="search" @submit.prevent="emit('search', model)">
-    <KFieldShell :id="fieldId" v-slot="{ describedby }" :label="label" label-hidden>
+    <KFieldShell :id="id" v-slot="{ id: fieldId, describedby }" :label="label" label-hidden>
       <div
         :class="[
           'flex items-center gap-1 rounded-full border-ink bg-paper pl-4',

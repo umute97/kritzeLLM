@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { h } from 'vue'
 
 import KBreadcrumb from '../KBreadcrumb.vue'
+import KListLink from '../KListLink.vue'
 import KLoadMore from '../KLoadMore.vue'
 import KNavLink from '../KNavLink.vue'
 import KPager from '../KPager.vue'
@@ -38,14 +39,16 @@ describe('KTopNav and KNavLink', () => {
   })
 })
 
-describe('KNavLink badge', () => {
-  it('reads out the badge label instead of the bare number', () => {
-    const wrapper = mount(KNavLink, {
-      props: { href: '#', badge: 3, badgeLabel: '3 pages need a hand' },
-      slots: { default: 'Pages' },
+describe('KListLink', () => {
+  it('links to a place, with a quiet line under its name, and frames the current one', () => {
+    const wrapper = mount(KListLink, {
+      props: { title: 'Sweet peas', meta: 'today', to: '/chat/cnv_1', current: true },
     })
-    expect(wrapper.get('.sr-only').text()).toBe('3 pages need a hand')
-    expect(wrapper.get('[aria-hidden="true"]').text()).toBe('3')
+    expect(wrapper.attributes('href')).toBe('/chat/cnv_1')
+    expect(wrapper.attributes('aria-current')).toBe('page')
+    expect(wrapper.get('strong').text()).toBe('Sweet peas')
+    expect(wrapper.text()).toContain('today')
+    expect(wrapper.classes()).toContain('border-ink')
   })
 })
 
@@ -96,16 +99,6 @@ describe('KPager', () => {
     ).toBeDefined()
     await wrapper.get('button[aria-label="More journals"]').trigger('click')
     expect(wrapper.emitted('next')).toHaveLength(1)
-  })
-})
-
-describe('KProgressBar as a meter', () => {
-  it('measures instead of counting down', () => {
-    const wrapper = mount(KProgressBar, {
-      props: { value: 0.5, max: 1, label: 'Words score', meter: true, color: 'lemon' },
-    })
-    expect(wrapper.attributes('role')).toBe('meter')
-    expect(wrapper.find('.bg-lemon').attributes('style')).toContain('width: 50%')
   })
 })
 

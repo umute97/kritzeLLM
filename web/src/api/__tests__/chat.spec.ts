@@ -1,19 +1,10 @@
-import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { BrokenStreamError, streamAnswer } from '@/api/chat'
+import { configureApi } from '@/api/client'
 import { ApiError } from '@/api/errors'
 import type { ChatStreamEvent } from '@/api/types'
-import { useHealth } from '@/stores/health'
-import { eventStream, json, makeMessage, makeSource } from '@/test-utils'
-
-beforeEach(() => {
-  setActivePinia(createPinia())
-})
-
-afterEach(() => {
-  vi.unstubAllGlobals()
-})
+import { eventStream, json, makeMessage, makeSource, problem } from '@/test-utils'
 
 /** Answers with `stream`, which fails the way a browser's does when the request is called off. */
 function serve(stream: ReturnType<typeof eventStream>) {
@@ -65,14 +56,14 @@ describe('streamAnswer', () => {
     const stream = eventStream()
     serve(stream)
     const { answer } = ask()
-    const problem = { type: 'about:blank', title: 'Bad Gateway', status: 502, detail: 'No model.' }
+    const failed = problem(502, 'Bad Gateway', 'No model.')
 
-    stream.send({ type: 'messageStart' }, { type: 'error', problem })
+    stream.send({ type: 'messageStart' }, { type: 'error', problem: failed })
     stream.end()
 
     const error = await answer.catch((e: unknown) => e)
     expect(error).toBeInstanceOf(ApiError)
-    expect((error as ApiError).problem).toEqual(problem)
+    expect((error as ApiError).problem).toEqual(failed)
   })
 
   it('says the stream broke when it ends or drops before the answer is saved', async () => {
@@ -94,9 +85,7 @@ describe('streamAnswer', () => {
   it('passes on a question the server turns down', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        json({ type: 'about:blank', title: 'Conflict', status: 409, detail: 'Full.' }, 409),
-      ),
+      vi.fn(async () => json(problem(409, 'Conflict', 'Full.'), 409)),
     )
     const { answer, events } = ask()
 
@@ -106,6 +95,8 @@ describe('streamAnswer', () => {
   })
 
   it('stops when called off, without taking the API for offline', async () => {
+    const onOffline = vi.fn()
+    configureApi({ token: () => null, onUnauthorized: () => {}, onOffline })
     const stream = eventStream()
     const fetch = serve(stream)
     const controller = new AbortController()
@@ -118,6 +109,6 @@ describe('streamAnswer', () => {
 
     const error = await answer.catch((e: unknown) => e)
     expect((error as DOMException).name).toBe('AbortError')
-    expect(useHealth().offline).toBe(false)
+    expect(onOffline).not.toHaveBeenCalled()
   })
 })

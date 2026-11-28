@@ -4,40 +4,33 @@ import { computed } from 'vue'
 import KChip from './KChip.vue'
 import { useUiMessages } from './messages'
 import {
-  jobStatusTones,
   pageStatusTones,
   uploadStatusTones,
-  type JobStatus,
   type PageStatus,
   type StatusKind,
   type Tone,
   type UploadStatus,
 } from './types'
 
-// A page's, a job's or an upload's status, in words and a hint of colour. `kind` (page unless it
-// says otherwise) decides which statuses `status` may be.
+// A page's or an upload's status, in words and a hint of colour. `kind` (page unless it says
+// otherwise) decides which statuses `status` may be.
 const props = withDefaults(
   defineProps<{
-    status: K extends 'job' ? JobStatus : K extends 'upload' ? UploadStatus : PageStatus
+    status: K extends 'upload' ? UploadStatus : PageStatus
     kind?: K
     size?: 'md' | 'sm'
     label?: string
   }>(),
-  { kind: undefined, size: 'md', label: undefined },
+  { size: 'md' },
 )
 
 const ui = useUiMessages()
 
-const looks = computed(() => {
-  const kind = props.kind ?? 'page'
-  const tones = { page: pageStatusTones, job: jobStatusTones, upload: uploadStatusTones }[kind]
-  const labels = {
-    page: ui.value.pageStatus,
-    job: ui.value.jobStatus,
-    upload: ui.value.uploadStatus,
-  }[kind]
-  return { tones, labels }
-})
+const looks = computed(() =>
+  props.kind === 'upload'
+    ? { tones: uploadStatusTones, labels: ui.value.uploadStatus }
+    : { tones: pageStatusTones, labels: ui.value.pageStatus },
+)
 const tone = computed<Tone>(
   () => (looks.value.tones as Record<string, Tone>)[props.status] ?? 'plain',
 )

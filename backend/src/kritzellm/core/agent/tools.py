@@ -13,11 +13,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from kritzellm.api.schemas.blocks import BlockKind
-from kritzellm.api.schemas.pages import PageStatus
-from kritzellm.api.schemas.search import SearchMode
 from kritzellm.config import Settings
 from kritzellm.db import models as db
+from kritzellm.domain import BlockKind, PageStatus, SearchMode
 from kritzellm.ids import SUFFIX_PATTERN, Prefix
 
 from .. import pages as pages_core

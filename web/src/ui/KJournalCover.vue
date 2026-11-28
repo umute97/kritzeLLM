@@ -15,7 +15,7 @@ const props = withDefaults(
     to?: LinkTarget
     as?: string | Component
   }>(),
-  { meta: undefined, color: 'herb', to: undefined, as: undefined },
+  { color: 'herb' },
 )
 
 const element = usePolymorphic(() => ({ as: props.as, to: props.to }))

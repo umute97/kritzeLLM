@@ -8,21 +8,18 @@ const props = withDefaults(
     max?: number
     label: string
     size?: 'lg' | 'md' | 'sm'
-    meter?: boolean
-    color?: 'accent' | 'lemon' | 'orchid'
   }>(),
-  { max: 100, size: 'md', color: 'accent' },
+  { max: 100, size: 'md' },
 )
 
 const percent = computed(() =>
   props.max > 0 ? Math.min(100, Math.max(0, (props.value / props.max) * 100)) : 0,
 )
-const fills = { accent: 'bg-accent', lemon: 'bg-lemon', orchid: 'bg-orchid' }
 </script>
 
 <template>
   <div
-    :role="meter ? 'meter' : 'progressbar'"
+    role="progressbar"
     :aria-valuemin="0"
     :aria-valuemax="max"
     :aria-valuenow="value"
@@ -34,8 +31,7 @@ const fills = { accent: 'bg-accent', lemon: 'bg-lemon', orchid: 'bg-orchid' }
   >
     <div
       :class="[
-        'h-full transition-[width] duration-300',
-        fills[color],
+        'h-full bg-accent transition-[width] duration-300',
         percent > 0 && percent < 100 && size !== 'sm' && 'border-r-[1.5px] border-ink',
       ]"
       :style="{ width: `${percent}%` }"

@@ -6,10 +6,12 @@ import { usePolymorphic, type LinkTarget } from './polymorphic'
 import { coverShape, disabledClass } from './styles'
 
 // A dashed "add one" tile that sits in a row of covers.
-const props = withDefaults(
-  defineProps<{ label: string; disabled?: boolean; to?: LinkTarget; as?: string | Component }>(),
-  { to: undefined, as: undefined },
-)
+const props = defineProps<{
+  label: string
+  disabled?: boolean
+  to?: LinkTarget
+  as?: string | Component
+}>()
 
 const element = usePolymorphic(() => ({ as: props.as, to: props.to, inactive: props.disabled }))
 </script>

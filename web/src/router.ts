@@ -2,23 +2,43 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import LibraryView from '@/views/LibraryView.vue'
 
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** Which nav link is current. */
+    room?: 'pages' | 'search' | 'chat'
+  }
+}
+
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'library', component: LibraryView },
-    { path: '/journals/:journalId', name: 'journal', component: LibraryView, props: true },
-    { path: '/search', name: 'search', component: () => import('@/views/SearchView.vue') },
+    { path: '/', name: 'library', component: LibraryView, meta: { room: 'pages' } },
+    {
+      path: '/journals/:journalId',
+      name: 'journal',
+      component: LibraryView,
+      props: true,
+      meta: { room: 'pages' },
+    },
+    {
+      path: '/search',
+      name: 'search',
+      component: () => import('@/views/SearchView.vue'),
+      meta: { room: 'search' },
+    },
     {
       path: '/chat/:conversationId?',
       name: 'chat',
       component: () => import('@/views/ChatView.vue'),
       props: true,
+      meta: { room: 'chat' },
     },
     {
       path: '/pages/:pageId',
       name: 'page',
       component: () => import('@/views/PageDetailView.vue'),
       props: true,
+      meta: { room: 'pages' },
     },
     {
       path: '/:rest(.*)*',

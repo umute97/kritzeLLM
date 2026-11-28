@@ -4,10 +4,12 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter, type LocationQuery } from 'vue-router'
 
 import { api, call } from '@/api/client'
-import type { Journal, SearchHit, SearchMode } from '@/api/types'
+import type { SearchHit, SearchMode } from '@/api/types'
 import SearchHitCard from '@/components/SearchHitCard.vue'
+import { useAction } from '@/composables/useAction'
 import { useRecentSearches } from '@/composables/useRecentSearches'
 import { toastError } from '@/utils/notify'
+import { newestWins } from '@/utils/newest'
 import { matcher, newestFirst } from '@/utils/search'
 import { useJournals } from '@/stores/journals'
 import {
@@ -102,11 +104,10 @@ const hits = ref<SearchHit[]>()
 /** What the hits on screen were found with; words about them follow it, not the form. */
 const shown = ref<Search>()
 const loading = ref(false)
-// Bumped by every search, so an answer that's been overtaken is dropped.
-let latest = 0
+const newest = newestWins()
 
 async function run() {
-  const mine = ++latest
+  const current = newest()
   const search = asked.value
   if (!search.q) {
     hits.value = shown.value = undefined
@@ -122,11 +123,11 @@ async function run() {
         params: { query: { q, mode: MODES[sort], journalId, dateFrom, dateTo, limit: LIMIT } },
       }),
     )
-    if (mine !== latest) return
+    if (!current()) return
     hits.value = result.items
     shown.value = search
   } catch (error) {
-    if (mine !== latest) return
+    if (!current()) return
     hits.value = shown.value = undefined
     toastError(error, t('search.failed'), {
       retry: run,
@@ -142,7 +143,7 @@ async function run() {
       },
     })
   } finally {
-    if (mine === latest) loading.value = false
+    if (current()) loading.value = false
   }
 }
 
@@ -153,18 +154,15 @@ watch(
   { immediate: true },
 )
 
-const journalList = ref<Journal[]>([])
-onMounted(async () => {
-  try {
-    journalList.value = await journals.all()
-  } catch (error) {
-    toastError(error, t('search.journalsFailed'))
-  }
-})
+const loadJournals = useAction(
+  () => journals.loadAll(),
+  () => ({ title: t('search.journalsFailed') }),
+)
+onMounted(() => loadJournals.run())
 
 const journalOptions = computed(() => [
   { value: '', label: t('search.allJournals') },
-  ...journalList.value.map((journal) => ({ value: journal.id, label: journal.name })),
+  ...journals.all.map((journal) => ({ value: journal.id, label: journal.name })),
 ])
 const sortOptions = computed(() =>
   SORTS.map((value) => ({ value, label: t(`search.sorts.${value}`) })),

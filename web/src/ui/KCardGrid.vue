@@ -8,15 +8,7 @@ import { coverShape } from './styles'
 
 // Journal covers or page cards, laid out like the shelf and the board. The default slot brings
 // the `<li>`s. When `empty`, the `#empty` slot takes a row as tall as a real card would.
-const props = withDefaults(
-  defineProps<{
-    kind: 'covers' | 'pages'
-    loading?: boolean
-    empty?: boolean
-    skeletons?: number
-  }>(),
-  { skeletons: 4 },
-)
+const props = defineProps<{ kind: 'covers' | 'pages'; loading?: boolean; empty?: boolean }>()
 
 const layout = computed(() =>
   props.kind === 'covers'
@@ -45,7 +37,7 @@ const layout = computed(() =>
     :aria-busy="loading ? 'true' : undefined"
   >
     <template v-if="loading">
-      <li v-for="n in skeletons" :key="n">
+      <li v-for="n in 4" :key="n">
         <KSkeleton shape="block" :class="layout.skeleton" />
       </li>
     </template>

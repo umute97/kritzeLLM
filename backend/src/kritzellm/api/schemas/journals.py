@@ -1,17 +1,26 @@
 """Journals: notebooks (or volumes) that pages belong to."""
 
+from typing import Annotated
+
 from pydantic import MISSING, Field
 
+from kritzellm.domain import JOURNAL_NAME_LENGTH
+
 from .common import NO_NUL, ApiModel, InputModel, JournalId, Timestamp
+
+DESCRIPTION_LENGTH = 2000
+
+NameInput = Annotated[str, Field(min_length=1, max_length=JOURNAL_NAME_LENGTH, pattern=NO_NUL)]
+DescriptionInput = Annotated[str, Field(max_length=DESCRIPTION_LENGTH, pattern=NO_NUL)]
 
 
 class Journal(ApiModel):
     """A notebook (or volume) of handwritten pages."""
 
     id: JournalId
-    name: str = Field(min_length=1, max_length=120)
+    name: str = Field(min_length=1, max_length=JOURNAL_NAME_LENGTH)
     """Display name."""
-    description: str | None = Field(max_length=2000)
+    description: str | None = Field(max_length=DESCRIPTION_LENGTH)
     """Optional notes about the journal."""
     page_count: int = Field(ge=0)
     """Number of pages in the journal."""
@@ -22,18 +31,18 @@ class Journal(ApiModel):
 class JournalCreate(InputModel):
     """A new journal."""
 
-    name: str = Field(min_length=1, max_length=120, pattern=NO_NUL)
+    name: NameInput
     """Display name."""
-    description: str | None = Field(default=None, max_length=2000, pattern=NO_NUL)
+    description: DescriptionInput | None = None
     """Optional notes about the journal."""
 
 
 class JournalUpdate(InputModel):
     """Changes to a journal. Only the given fields change."""
 
-    name: str | MISSING = Field(default=MISSING, min_length=1, max_length=120, pattern=NO_NUL)
+    name: NameInput | MISSING = MISSING
     """New display name."""
-    description: str | None = Field(default=None, max_length=2000, pattern=NO_NUL)
+    description: DescriptionInput | None = None
     """New notes; `null` clears them."""
 
 

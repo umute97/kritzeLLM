@@ -1,14 +1,14 @@
 """Conversations: chat threads with the journal, and their messages."""
 
-from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import ConfigDict, Field, RootModel, StringConstraints
 
-from kritzellm.ids import SUFFIX_PATTERN, Prefix
+from kritzellm.domain import CONVERSATION_CURSOR, CONVERSATION_TITLE_LENGTH, MessageRole
 
 from .common import (
     NO_NUL,
+    NON_BLANK,
     ApiModel,
     BlockId,
     ConversationId,
@@ -21,20 +21,9 @@ from .common import (
     Timestamp,
 )
 
-MAX_QUESTIONS = 20
-"""Questions one conversation takes. Every answer rereads the whole thread, so this keeps answers
-quick and cheap."""
-
-CONVERSATION_CURSOR = rf"^{Prefix.CONVERSATION}_{SUFFIX_PATTERN}\.[0-9]{{1,17}}$"
-"""A `GET /conversations` cursor: the conversation to continue after and its last activity in
-microseconds since 1970, e.g. `cnv_01k7….1764262496000000`."""
-
-
-class MessageRole(StrEnum):
-    """Who wrote a message: you (`user`) or the journal's helper (`assistant`)."""
-
-    USER = "user"
-    ASSISTANT = "assistant"
+TitleInput = Annotated[
+    str, Field(min_length=1, max_length=CONVERSATION_TITLE_LENGTH, pattern=NO_NUL)
+]
 
 
 class ToolCall(ApiModel):
@@ -80,7 +69,7 @@ class Conversation(ApiModel):
     """A chat thread with the journal."""
 
     id: ConversationId
-    title: str | None = Field(max_length=200)
+    title: str | None = Field(max_length=CONVERSATION_TITLE_LENGTH)
     """Display name; `null` until it has one."""
     created_at: Timestamp
     updated_at: Timestamp
@@ -97,25 +86,21 @@ class ConversationDetail(Conversation):
 class ConversationCreate(InputModel):
     """A new, empty conversation."""
 
-    title: str | None = Field(default=None, min_length=1, max_length=200, pattern=NO_NUL)
+    title: TitleInput | None = None
     """Display name; leave it out to name the conversation later."""
 
 
 class ConversationUpdate(InputModel):
     """Changes to a conversation. Only the given fields change."""
 
-    title: str | None = Field(default=None, min_length=1, max_length=200, pattern=NO_NUL)
+    title: TitleInput | None = None
     """New display name; `null` clears it."""
-
-
-QUESTION_TEXT = r"^[^\x00]*[^\x00\s][^\x00]*$"
-"""Any text with something besides whitespace (and no NUL characters)."""
 
 
 class Question(InputModel):
     """A question for the journal."""
 
-    content: str = Field(min_length=1, max_length=4000, pattern=QUESTION_TEXT)
+    content: str = Field(min_length=1, max_length=4000, pattern=NON_BLANK)
 
 
 class ConversationList(ApiModel):

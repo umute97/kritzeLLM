@@ -14,9 +14,9 @@ from pydantic_ai.exceptions import ModelHTTPError
 from sqlalchemy import update
 
 from kritzellm.config import Settings
-from kritzellm.core import embeddings
-from kritzellm.core.embeddings import EMBED_DIMENSIONS
+from kritzellm.core import llm
 from kritzellm.db import models as db
+from kritzellm.domain import EMBED_DIMENSIONS
 from kritzellm.main import create_app
 
 pytestmark = pytest.mark.db
@@ -65,7 +65,7 @@ class FailingModel(TestEmbeddingModel):
 def _use_model(monkeypatch: pytest.MonkeyPatch, model: TestEmbeddingModel) -> None:
     """Embeds with `model` everywhere: in the worker and in the API's thread."""
     embedder = Embedder(model, settings={"dimensions": EMBED_DIMENSIONS})
-    monkeypatch.setattr(embeddings, "_embedder", lambda name, api_key: embedder)
+    monkeypatch.setattr(llm, "_embedder", lambda name, api_key: embedder)
 
 
 @pytest.fixture

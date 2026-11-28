@@ -8,13 +8,6 @@ const pageStatus: UiMessages['pageStatus'] = {
   failed: 'Fehlgeschlagen',
 }
 
-const jobStatus: UiMessages['jobStatus'] = {
-  queued: 'Wartet',
-  running: 'Läuft',
-  succeeded: 'Fertig',
-  failed: 'Fehlgeschlagen',
-}
-
 /** The cottage library's own words in German. */
 export const uiGerman: UiMessages = {
   close: 'Schließen',
@@ -46,7 +39,6 @@ export const uiGerman: UiMessages = {
   hide: (label) => `${label} ausblenden`,
   page: (n) => `Seite ${n}`,
   block: (seq, kind) => `Block ${seq}, ${kind}`,
-  progress: (value, max) => `${value} von ${max}`,
   sending: (fileName) => `${fileName} wird gesendet`,
   moreBlocks: (n) => (n === 1 ? 'und 1 weiterer Block' : `und ${n} weitere Blöcke`),
   files: (n) => (n === 1 ? '1 Datei' : `${n} Dateien`),
@@ -57,10 +49,9 @@ export const uiGerman: UiMessages = {
     saved: 'gespeichert',
   },
   pageStatus,
-  jobStatus,
   uploadStatus: {
     sending: 'Wird gesendet',
-    queued: jobStatus.queued,
+    queued: 'Wartet',
     transcribing: pageStatus.transcribing,
     indexing: pageStatus.indexing,
     ready: pageStatus.ready,
