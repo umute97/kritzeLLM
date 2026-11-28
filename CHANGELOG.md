@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.6.0](https://github.com/umute97/kritzeLLM/compare/v0.5.1...v0.6.0) (2026-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** chunk and embed pages for search 🧩 ([#91](https://github.com/umute97/kritzeLLM/issues/91))
+
+### Features
+
+* **api:** chat agent 🧚🏽‍♀️ ([#118](https://github.com/umute97/kritzeLLM/issues/118)) ([017e9be](https://github.com/umute97/kritzeLLM/commit/017e9beb88a4578244630da597e1c1f27be27b5a))
+* **api:** chunk and embed pages for search 🧩 ([#91](https://github.com/umute97/kritzeLLM/issues/91)) ([e7f7d60](https://github.com/umute97/kritzeLLM/commit/e7f7d60cc73921435dfd95101928f70ed76ebf24))
+* **api:** conversations 💬 ([#117](https://github.com/umute97/kritzeLLM/issues/117)) ([5b02eef](https://github.com/umute97/kritzeLLM/commit/5b02eefcd09fc86c43ce37def11ece6e89ba07e0))
+* **api:** hybrid search 🔎 ([#92](https://github.com/umute97/kritzeLLM/issues/92)) ([666b738](https://github.com/umute97/kritzeLLM/commit/666b738d576250a56810df44a87fb0ecad0cb9f1))
+* **web:** chat with your journals 💖 ([#121](https://github.com/umute97/kritzeLLM/issues/121)) ([8a3371c](https://github.com/umute97/kritzeLLM/commit/8a3371c55932a8f5343cd6bc752d47cc2ac5bbc6))
+* **web:** internationalize web app 🏳️‍⚧️ ([#93](https://github.com/umute97/kritzeLLM/issues/93)) ([ad94c5f](https://github.com/umute97/kritzeLLM/commit/ad94c5f00147fc04e5c61322142ff59aa7d269a6))
+* **web:** search your journals 🔎 ([#116](https://github.com/umute97/kritzeLLM/issues/116)) ([968309f](https://github.com/umute97/kritzeLLM/commit/968309f06742f338ff9c51f066d77b85616d6b4a))
+
+
+### Bug Fixes
+
+* **web:** find the api again after it restarts 🔁 ([#120](https://github.com/umute97/kritzeLLM/issues/120)) ([54f806e](https://github.com/umute97/kritzeLLM/commit/54f806e1b6fed5b128bdb7290195faac232be8fd))
+* **web:** keep page edits safe and test the page detail view 🔍 ([#89](https://github.com/umute97/kritzeLLM/issues/89)) ([ad094e5](https://github.com/umute97/kritzeLLM/commit/ad094e522cbc296a33bdc4f89a94e513a3989686))
+
+
+### Refactoring
+
+* tidy up the backend and the web app 🧹 ([#122](https://github.com/umute97/kritzeLLM/issues/122)) ([54523f7](https://github.com/umute97/kritzeLLM/commit/54523f7c6a731da2cf0049843df394159e43fc0e))
+
 ## [0.5.1](https://github.com/umute97/kritzeLLM/compare/v0.5.0...v0.5.1) (2026-10-30)
 
 
