@@ -24,6 +24,7 @@ export interface UiMessages {
   save: string
   looksRight: string
   changedNotSaved: string
+  tabToUnreadable: string
   openPage: string
   pageWaiting: string
   pageReading: string
@@ -71,6 +72,7 @@ export const englishMessages: UiMessages = {
   save: 'Save',
   looksRight: 'Looks right',
   changedNotSaved: 'changed, not saved',
+  tabToUnreadable: 'Tab jumps to the next [?], Shift+Tab goes back',
   openPage: 'Open the page',
   pageWaiting: 'waiting…',
   pageReading: 'reading…',

@@ -29,6 +29,7 @@ export const uiGerman: UiMessages = {
   save: 'Speichern',
   looksRight: 'Passt so',
   changedNotSaved: 'geändert, nicht gespeichert',
+  tabToUnreadable: 'Tab springt zum nächsten [?], Shift+Tab zurück',
   openPage: 'Seite öffnen',
   pageWaiting: 'wartet…',
   pageReading: 'wird gelesen…',

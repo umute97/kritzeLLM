@@ -169,6 +169,8 @@ the nav when its backend exists.
 - Editing a block shows "changed, not saved" with Undo and Save (`PATCH /blocks/{id}`).
   Cmd/Ctrl+Enter saves, Escape undoes. Unsure blocks get "Looks right". An emptied block isn't
   saved, and leaving with unsaved changes asks first.
+- Tab and Shift+Tab inside a block select its next or previous `[?]`, so typing replaces it; with
+  none left that way, Tab moves on as usual. A quiet hint says so while the block has one.
 - Header: breadcrumb, page number and status, _Re-transcribe_ (`POST /pages/{id}/transcribe`),
   a page actions menu, and _Delete page_ with a confirm dialog.
 - A failed page shows a banner with its error. `KPager` moves to the neighbouring pages.
