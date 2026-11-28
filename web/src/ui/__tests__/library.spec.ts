@@ -215,4 +215,69 @@ describe('KBlockCard', () => {
     expect(wrapper.emitted('activate')).toHaveLength(1)
     expect(wrapper.emitted('deactivate')).toHaveLength(1)
   })
+
+  describe('the unreadable [?]', () => {
+    // The two [?] sit at 11–14 and 19–22.
+    const unreadable = 'Kaffee mit [?] und [?] am See'
+
+    /** Presses Tab in the box; true when the block kept the key for itself. */
+    function tab(box: HTMLTextAreaElement, init: KeyboardEventInit = {}) {
+      const event = new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, ...init })
+      box.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+    const picked = (box: HTMLTextAreaElement) => [box.selectionStart, box.selectionEnd]
+
+    it('picks each one with Tab, then lets Tab move on', () => {
+      const box = block({ modelValue: unreadable }).get('textarea').element
+      box.setSelectionRange(0, 0)
+      expect(tab(box)).toBe(true)
+      expect(picked(box)).toEqual([11, 14])
+      expect(tab(box)).toBe(true)
+      expect(picked(box)).toEqual([19, 22])
+      expect(tab(box)).toBe(false)
+    })
+
+    it('goes back with Shift+Tab', () => {
+      const box = block({ modelValue: unreadable }).get('textarea').element
+      box.setSelectionRange(unreadable.length, unreadable.length)
+      expect(tab(box, { shiftKey: true })).toBe(true)
+      expect(picked(box)).toEqual([19, 22])
+      expect(tab(box, { shiftKey: true })).toBe(true)
+      expect(picked(box)).toEqual([11, 14])
+      expect(tab(box, { shiftKey: true })).toBe(false)
+    })
+
+    it('is replaced by what is typed over it', async () => {
+      const wrapper = block({ modelValue: unreadable })
+      const textarea = wrapper.get('textarea')
+      textarea.element.setSelectionRange(0, 0)
+      tab(textarea.element)
+      textarea.element.setRangeText('Anna')
+      await textarea.trigger('input')
+      expect(wrapper.props('modelValue')).toBe('Kaffee mit Anna und [?] am See')
+    })
+
+    it('leaves Tab alone with a modifier, or when there is none', () => {
+      const box = block({ modelValue: unreadable }).get('textarea').element
+      box.setSelectionRange(0, 0)
+      expect(tab(box, { ctrlKey: true })).toBe(false)
+      expect(tab(box, { altKey: true })).toBe(false)
+      expect(tab(block().get('textarea').element)).toBe(false)
+    })
+
+    it('hints at Tab while the box is focused, and tells screen readers always', async () => {
+      const wrapper = block({ modelValue: unreadable })
+      const textarea = wrapper.get('textarea')
+      const hint = wrapper.get(`[id="${textarea.attributes('aria-describedby')}"]`)
+      expect(hint.text()).toBe('Tab jumps to the next [?], Shift+Tab goes back')
+      expect(hint.classes()).toContain('sr-only')
+      await textarea.trigger('focus')
+      expect(hint.classes()).not.toContain('sr-only')
+
+      await textarea.setValue('Kaffee mit Anna und Ben am See')
+      expect(textarea.attributes('aria-describedby')).toBeUndefined()
+      expect(wrapper.text()).not.toContain('Tab jumps')
+    })
+  })
 })

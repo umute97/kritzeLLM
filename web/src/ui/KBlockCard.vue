@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, useId } from 'vue'
 
 import KButton from './KButton.vue'
 import KFlag from './KFlag.vue'
@@ -8,7 +8,9 @@ import { focusRing } from './styles'
 import type { BlockKind } from './types'
 import { useUiMessages } from './messages'
 
-// One transcribed block, editable. Cmd/Ctrl+Enter saves, Escape undoes.
+// One transcribed block, editable. Cmd/Ctrl+Enter saves, Escape undoes, and Tab / Shift+Tab
+// select the next or previous unreadable `[?]`, so typing replaces it. With none left that way,
+// Tab moves on as usual.
 // `selected` mirrors hover/focus so the page can point at the same block elsewhere.
 const text = defineModel<string>({ required: true })
 
@@ -30,6 +32,12 @@ const emit = defineEmits<{
   deactivate: []
 }>()
 
+const UNREADABLE = '[?]'
+
+const focused = ref(false)
+const hasUnreadable = computed(() => text.value.includes(UNREADABLE))
+const hintId = useId()
+
 const rows = computed(() => {
   const min = props.kind === 'paragraph' || props.kind === 'list' ? 2 : 1
   const lines = text.value
@@ -38,8 +46,23 @@ const rows = computed(() => {
   return Math.min(10, Math.max(min, lines))
 })
 
+function selectUnreadable(event: KeyboardEvent) {
+  const box = event.target as HTMLTextAreaElement
+  const at = event.shiftKey
+    ? box.value.slice(0, box.selectionStart).lastIndexOf(UNREADABLE)
+    : box.value.indexOf(UNREADABLE, box.selectionEnd)
+  if (at === -1) return
+  event.preventDefault()
+  box.setSelectionRange(at, at + UNREADABLE.length)
+}
+
 function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && props.dirty) {
+  if (
+    event.key === 'Tab' &&
+    !(event.ctrlKey || event.altKey || event.metaKey || event.isComposing)
+  ) {
+    selectUnreadable(event)
+  } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && props.dirty) {
     event.preventDefault()
     emit('save')
   } else if (event.key === 'Escape' && props.dirty) {
@@ -87,6 +110,7 @@ const ui = useUiMessages()
       v-model="text"
       :rows="rows"
       :aria-label="ui.block(seq, ui.blockKind[kind])"
+      :aria-describedby="hasUnreadable ? hintId : undefined"
       :class="[
         'w-full resize-y rounded-field bg-paper px-3 py-2.5 leading-normal text-ink',
         focusRing,
@@ -98,6 +122,11 @@ const ui = useUiMessages()
             : 'border-[1.5px] border-edge focus:border-ink',
       ]"
       @keydown="onKeydown"
+      @focus="focused = true"
+      @blur="focused = false"
     />
+    <p v-if="hasUnreadable" :id="hintId" :class="focused ? 'm-0 text-xs text-muted' : 'sr-only'">
+      {{ ui.tabToUnreadable }}
+    </p>
   </div>
 </template>
